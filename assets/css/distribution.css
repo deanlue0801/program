@@ -336,3 +336,12 @@
     margin: 0;       /* 取消水平置中 */
     padding: 0;      /* 外部 main-content 已有 padding，這裡歸零避免雙重邊距 */
 }
+.table-container {
+    max-height: 70vh; /* 設定一個最大高度，例如螢幕高度的70% */
+    overflow-y: auto;  /* 當內容超出這個高度時，顯示垂直滾動條 */
+}
+
+/* 解決問題二：確保表格行高正常，避免被過度撐開 */
+.distribution-table tbody tr {
+    height: auto; /* 讓每一行的高度由其內容自然決定 */
+}
