@@ -421,7 +421,7 @@
                         
                         // 跳轉到主控台
                         setTimeout(() => {
-                            window.location.href = 'dashboard.html';
+                            window.location.href = '/index.html';
                         }, 2000);
                     } else {
                         console.log('⚠️ 用戶未登入');
@@ -657,7 +657,7 @@
         // 繼續使用目前帳號
         function continueWithCurrentUser() {
             showAlert('跳轉到主控台...', 'success');
-            window.location.href = 'dashboard.html';
+            window.location.href = '/index.html';
         }
 
         // 登出並顯示登入表單
