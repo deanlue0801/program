@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登入 - 專案管理系統</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 40px;
+            width: 90%;
+            max-width: 450px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            font-size: 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .logo p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-control.error {
+            border-color: #dc3545;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 15px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-outline {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .quick-login {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .quick-login h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .quick-login p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .firebase-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            font-size: 14px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #dc3545;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: #28a745;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+
+        .alert.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+            font-size: 12px;
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                margin: 20px;
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <!-- Logo 區域 -->
+        <div class="logo">
+            <h1>🏗️ 專案管理系統</h1>
+            <p>Project Management System</p>
+        </div>
+
+        <!-- Firebase 狀態 -->
+        <div class="firebase-status">
+            <div class="status-indicator" id="firebaseStatus"></div>
+            <span id="firebaseStatusText">正在連接 Firebase...</span>
+        </div>
+
+        <!-- 目前登入用戶資訊 -->
+        <div id="currentUserInfo" style="display: none; background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 10px; padding: 20px; margin-bottom: 20px; text-align: center;">
+            <h4 style="color: #0056b3; margin-bottom: 10px;">🔐 檢測到已登入用戶</h4>
+            <p style="margin-bottom: 15px;">
+                目前登入帳號：<strong id="currentUserEmail"></strong>
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button onclick="continueWithCurrentUser()" class="btn btn-primary">繼續使用此帳號</button>
+                <button onclick="logoutAndShowLogin()" class="btn btn-secondary">切換帳號</button>
+            </div>
+        </div>
+
+        <!-- 載入指示器 -->
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>處理中...</p>
+        </div>
+
+        <!-- 標籤切換 -->
+        <div class="tabs" id="tabs">
+            <button class="tab-btn active" onclick="switchTab('login')" id="loginTab">登入</button>
+            <button class="tab-btn" onclick="switchTab('register')" id="registerTab">註冊</button>
+        </div>
+
+        <!-- 提示訊息 -->
+        <div id="alert" class="alert"></div>
+
+        <!-- 登入表單 -->
+        <div id="loginForm" class="tab-content active">
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="loginEmail">電子郵件</label>
+                    <input type="email" id="loginEmail" class="form-control" placeholder="請輸入電子郵件" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">密碼</label>
+                    <input type="password" id="loginPassword" class="form-control" placeholder="請輸入密碼" required>
+                </div>
+                <button type="submit" class="btn btn-primary">登入</button>
+            </form>
+        </div>
+
+        <!-- 註冊表單 -->
+        <div id="registerForm" class="tab-content">
+            <form onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label for="registerEmail">電子郵件</label>
+                    <input type="email" id="registerEmail" class="form-control" placeholder="請輸入電子郵件" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">密碼</label>
+                    <input type="password" id="registerPassword" class="form-control" placeholder="請輸入密碼（至少6位）" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">確認密碼</label>
+                    <input type="password" id="confirmPassword" class="form-control" placeholder="請再次輸入密碼" required>
+                </div>
+                <button type="submit" class="btn btn-primary">註冊</button>
+            </form>
+        </div>
+
+        <!-- 快速測試登入 -->
+        <div class="quick-login">
+            <h4>🚀 快速測試</h4>
+            <p>使用測試帳號快速體驗系統</p>
+            <button onclick="quickLogin()" class="btn btn-outline">測試登入</button>
+        </div>
+
+        <div class="footer">
+            <p>© 2024 專案管理系統 - Powered by Firebase</p>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // Firebase 配置
+        const firebaseConfig = {
+            apiKey: "AIzaSyDV26PsFl_nH9SkfQAYgbCPjbanDluFrvo",
+            authDomain: "project-management-syste-4c9ce.firebaseapp.com",
+            projectId: "project-management-syste-4c9ce",
+            storageBucket: "project-management-syste-4c9ce.firebasestorage.app",
+            messagingSenderId: "153223609209",
+            appId: "1:153223609209:web:f4504f7ac52fc76b910da8",
+            measurementId: "G-P57N5Y5BE2"
+        };
+
+        // 全局變數
+        let app, auth, db;
+
+        // 初始化 Firebase
+        async function initFirebase() {
+            try {
+                console.log('🔥 初始化 Firebase...');
+                
+                app = firebase.initializeApp(firebaseConfig);
+                auth = firebase.auth();
+                db = firebase.firestore();
+
+                showFirebaseStatus(true, 'Firebase 連接成功');
+
+                // 監聽認證狀態
+                auth.onAuthStateChanged((user) => {
+                    if (user) {
+                        console.log('✅ 用戶已登入:', user.email);
+                        showAlert(`檢測到已登入用戶：${user.email}，正在跳轉...`, 'success');
+                        
+                        // 顯示目前登入的用戶資訊
+                        showCurrentUserInfo(user);
+                        
+                        // 跳轉到主控台
+                        setTimeout(() => {
+                            window.location.href = 'dashboard.html';
+                        }, 2000);
+                    } else {
+                        console.log('⚠️ 用戶未登入');
+                        hideLoading();
+                        hideCurrentUserInfo();
+                    }
+                });
+
+                console.log('✅ Firebase 初始化完成');
+                
+            } catch (error) {
+                console.error('❌ Firebase 初始化失敗:', error);
+                showFirebaseStatus(false, 'Firebase 連接失敗');
+                showAlert('Firebase 連接失敗，請檢查網路連接', 'error');
+            }
+        }
+
+        // 顯示 Firebase 狀態
+        function showFirebaseStatus(connected, message) {
+            const indicator = document.getElementById('firebaseStatus');
+            const text = document.getElementById('firebaseStatusText');
+            
+            if (indicator) {
+                indicator.className = `status-indicator ${connected ? 'connected' : ''}`;
+            }
+            if (text) {
+                text.textContent = message;
+            }
+        }
+
+        // 切換標籤
+        function switchTab(tab) {
+            const loginTab = document.getElementById('loginTab');
+            const registerTab = document.getElementById('registerTab');
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+
+            // 移除所有 active 類別
+            loginTab.classList.remove('active');
+            registerTab.classList.remove('active');
+            loginForm.classList.remove('active');
+            registerForm.classList.remove('active');
+
+            // 添加 active 到選中的標籤
+            if (tab === 'login') {
+                loginTab.classList.add('active');
+                loginForm.classList.add('active');
+            } else {
+                registerTab.classList.add('active');
+                registerForm.classList.add('active');
+            }
+
+            // 清除提示訊息
+            hideAlert();
+        }
+
+        // 處理登入
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+
+            if (!email || !password) {
+                showAlert('請填寫完整資訊', 'error');
+                return;
+            }
+
+            showLoading();
+            hideAlert();
+
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                // 成功後會自動觸發 onAuthStateChanged
+            } catch (error) {
+                console.error('❌ 登入失敗:', error);
+                hideLoading();
+                
+                let message = '登入失敗';
+                switch (error.code) {
+                    case 'auth/user-not-found':
+                        message = '找不到此用戶，請先註冊或檢查電子郵件';
+                        break;
+                    case 'auth/wrong-password':
+                        message = '密碼錯誤，請重新輸入';
+                        break;
+                    case 'auth/invalid-email':
+                        message = '電子郵件格式不正確';
+                        break;
+                    case 'auth/too-many-requests':
+                        message = '嘗試次數過多，請稍後再試';
+                        break;
+                    default:
+                        message = error.message;
+                }
+                
+                showAlert(message, 'error');
+            }
+        }
+
+        // 處理註冊
+        async function handleRegister(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('registerEmail').value.trim();
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (!email || !password || !confirmPassword) {
+                showAlert('請填寫完整資訊', 'error');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                showAlert('兩次密碼輸入不一致', 'error');
+                return;
+            }
+
+            if (password.length < 6) {
+                showAlert('密碼至少需要6位數', 'error');
+                return;
+            }
+
+            showLoading();
+            hideAlert();
+
+            try {
+                await auth.createUserWithEmailAndPassword(email, password);
+                // 成功後會自動觸發 onAuthStateChanged
+            } catch (error) {
+                console.error('❌ 註冊失敗:', error);
+                hideLoading();
+                
+                let message = '註冊失敗';
+                switch (error.code) {
+                    case 'auth/email-already-in-use':
+                        message = '此電子郵件已被使用，請使用其他郵件或嘗試登入';
+                        break;
+                    case 'auth/invalid-email':
+                        message = '電子郵件格式不正確';
+                        break;
+                    case 'auth/weak-password':
+                        message = '密碼強度不足，請使用更複雜的密碼';
+                        break;
+                    default:
+                        message = error.message;
+                }
+                
+                showAlert(message, 'error');
+            }
+        }
+
+        // 快速測試登入
+        async function quickLogin() {
+            showLoading();
+            hideAlert();
+
+            try {
+                // 先嘗試登入測試帳號
+                try {
+                    await auth.signInWithEmailAndPassword('test@example.com', 'test123456');
+                    showAlert('測試帳號登入成功！', 'success');
+                } catch (loginError) {
+                    if (loginError.code === 'auth/user-not-found') {
+                        // 如果測試帳號不存在，就建立一個
+                        showAlert('建立測試帳號中...', 'info');
+                        await auth.createUserWithEmailAndPassword('test@example.com', 'test123456');
+                        showAlert('測試帳號建立並登入成功！', 'success');
+                    } else {
+                        throw loginError;
+                    }
+                }
+            } catch (error) {
+                console.error('❌ 快速登入失敗:', error);
+                hideLoading();
+                showAlert('快速登入失敗: ' + error.message, 'error');
+            }
+        }
+
+        // 顯示載入狀態
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('tabs').style.display = 'none';
+            
+            // 禁用所有按鈕
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(btn => btn.disabled = true);
+        }
+
+        // 隱藏載入狀態
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('tabs').style.display = 'flex';
+            
+            // 啟用所有按鈕
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(btn => btn.disabled = false);
+        }
+
+        // 顯示提示訊息
+        function showAlert(message, type = 'info') {
+            const alert = document.getElementById('alert');
+            alert.textContent = message;
+            alert.className = `alert ${type}`;
+            alert.style.display = 'block';
+            
+            // 自動隱藏成功訊息
+            if (type === 'success') {
+                setTimeout(() => {
+                    hideAlert();
+                }, 3000);
+            }
+        }
+
+        // 顯示目前登入用戶資訊
+        function showCurrentUserInfo(user) {
+            document.getElementById('currentUserInfo').style.display = 'block';
+            document.getElementById('currentUserEmail').textContent = user.email;
+            document.getElementById('tabs').style.display = 'none';
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'none';
+            document.querySelector('.quick-login').style.display = 'none';
+        }
+
+        // 隱藏目前登入用戶資訊
+        function hideCurrentUserInfo() {
+            document.getElementById('currentUserInfo').style.display = 'none';
+            document.getElementById('tabs').style.display = 'flex';
+            document.getElementById('loginForm').style.display = 'block';
+            document.querySelector('.quick-login').style.display = 'block';
+        }
+
+        // 繼續使用目前帳號
+        function continueWithCurrentUser() {
+            showAlert('跳轉到主控台...', 'success');
+            window.location.href = 'dashboard.html';
+        }
+
+        // 登出並顯示登入表單
+        async function logoutAndShowLogin() {
+            try {
+                showAlert('正在登出...', 'info');
+                await auth.signOut();
+                hideCurrentUserInfo();
+                showAlert('已登出，請重新登入', 'success');
+            } catch (error) {
+                console.error('❌ 登出失敗:', error);
+                showAlert('登出失敗: ' + error.message, 'error');
+            }
+        }
+        function hideAlert() {
+            const alert = document.getElementById('alert');
+            alert.style.display = 'none';
+        }
+
+        // 頁面載入完成後初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initFirebase();
+        });
+
+        // 檢查是否已經登入
+        window.addEventListener('load', () => {
+            // 如果已經有認證狀態，Firebase 會自動觸發 onAuthStateChanged
+        });
+    </script>
+</body>
+</html>
