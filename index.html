@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>專案管理系統</title>
+    <link rel="stylesheet" href="assets/css/layout.css">
+    <link rel="stylesheet" href="assets/css/dashboard.css">
+    <link rel="stylesheet" href="assets/css/detail.css">
+    <link rel="stylesheet" href="assets/css/import.css">
+    </head>
+<body>
+    <div class="app-layout">
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h3>🏗️ 專案管理</h3>
+            </div>
+            <ul class="nav-list">
+                <li><a href="/dashboard.html" data-route>📊 儀表板</a></li>
+                <li>
+                    <a href="/tenders/list.html" data-route>📋 標單管理</a>
+                    <ul class="sub-nav">
+                        <li><a href="/tenders/distribution.html" data-route>🏢 分配管理</a></li>
+                        <li><a href="/tenders/import.html" data-route>📥 匯入細項</a></li>
+                    </ul>
+                </li>
+                </ul>
+            <div class="sidebar-footer">
+                <span id="currentUser"></span>
+                <button onclick="logout()">登出</button>
+            </div>
+        </nav>
+
+        <main class="main-content" id="app-content">
+            </main>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+
+    <script src="assets/js/firebase-config.js"></script> 
+    <script src="assets/js/router.js"></script>
+
+    <script src="assets/js/dashboard.js"></script>
+    <script src="assets/js/tenders-list.js"></script> 
+    <script src="assets/js/tenders-detail.js"></script>
+    <script src="assets/js/tenders-distribution.js"></script>
+    <script src="assets/js/tenders-import.js"></script>
+</body>
+</html>

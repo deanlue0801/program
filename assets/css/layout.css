@@ -1,0 +1,129 @@
+/* --- 全局與基礎樣式 --- */
+:root {
+    --sidebar-bg: #2c3e50; /* 側邊欄背景色 */
+    --sidebar-text: #ecf0f1; /* 側邊欄文字顏色 */
+    --sidebar-active-bg: #34495e; /* 當前選項背景色 */
+    --sidebar-active-border: #3498db; /* 當前選項左側邊框色 */
+    --main-bg: #f4f7f6; /* 主要內容區背景色 */
+    --header-bg: #ffffff; /* 內容區塊卡片背景色 */
+    --text-primary: #333333;
+    --text-secondary: #666666;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body, html {
+    font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif;
+    background-color: var(--main-bg);
+    height: 100%;
+}
+
+/* --- App 主佈局 --- */
+.app-layout {
+    display: flex;
+    height: 100vh;
+}
+
+/* --- 側邊導覽列 (Sidebar) --- */
+.sidebar {
+    width: 240px;
+    background-color: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    transition: transform 0.3s ease-in-out;
+    z-index: 1000;
+}
+
+.sidebar-header {
+    padding: 20px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-header h3 {
+    font-size: 22px;
+}
+
+.nav-list {
+    list-style-type: none;
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.nav-list li a {
+    display: block;
+    color: var(--sidebar-text);
+    text-decoration: none;
+    padding: 15px 20px;
+    transition: background-color 0.2s ease, padding-left 0.2s ease;
+    border-left: 4px solid transparent;
+}
+
+.nav-list li a:hover {
+    background-color: var(--sidebar-active-bg);
+    padding-left: 25px;
+}
+
+.nav-list li a.active {
+    background-color: var(--sidebar-active-bg);
+    border-left-color: var(--sidebar-active-border);
+    font-weight: bold;
+}
+
+/* 子選單樣式 */
+.sub-nav {
+    list-style-type: none;
+    background-color: rgba(0, 0, 0, 0.2);
+    padding-left: 15px;
+}
+
+.sub-nav li a {
+    padding-left: 30px;
+    font-size: 14px;
+}
+
+.sub-nav li a:hover {
+    padding-left: 35px;
+}
+
+.sidebar-footer {
+    padding: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 14px;
+}
+
+/* --- 主要內容區 (Main Content) --- */
+.main-content {
+    flex-grow: 1;
+    margin-left: 240px; /* 側邊欄寬度 */
+    padding: 25px;
+    overflow-y: auto;
+    transition: margin-left 0.3s ease-in-out;
+}
+
+/* --- 響應式設計 (Responsive Web Design) --- */
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%); /* 在小螢幕上預設隱藏 */
+        width: 260px; /* 在手機上可以稍微寬一點 */
+    }
+
+    .sidebar.open {
+        transform: translateX(0); /* 未來用 JS 加入 .open class 來顯示 */
+    }
+
+    .main-content {
+        margin-left: 0; /* 主要內容區佔滿整個寬度 */
+    }
+    
+    /* 未來您可以新增一個漢堡選單按鈕來控制 .sidebar.open */
+}

@@ -1,0 +1,73 @@
+<div class="content-card">
+    <h1 class="page-title">📊 EXCEL 匯入</h1>
+    <p class="page-subtitle">智能解析 EXCEL 檔案，確保項目對應關係正確</p>
+
+    <div class="steps-indicator">
+        <div class="step active" id="step1"><span>1. 上傳檔案</span></div>
+        <div class="step inactive" id="step2"><span>2. 智能解析</span></div>
+        <div class="step inactive" id="step3"><span>3. 驗證修正</span></div>
+        <div class="step inactive" id="step4"><span>4. 確認匯入</span></div>
+    </div>
+
+    <div id="uploadSection">
+        <div class="upload-area" id="uploadArea">
+            <div style="font-size: 48px; color: #667eea; margin-bottom: 15px;">📤</div>
+            <div style="font-size: 16px; color: #495057; margin-bottom: 10px; font-weight: 500;">點擊選擇檔案或拖放檔案到此處</div>
+            <div style="font-size: 14px; color: #6c757d;">支援 .xls, .xlsx 格式，檔案大小限制 10MB</div>
+        </div>
+        <input type="file" id="fileInput" style="display: none;" accept=".xls,.xlsx">
+    </div>
+
+    <div id="parseSection" style="display: none;">
+        <h3>解析設定</h3>
+        <div class="form-group"><label for="worksheetSelect">選擇工作表</label><select id="worksheetSelect" class="form-control"></select></div>
+        <div class="form-group"><label for="startRow">資料起始列</label><input type="number" id="startRow" class="form-control" value="1" min="1"></div>
+        <div class="form-group">
+            <label>大項目識別規則</label>
+            <div style="display: flex; gap: 15px; margin-top: 8px;">
+                <label><input type="checkbox" id="ruleChineseNumber" checked> 中文數字 (一、二...)</label>
+                <label><input type="checkbox" id="ruleRomanNumber"> 羅馬數字 (I、II...)</label>
+                <label><input type="checkbox" id="ruleCustomPattern"> 自定義模式</label>
+            </div>
+        </div>
+        <div class="form-group" id="customPatternGroup" style="display: none;"><label for="customPattern">自定義模式 (正則表達式)</label><input type="text" id="customPattern" class="form-control" placeholder="例：^第.*章$"></div>
+        <button class="btn btn-primary" onclick="window.exposedImportFuncs.parseExcel()">開始解析</button>
+    </div>
+
+    <div id="previewSection" style="display: none;">
+        <h3>解析結果預覽</h3>
+        <div class="summary-grid">
+            <div class="summary-card"><div class="summary-value" id="summaryTotal">0</div><div class="summary-label">總行數</div></div>
+            <div class="summary-card"><div class="summary-value" id="summaryMajor">0</div><div class="summary-label">大項目</div></div>
+            <div class="summary-card"><div class="summary-value" id="summaryDetail">0</div><div class="summary-label">細項</div></div>
+            <div class="summary-card"><div class="summary-value" id="summaryAmount">$0</div><div class="summary-label">總金額</div></div>
+        </div>
+        <div class="correction-tools">
+            <h4>修正工具</h4>
+            <div class="correction-row">
+                <button class="btn btn-warning btn-sm" onclick="window.exposedImportFuncs.autoDetectMajorItems()">自動重新識別大項目</button>
+                <button class="btn btn-secondary btn-sm" onclick="window.exposedImportFuncs.clearAllClassifications()">清除所有分類</button>
+            </div>
+            <div class="correction-row"><span>手動修正：點擊表格中的項目類型標籤可以切換分類</span></div>
+        </div>
+        <div class="preview-table"><table id="previewTable"><thead></thead><tbody></tbody></table></div>
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="btn btn-secondary" onclick="window.exposedImportFuncs.backToUpload()">重新上傳</button>
+            <button class="btn btn-success" onclick="window.exposedImportFuncs.proceedToImport()">確認無誤，進行匯入</button>
+        </div>
+    </div>
+
+    <div id="importSection" style="display: none;">
+        <h3>匯入設定</h3>
+        <div class="form-group"><label for="projectSelectForImport">選擇專案 <span style="color: #dc3545;">*</span></label><select id="projectSelectForImport" class="form-control" required></select></div>
+        <div class="form-group"><label for="tenderName">標單名稱 <span style="color: #dc3545;">*</span></label><input type="text" id="tenderName" class="form-control" required></div>
+        <div class="form-group"><label for="contractorName">承包商名稱</label><input type="text" id="contractorName" class="form-control" placeholder="可選填"></div>
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="btn btn-secondary" onclick="window.exposedImportFuncs.backToPreview()">返回預覽</button>
+            <button class="btn btn-primary" onclick="window.exposedImportFuncs.executeImport()">執行匯入</button>
+        </div>
+    </div>
+
+    <div id="loadingSection" class="loading"><div class="spinner"></div><p id="loadingText">處理中...</p></div>
+    <div id="alertMessage" class="alert"></div>
+</div>

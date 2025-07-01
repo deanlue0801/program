@@ -1,0 +1,70 @@
+<div class="loading" id="loading" style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 4rem;">
+    <div class="spinner"></div>
+    <p style="margin-top: 1rem; font-size: 1rem; color: #666;">載入主控台資料中...</p>
+</div>
+
+<div id="mainContent" style="display: none;">
+    <div class="welcome-section">
+        <h1>歡迎回來！</h1>
+        <p>這裡是您的專案管理主控台，可以快速查看專案狀態和執行各種操作。</p>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stats-card">
+            <div class="stats-icon">📂</div>
+            <div class="stats-value" id="projectCount">-</div>
+            <div class="stats-label">進行中專案</div>
+            <div class="stats-change positive" id="projectChange">載入中...</div>
+        </div>
+        <div class="stats-card">
+            <div class="stats-icon">📋</div>
+            <div class="stats-value" id="tenderCount">-</div>
+            <div class="stats-label">標單總數</div>
+            <div class="stats-change positive" id="tenderChange">載入中...</div>
+        </div>
+        <div class="stats-card">
+            <div class="stats-icon">💰</div>
+            <div class="stats-value" id="totalAmount">-</div>
+            <div class="stats-label">總金額</div>
+            <div class="stats-change positive" id="amountChange">載入中...</div>
+        </div>
+        <div class="stats-card">
+            <div class="stats-icon">⏱️</div>
+            <div class="stats-value" id="lastUpdate">-</div>
+            <div class="stats-label">最後更新</div>
+            <div class="stats-change" id="updateTime">載入中...</div>
+        </div>
+    </div>
+
+    <div class="quick-actions">
+        <h2>🚀 快速操作</h2>
+        <div class="actions-grid">
+            <a href="/projects/create.html" data-route class="action-card">
+                <span class="action-icon">➕</span>
+                <div class="action-title">建立專案</div>
+                <div class="action-desc">建立新的建設專案</div>
+            </a>
+            <a href="/tenders/import.html" data-route class="action-card">
+                <span class="action-icon">📊</span>
+                <div class="action-title">匯入標單</div>
+                <div class="action-desc">從EXCEL匯入標單資料</div>
+            </a>
+            <a href="/tenders/list.html" data-route class="action-card">
+                <span class="action-icon">📋</span>
+                <div class="action-title">標單管理</div>
+                <div class="action-desc">查看和管理所有標單</div>
+            </a>
+            <a href="/reports/summary.html" data-route class="action-card">
+                <span class="action-icon">📈</span>
+                <div class="action-title">產生報表</div>
+                <div class="action-desc">查看專案統計報表</div>
+            </a>
+        </div>
+    </div>
+
+    <div class="recent-activity">
+        <h2>📝 最近活動</h2>
+        <ul class="activity-list" id="activityList">
+            </ul>
+    </div>
+</div>

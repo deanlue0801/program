@@ -1,0 +1,90 @@
+<div class="content-card">
+    <div class="page-header">
+        <h1 class="page-title">📋 標單管理</h1>
+        <div>
+            <a href="/tenders/import.html" data-route class="btn btn-success">📊 EXCEL匯入</a>
+            <a href="/tenders/create.html" data-route class="btn btn-primary">➕ 建立標單</a>
+        </div>
+    </div>
+
+    <div class="loading" id="loading" style="display: flex;">
+        <div class="spinner"></div>
+        <p>載入標單資料中...</p>
+    </div>
+
+    <div id="mainContent" style="display: none;">
+        <div class="filter-section">
+            <div class="filter-row">
+                <div class="form-group">
+                    <label for="projectFilter">專案篩選</label>
+                    <select id="projectFilter" class="form-control" onchange="window.exposedListFuncs.applyFilters()">
+                        <option value="">所有專案</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="statusFilter">狀態篩選</label>
+                    <select id="statusFilter" class="form-control" onchange="window.exposedListFuncs.applyFilters()">
+                        <option value="">所有狀態</option>
+                        <option value="planning">規劃中</option>
+                        <option value="active">進行中</option>
+                        <option value="completed">已完成</option>
+                        <option value="paused">暫停</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="searchInput">搜尋標單</label>
+                    <input type="text" id="searchInput" class="form-control" placeholder="輸入標單名稱或編號" oninput="window.exposedListFuncs.applyFilters()">
+                </div>
+                <div class="form-group">
+                    <button class="btn btn-secondary" onclick="window.exposedListFuncs.clearFilters()">清除篩選</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="summary-cards">
+            <div class="summary-card">
+                <div class="summary-value" id="totalTenders">0</div>
+                <div class="summary-label">標單總數</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="totalAmount">$0</div>
+                <div class="summary-label">總金額</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="activeTenders">0</div>
+                <div class="summary-label">進行中</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="completedTenders">0</div>
+                <div class="summary-label">已完成</div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>標單名稱</th>
+                        <th>標單編號</th>
+                        <th>所屬專案</th>
+                        <th>總金額</th>
+                        <th>狀態</th>
+                        <th>建立時間</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="tendersTableBody">
+                    </tbody>
+            </table>
+        </div>
+
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <div class="empty-state-icon">📋</div>
+            <h3>暫無標單資料</h3>
+            <p>您還沒有建立任何標單，開始建立您的第一個標單吧！</p>
+            <br>
+            <a href="/tenders/import.html" data-route class="btn btn-success">📊 匯入EXCEL標單</a>
+            <a href="/tenders/create.html" data-route class="btn btn-primary">➕ 建立新標單</a>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>標單管理 - 專案管理系統</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* 頂部導航 */
+        .top-nav {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 15px 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .breadcrumb a {
+            color: #667eea;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .breadcrumb a:hover {
+            color: #764ba2;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logout-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        /* 主要內容 */
+        .content-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .page-subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .form-section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .required {
+            color: #dc3545;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: #fff;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-control:disabled {
+            background: #f8f9fa;
+            color: #6c757d;
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 120px;
+            justify-content: center;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .info-row:last-child {
+            margin-bottom: 0;
+        }
+
+        /* 響應式設計 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .top-nav {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 頂部導航 -->
+        <nav class="top-nav">
+            <div class="breadcrumb">
+                <a href="javascript:void(0)" onclick="goToDashboard()">🏠 首頁</a>
+                <span>/</span>
+                <a href="list.html">標單管理</a>
+                <span>/</span>
+                <span id="breadcrumbMode">標單管理</span>
+            </div>
+            <div class="user-info">
+                <span id="currentUser">載入中...</span>
+                <button class="logout-btn" onclick="logout()">登出</button>
+            </div>
+        </nav>
+
+        <!-- 載入指示器 -->
+        <div id="loadingContainer" class="content-card loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>載入中...</p>
+        </div>
+
+        <!-- 主要內容 -->
+        <div class="content-card" id="mainContainer">
+            <h1 class="page-title" id="pageTitle">
+                ➕ 新增標單
+            </h1>
+            <p class="page-subtitle" id="pageSubtitle">建立新的標單資料，設定基本資訊和專案關聯</p>
+
+            <!-- 標單資訊卡片 (編輯模式顯示) -->
+            <div class="info-card" id="tenderInfoCard" style="display: none;">
+                <div class="info-row">
+                    <span><strong>標單編號：</strong></span>
+                    <span id="displayTenderCode"></span>
+                </div>
+                <div class="info-row">
+                    <span><strong>建立者：</strong></span>
+                    <span id="displayCreatedBy"></span>
+                </div>
+                <div class="info-row">
+                    <span><strong>建立時間：</strong></span>
+                    <span id="displayCreatedAt"></span>
+                </div>
+                <div class="info-row">
+                    <span><strong>最後更新：</strong></span>
+                    <span id="displayUpdatedAt"></span>
+                </div>
+            </div>
+
+            <div id="alertMessage" class="alert"></div>
+
+            <form id="tenderForm">
+                <!-- 基本資訊 -->
+                <div class="form-section">
+                    <h3 class="section-title">📋 基本資訊</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="projectId">所屬專案 <span class="required">*</span></label>
+                            <select id="projectId" class="form-control" required>
+                                <option value="">請選擇專案</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="tenderCode">標單編號</label>
+                            <input type="text" id="tenderCode" class="form-control" placeholder="自動生成" disabled>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="tenderName">標單名稱 <span class="required">*</span></label>
+                        <input type="text" id="tenderName" class="form-control" placeholder="請輸入標單名稱" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="description">標單描述</label>
+                        <textarea id="description" class="form-control" placeholder="請輸入標單詳細描述..."></textarea>
+                    </div>
+                </div>
+
+                <!-- 承包商資訊 -->
+                <div class="form-section">
+                    <h3 class="section-title">🏢 承包商資訊</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="contractorName">承包商名稱</label>
+                            <input type="text" id="contractorName" class="form-control" placeholder="請輸入承包商名稱">
+                        </div>
+                        <div class="form-group">
+                            <label for="contractorContact">聯絡方式</label>
+                            <input type="text" id="contractorContact" class="form-control" placeholder="電話或Email">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 時程規劃 -->
+                <div class="form-section">
+                    <h3 class="section-title">📅 時程規劃</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="startDate">開始日期</label>
+                            <input type="date" id="startDate" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="endDate">結束日期</label>
+                            <input type="date" id="endDate" class="form-control">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 金額資訊 -->
+                <div class="form-section">
+                    <h3 class="section-title">💰 金額資訊</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="amount">標單金額</label>
+                            <input type="number" id="amount" class="form-control" placeholder="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="tax">營業稅</label>
+                            <input type="number" id="tax" class="form-control" placeholder="0" min="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="totalAmount">總金額</label>
+                        <input type="number" id="totalAmount" class="form-control" placeholder="0" min="0" disabled>
+                    </div>
+                </div>
+
+                <!-- 其他資訊 -->
+                <div class="form-section">
+                    <h3 class="section-title">📝 其他資訊</h3>
+                    <div class="form-group">
+                        <label for="status">標單狀態</label>
+                        <select id="status" class="form-control">
+                            <option value="planning">規劃中</option>
+                            <option value="bidding">招標中</option>
+                            <option value="awarded">得標</option>
+                            <option value="active">進行中</option>
+                            <option value="completed">已完成</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">備註</label>
+                        <textarea id="notes" class="form-control" placeholder="其他備註資訊..."></textarea>
+                    </div>
+                </div>
+
+                <!-- 按鈕區 -->
+                <div class="button-group">
+                    <button type="button" class="btn btn-secondary" onclick="goBack()">
+                        ← 返回
+                    </button>
+                    <button type="button" class="btn btn-danger" id="deleteBtn" onclick="deleteTender()" style="display: none;">
+                        🗑️ 刪除標單
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        💾 儲存標單
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // Firebase 配置
+        const firebaseConfig = {
+            apiKey: "AIzaSyDV26PsFl_nH9SkfQAYgbCPjbanDluFrvo",
+            authDomain: "project-management-syste-4c9ce.firebaseapp.com",
+            projectId: "project-management-syste-4c9ce",
+            storageBucket: "project-management-syste-4c9ce.firebasestorage.app",
+            messagingSenderId: "153223609209",
+            appId: "1:153223609209:web:f4504f7ac52fc76b910da8",
+            measurementId: "G-P57N5Y5BE2"
+        };
+
+        // 全局變數
+        let app, auth, db, currentUser;
+        let allProjects = [];
+        let isEditMode = false;
+        let editTenderId = null;
+        let currentTender = null;
+
+        // 初始化應用
+        async function initApp() {
+            try {
+                console.log('🚀 初始化標單管理頁面...');
+                
+                // 初始化 Firebase
+                app = firebase.initializeApp(firebaseConfig);
+                auth = firebase.auth();
+                db = firebase.firestore();
+
+                // 監聽認證狀態
+                auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        currentUser = user;
+                        updateUserInfo();
+                        
+                        // 檢查是否為編輯模式
+                        checkEditMode();
+                        
+                        // 載入專案清單
+                        await loadProjects();
+                        
+                        // 如果是編輯模式，載入標單資料
+                        if (isEditMode) {
+                            await loadTenderForEdit();
+                        } else {
+                            generateTenderCode();
+                        }
+                        
+                        setupEventListeners();
+                        
+                    } else {
+                        window.location.href = '../login_page.html';
+                    }
+                });
+
+            } catch (error) {
+                console.error('❌ 初始化失敗:', error);
+                showAlert('系統初始化失敗，請重新整理頁面', 'error');
+            }
+        }
+
+        // 更新用戶資訊
+        function updateUserInfo() {
+            if (currentUser) {
+                document.getElementById('currentUser').textContent = `👤 ${currentUser.email}`;
+            }
+        }
+
+        // 檢查編輯模式
+        function checkEditMode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            editTenderId = urlParams.get('edit');
+            
+            if (editTenderId) {
+                isEditMode = true;
+                document.getElementById('pageTitle').innerHTML = '✏️ 編輯標單';
+                document.getElementById('pageSubtitle').textContent = '修改標單資訊';
+                document.getElementById('breadcrumbMode').textContent = '編輯標單';
+                document.getElementById('submitBtn').innerHTML = '💾 更新標單';
+                document.getElementById('deleteBtn').style.display = 'inline-flex';
+                document.getElementById('tenderInfoCard').style.display = 'block';
+            }
+        }
+
+        // 載入專案清單
+        async function loadProjects() {
+            try {
+                console.log('📊 載入專案清單...');
+                
+                let projectsSnap;
+                try {
+                    // 嘗試使用服務器端排序
+                    projectsSnap = await db.collection('projects')
+                        .where('createdBy', '==', currentUser.email)
+                        .orderBy('name', 'asc')
+                        .get();
+                    console.log('✅ 專案載入成功 (服務器端排序)');
+                } catch (indexError) {
+                    console.warn('⚠️ 複合索引問題，切換到客戶端排序:', indexError.message);
+                    // 備用方案：客戶端排序
+                    projectsSnap = await db.collection('projects')
+                        .where('createdBy', '==', currentUser.email)
+                        .get();
+                    console.log('✅ 專案載入成功 (客戶端排序)');
+                }
+
+                allProjects = [];
+                projectsSnap.forEach(doc => {
+                    allProjects.push({ id: doc.id, ...doc.data() });
+                });
+
+                // 客戶端排序（確保始終有序）
+                allProjects.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+                console.log(`✅ 載入了 ${allProjects.length} 個專案`);
+                updateProjectOptions();
+
+            } catch (error) {
+                console.error('❌ 載入專案失敗:', error);
+                showAlert('載入專案清單失敗', 'error');
+            }
+        }
+
+        // 更新專案選項
+        function updateProjectOptions() {
+            const projectSelect = document.getElementById('projectId');
+            projectSelect.innerHTML = '<option value="">請選擇專案</option>';
+            
+            allProjects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = `${project.name} (${project.code || 'N/A'})`;
+                projectSelect.appendChild(option);
+            });
+        }
+
+        // 載入標單資料 (編輯模式)
+        async function loadTenderForEdit() {
+            try {
+                showLoading(true);
+                console.log('📊 載入標單資料...', editTenderId);
+                
+                const doc = await db.collection('tenders').doc(editTenderId).get();
+                
+                if (!doc.exists) {
+                    showAlert('找不到指定的標單', 'error');
+                    setTimeout(() => {
+                        window.location.href = 'list.html';
+                    }, 2000);
+                    return;
+                }
+                
+                currentTender = { id: doc.id, ...doc.data() };
+                console.log('✅ 標單資料載入成功:', currentTender);
+                
+                fillFormWithTender(currentTender);
+                showLoading(false);
+                
+            } catch (error) {
+                console.error('❌ 載入標單資料失敗:', error);
+                showAlert('載入標單資料失敗: ' + error.message, 'error');
+                showLoading(false);
+            }
+        }
+
+        // 填入標單資料到表單
+        function fillFormWithTender(tender) {
+            // 基本資訊
+            document.getElementById('projectId').value = tender.projectId || '';
+            document.getElementById('tenderCode').value = tender.code || '';
+            document.getElementById('tenderName').value = tender.name || '';
+            document.getElementById('description').value = tender.description || '';
+            
+            // 承包商資訊
+            document.getElementById('contractorName').value = tender.contractorName || '';
+            document.getElementById('contractorContact').value = tender.contractorContact || '';
+            
+            // 時程規劃
+            document.getElementById('startDate').value = tender.startDate || '';
+            document.getElementById('endDate').value = tender.endDate || '';
+            
+            // 金額資訊
+            document.getElementById('amount').value = tender.amount || '';
+            document.getElementById('tax').value = tender.tax || '';
+            document.getElementById('totalAmount').value = tender.totalAmount || '';
+            
+            // 其他資訊
+            document.getElementById('status').value = tender.status || 'planning';
+            document.getElementById('notes').value = tender.notes || '';
+            
+            // 顯示標單資訊
+            document.getElementById('displayTenderCode').textContent = tender.code || '';
+            document.getElementById('displayCreatedBy').textContent = tender.createdBy || '';
+            document.getElementById('displayCreatedAt').textContent = formatDateTime(tender.createdAt);
+            document.getElementById('displayUpdatedAt').textContent = formatDateTime(tender.updatedAt);
+        }
+
+        // 生成標單編號
+        function generateTenderCode() {
+            const now = new Date();
+            const date = now.toISOString().slice(0,10).replace(/-/g,'');
+            const time = now.toTimeString().slice(0,8).replace(/:/g,'');
+            const code = `TENDER-${date}-${time}`;
+            
+            document.getElementById('tenderCode').value = code;
+        }
+
+        // 設置事件監聽器
+        function setupEventListeners() {
+            // 金額計算
+            const amountInput = document.getElementById('amount');
+            const taxInput = document.getElementById('tax');
+            const totalAmountInput = document.getElementById('totalAmount');
+
+            function calculateTotal() {
+                const amount = parseFloat(amountInput.value) || 0;
+                const tax = parseFloat(taxInput.value) || 0;
+                totalAmountInput.value = amount + tax;
+            }
+
+            amountInput.addEventListener('input', calculateTotal);
+            taxInput.addEventListener('input', calculateTotal);
+
+            // 表單提交
+            document.getElementById('tenderForm').addEventListener('submit', handleSubmit);
+        }
+
+        // 處理表單提交
+        async function handleSubmit(event) {
+            event.preventDefault();
+            
+            try {
+                // 驗證必填欄位
+                const projectId = document.getElementById('projectId').value;
+                const tenderName = document.getElementById('tenderName').value.trim();
+                
+                if (!projectId) {
+                    showAlert('請選擇所屬專案！', 'error');
+                    return;
+                }
+                
+                if (!tenderName) {
+                    showAlert('請輸入標單名稱！', 'error');
+                    return;
+                }
+                
+                showLoading(true);
+                
+                const tenderData = collectFormData();
+                
+                if (isEditMode) {
+                    await updateTender(tenderData);
+                    showAlert('標單更新成功！', 'success');
+                } else {
+                    await createTender(tenderData);
+                    showAlert('標單建立成功！', 'success');
+                }
+                
+                // 2秒後跳轉到列表頁面
+                setTimeout(() => {
+                    window.location.href = 'list.html';
+                }, 2000);
+                
+            } catch (error) {
+                console.error('❌ 儲存標單失敗:', error);
+                showAlert('儲存失敗：' + error.message, 'error');
+                showLoading(false);
+            }
+        }
+
+        // 收集表單資料
+        function collectFormData() {
+            const baseData = {
+                projectId: document.getElementById('projectId').value,
+                name: document.getElementById('tenderName').value.trim(),
+                code: document.getElementById('tenderCode').value,
+                description: document.getElementById('description').value.trim(),
+                contractorName: document.getElementById('contractorName').value.trim(),
+                contractorContact: document.getElementById('contractorContact').value.trim(),
+                startDate: document.getElementById('startDate').value,
+                endDate: document.getElementById('endDate').value,
+                amount: parseFloat(document.getElementById('amount').value) || 0,
+                tax: parseFloat(document.getElementById('tax').value) || 0,
+                totalAmount: parseFloat(document.getElementById('totalAmount').value) || 0,
+                status: document.getElementById('status').value,
+                notes: document.getElementById('notes').value.trim(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            if (!isEditMode) {
+                baseData.createdBy = currentUser.email;
+                baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            }
+
+            return baseData;
+        }
+
+        // 安全的重複檢查函數
+        async function checkTenderCodeDuplicate(code, excludeId = null) {
+            try {
+                // 嘗試使用複合查詢
+                let codeQuery = await db.collection('tenders')
+                    .where('code', '==', code)
+                    .where('createdBy', '==', currentUser.email)
+                    .get();
+                
+                console.log('✅ 複合查詢成功');
+                
+                // 檢查重複（排除當前編輯的文檔）
+                const duplicates = codeQuery.docs.filter(doc => doc.id !== excludeId);
+                if (duplicates.length > 0) {
+                    throw new Error('標單編號已存在，請使用其他編號');
+                }
+                
+            } catch (indexError) {
+                if (indexError.message.includes('index')) {
+                    console.warn('⚠️ 複合索引問題，使用替代方法檢查重複:', indexError.message);
+                    
+                    // 備用方案：先取得用戶的所有標單，再檢查重複
+                    const userTenders = await db.collection('tenders')
+                        .where('createdBy', '==', currentUser.email)
+                        .get();
+                    
+                    const duplicateFound = userTenders.docs.some(doc => 
+                        doc.id !== excludeId && doc.data().code === code
+                    );
+                    
+                    if (duplicateFound) {
+                        throw new Error('標單編號已存在，請使用其他編號');
+                    }
+                    
+                    console.log('✅ 重複檢查完成 (客戶端方式)');
+                } else {
+                    // 如果是其他錯誤，重新拋出
+                    throw indexError;
+                }
+            }
+        }
+
+        // 建立標單
+        async function createTender(tenderData) {
+            try {
+                console.log('📝 建立標單:', tenderData);
+                
+                // 檢查標單編號是否重複（安全的查詢方式）
+                await checkTenderCodeDuplicate(tenderData.code);
+
+                // 新增到 Firestore
+                const docRef = await db.collection('tenders').add(tenderData);
+                console.log('✅ 標單建立成功，ID:', docRef.id);
+
+            } catch (error) {
+                console.error('❌ 建立標單失敗:', error);
+                throw error;
+            }
+        }
+
+        // 更新標單
+        async function updateTender(tenderData) {
+            try {
+                console.log('📝 更新標單:', editTenderId, tenderData);
+                
+                // 如果編號有變更，檢查是否重複
+                if (currentTender.code !== tenderData.code) {
+                    await checkTenderCodeDuplicate(tenderData.code, editTenderId);
+                }
+
+                // 更新到 Firestore
+                await db.collection('tenders').doc(editTenderId).update(tenderData);
+                console.log('✅ 標單更新成功');
+
+            } catch (error) {
+                console.error('❌ 更新標單失敗:', error);
+                throw error;
+            }
+        }
+
+        // 刪除標單
+        async function deleteTender() {
+            if (!confirm(`確定要刪除標單「${currentTender.name}」嗎？\n此操作無法復原！`)) {
+                return;
+            }
+
+            try {
+                showLoading(true);
+                
+                // 同時刪除標單和相關的大項目、細項
+                const batch = db.batch();
+                
+                // 刪除標單
+                batch.delete(db.collection('tenders').doc(editTenderId));
+                
+                // 刪除相關大項目
+                const majorItemsSnap = await db.collection('majorItems')
+                    .where('tenderId', '==', editTenderId)
+                    .get();
+                
+                majorItemsSnap.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                
+                // 刪除相關細項
+                const detailItemsSnap = await db.collection('detailItems')
+                    .where('tenderId', '==', editTenderId)
+                    .get();
+                
+                detailItemsSnap.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                
+                // 執行批次刪除
+                await batch.commit();
+                
+                console.log('標單及相關資料已刪除:', editTenderId);
+                showAlert('標單已成功刪除！', 'success');
+                
+                // 2秒後跳轉到列表頁面
+                setTimeout(() => {
+                    window.location.href = 'list.html';
+                }, 2000);
+                
+            } catch (error) {
+                console.error('刪除標單失敗:', error);
+                showAlert('刪除失敗：' + error.message, 'error');
+                showLoading(false);
+            }
+        }
+
+        // 格式化日期時間
+        function formatDateTime(timestamp) {
+            if (!timestamp) return '未設定';
+            
+            let date;
+            if (timestamp.toDate) {
+                date = timestamp.toDate();
+            } else {
+                date = new Date(timestamp);
+            }
+            
+            if (isNaN(date.getTime())) return '未設定';
+            
+            return date.toLocaleString('zh-TW', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // 顯示警告訊息
+        function showAlert(message, type = 'info') {
+            const alertElement = document.getElementById('alertMessage');
+            alertElement.textContent = message;
+            alertElement.className = `alert ${type}`;
+            alertElement.style.display = 'block';
+            
+            // 3秒後自動隱藏
+            setTimeout(() => {
+                alertElement.style.display = 'none';
+            }, 3000);
+        }
+
+        // 顯示/隱藏載入狀態
+        function showLoading(show) {
+            const loadingContainer = document.getElementById('loadingContainer');
+            const mainContainer = document.getElementById('mainContainer');
+            
+            if (show) {
+                loadingContainer.style.display = 'block';
+                mainContainer.style.display = 'none';
+            } else {
+                loadingContainer.style.display = 'none';
+                mainContainer.style.display = 'block';
+            }
+        }
+
+        // 導航函數
+        function goToDashboard() {
+            window.location.href = '../dashboard.html';
+        }
+
+        function goBack() {
+            window.location.href = 'list.html';
+        }
+
+        // 登出功能
+        async function logout() {
+            if (confirm('確定要登出嗎？')) {
+                try {
+                    await auth.signOut();
+                    window.location.href = '../login_page.html';
+                } catch (error) {
+                    console.error('登出失敗:', error);
+                    showAlert('登出失敗，請重試', 'error');
+                }
+            }
+        }
+
+        // 診斷工具（可選）
+        function diagnoseCreatePageQueries() {
+            if (!currentUser) {
+                console.log('❌ 請先登入');
+                return;
+            }
+            
+            console.log('🔍 診斷 create.html 的查詢問題...');
+            
+            const tests = [
+                {
+                    name: '專案查詢 (where + orderBy)',
+                    query: () => db.collection('projects')
+                        .where('createdBy', '==', currentUser.email)
+                        .orderBy('name', 'asc')
+                        .limit(1)
+                        .get()
+                },
+                {
+                    name: '標單查詢 (where + orderBy)', 
+                    query: () => db.collection('tenders')
+                        .where('createdBy', '==', currentUser.email)
+                        .orderBy('createdAt', 'desc')
+                        .limit(1)
+                        .get()
+                },
+                {
+                    name: '標單編號重複檢查 (複合where)',
+                    query: () => db.collection('tenders')
+                        .where('code', '==', 'TEST-CODE')
+                        .where('createdBy', '==', currentUser.email)
+                        .limit(1)
+                        .get()
+                }
+            ];
+            
+            tests.forEach(function(test) {
+                test.query()
+                    .then(function(snapshot) {
+                        console.log('✅', test.name, '查詢成功');
+                    })
+                    .catch(function(error) {
+                        console.log('❌', test.name, '查詢失敗:', error.message);
+                        if (error.message.includes('index')) {
+                            console.log('💡 需要建立索引');
+                        }
+                    });
+            });
+        }
+
+        // 頁面載入完成
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('標單管理頁面開始初始化...');
+            initApp();
+        });
+
+        console.log('標單管理頁面腳本已載入');
+    </script>
+</body>
+</html>

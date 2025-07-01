@@ -1,0 +1,88 @@
+<div id="loading" class="loading" style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 4rem;">
+    <div class="spinner"></div>
+    <p style="margin-top: 1rem; font-size: 1rem; color: #666;">載入標單詳情中...</p>
+</div>
+
+<div id="mainContent" class="content" style="display: none;">
+    <div class="header-card">
+        <div class="header-content">
+            <div class="header-info">
+                <h1 id="tenderName">載入中...</h1>
+                <div class="header-meta">
+                    <span id="tenderCode"></span>
+                    <span id="projectName"></span>
+                    <span id="createdInfo"></span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div id="statusBadge" class="status-badge"></div>
+                <div class="action-buttons">
+                    <a id="editBtn" href="/tenders/edit.html" data-route class="btn btn-primary">✏️ 編輯標單</a>
+                    <a id="importBtn" href="/tenders/import.html" data-route class="btn btn-success">📊 EXCEL匯入</a>
+                    <a id="distributionBtn" href="/tenders/distribution.html" data-route class="btn btn-warning">🔧 分配設定</a>
+                    <a href="/tenders/list.html" data-route class="btn btn-secondary">← 返回列表</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number amount" id="totalAmount">$0</div>
+            <div class="stat-label">標單總金額</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="majorItemsCount">0</div>
+            <div class="stat-label">工程大項</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="detailItemsCount">0</div>
+            <div class="stat-label">細項總數</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number progress" id="overallProgress">0%</div>
+            <div class="stat-label">整體進度</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number progress" id="distributionProgress">0%</div>
+            <div class="stat-label">分配進度</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number amount" id="billingAmount">$0</div>
+            <div class="stat-label">可請款金額</div>
+        </div>
+    </div>
+
+    <div class="tab-navigation">
+        <button class="tab-btn active" onclick="window.exposedDetailFuncs.switchTab('overview')">📊 總覽</button>
+        <button class="tab-btn" onclick="window.exposedDetailFuncs.switchTab('major-items')">🔧 工程大項</button>
+        <button class="tab-btn" onclick="window.exposedDetailFuncs.switchTab('progress')">📈 進度報表</button>
+        <button class="tab-btn" onclick="window.exposedDetailFuncs.switchTab('info')">📋 詳細資訊</button>
+    </div>
+
+    <div id="tab-overview" class="tab-content active">
+        </div>
+
+    <div id="tab-major-items" class="tab-content">
+        <div class="major-items-section">
+            <div class="section-header">
+                <h2 class="section-title">🔧 工程大項管理</h2>
+                <div class="action-buttons">
+                    <button class="btn btn-secondary" onclick="window.exposedDetailFuncs.toggleAllMajorItems()">
+                        <span id="toggleMajorText">展開全部</span>
+                    </button>
+                    <button class="btn btn-primary" onclick="window.exposedDetailFuncs.refreshMajorItems()">🔄 重新載入</button>
+                </div>
+            </div>
+            <div id="majorItemsList"></div>
+            <div id="emptyMajorItemsState" class="empty-state" style="display: none;">
+                </div>
+        </div>
+    </div>
+
+    <div id="tab-progress" class="tab-content">
+        </div>
+
+    <div id="tab-info" class="tab-content">
+        </div>
+</div>
