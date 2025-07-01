@@ -1,8 +1,11 @@
 /**
- * 簡易前端路由器 (SPA Router) - v2.2 (GitHub Pages 最終相容版)
+ * 簡易前端路由器 (SPA Router) - v3.0 (GitHub Pages 子目錄最終相容版)
  */
 
-// --- 路由表 ---
+// 專案在 GitHub Pages 上的基礎路徑 (您的專案名稱)
+const GHP_BASE_PATH = 'program';
+
+// --- 路由表：使用相對路徑，不含 base path ---
 const routes = {
     '/': { html: 'pages/dashboard.html', init: 'initDashboardPage' },
     '/index.html': { html: 'pages/dashboard.html', init: 'initDashboardPage' },
@@ -16,33 +19,38 @@ const routes = {
 
 // --- 路由核心邏輯 ---
 
+// 獲取當前環境的基礎 URL
+function getBaseUrl() {
+    const isGitHubPages = window.location.hostname.includes('github.io');
+    return isGitHubPages ? `/${GHP_BASE_PATH}/` : '/';
+}
+
 const navigateTo = url => {
     history.pushState(null, null, url);
     handleLocation();
 };
 
 async function handleLocation() {
-    const isGitHubPages = window.location.hostname.includes('github.io');
-    const pathSegments = window.location.pathname.split('/').filter(Boolean);
+    const baseUrl = getBaseUrl();
+    // 從 URL 中移除基礎路徑，得到乾淨的路由鍵
+    let path = window.location.pathname.replace(baseUrl, '/').replace('//', '/');
+    if (path === '' || path === baseUrl) path = '/';
     
-    // 在 GitHub Pages 環境下，路徑通常是 /<repo-name>/<page>，我們需要移除 repo-name
-    const path = isGitHubPages && pathSegments.length > 1 ? `/${pathSegments.slice(1).join('/')}` : window.location.pathname;
-
-    const route = routes[path] || routes['/'] || routes['404'];
+    const route = routes[path] || routes['404'];
     
     try {
-        // 構建正確的檔案路徑
-        const fetchPath = isGitHubPages ? `/${pathSegments[0]}/${route.html}` : route.html;
+        // 構建正確的檔案抓取路徑
+        const fetchPath = `${baseUrl}${route.html}`;
         const response = await fetch(fetchPath);
 
-        if (!response.ok) throw new Error(`頁面載入失敗: ${response.status}`);
+        if (!response.ok) throw new Error(`頁面載入失敗: ${fetchPath}`);
         
         document.getElementById('app-content').innerHTML = await response.text();
         
         if (route.init && typeof window[route.init] === 'function') {
             window[route.init]();
         }
-        updateSidebarActiveState(path);
+        updateSidebarActiveState();
         
     } catch (error) {
         console.error('路由載入錯誤:', error);
@@ -50,10 +58,10 @@ async function handleLocation() {
     }
 }
 
-function updateSidebarActiveState(path) {
+function updateSidebarActiveState() {
+    const currentPath = window.location.pathname;
     document.querySelectorAll('#sidebar a[data-route]').forEach(link => {
-        const linkPath = new URL(link.href).pathname;
-        if (window.location.pathname === linkPath) {
+        if (link.pathname === currentPath) {
             link.classList.add('active');
         } else {
             link.classList.remove('active');
@@ -75,18 +83,17 @@ function setupRouter() {
 document.addEventListener('DOMContentLoaded', () => {
     initFirebase(
         (user) => {
-            console.log('Router: 登入成功，設定路由');
             const currentUserEl = document.getElementById('currentUser');
             if(currentUserEl) currentUserEl.textContent = `👤 ${user.email}`;
             setupRouter();
             handleLocation();
         },
         () => {
-            // 【關鍵修正】使用相對路徑，以相容 GitHub Pages
-            if (!window.location.pathname.includes('login_page.html')) {
-                // 從當前路徑跳轉到 login_page.html
-                const newPath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/')) + '/login_page.html';
-                window.location.href = newPath;
+            // 【關鍵修正】跳轉到 login_page.html
+            const baseUrl = getBaseUrl();
+            const loginUrl = `${baseUrl}login_page.html`;
+            if (!window.location.pathname.endsWith('login_page.html')) {
+                window.location.href = loginUrl;
             }
         }
     );
