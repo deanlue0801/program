@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="assets/css/dashboard.css">
     <link rel="stylesheet" href="assets/css/detail.css">
     <link rel="stylesheet" href="assets/css/import.css">
-    </head>
+</head>
 <body>
     <div class="app-layout">
         <nav class="sidebar" id="sidebar">
@@ -16,23 +16,22 @@
                 <h3>🏗️ 專案管理</h3>
             </div>
             <ul class="nav-list">
-                <li><a href="/dashboard.html" data-route>📊 儀表板</a></li>
+                <li><a href="/program/dashboard.html" data-route>📊 儀表板</a></li>
                 <li>
-                    <a href="/tenders/list.html" data-route>📋 標單管理</a>
+                    <a href="/program/tenders/list.html" data-route>📋 標單管理</a>
                     <ul class="sub-nav">
-                        <li><a href="/tenders/distribution.html" data-route>🏢 分配管理</a></li>
-                        <li><a href="/tenders/import.html" data-route>📥 匯入細項</a></li>
+                        <li><a href="/program/tenders/distribution.html" data-route>🏢 分配管理</a></li>
+                        <li><a href="/program/tenders/import.html" data-route>📥 匯入細項</a></li>
                     </ul>
                 </li>
-                </ul>
+            </ul>
             <div class="sidebar-footer">
                 <span id="currentUser"></span>
                 <button onclick="logout()">登出</button>
             </div>
         </nav>
 
-        <main class="main-content" id="app-content">
-            </main>
+        <main class="main-content" id="app-content"></main>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
