@@ -415,10 +415,54 @@ function initDistributionPage() {
         return partsA.num - partsB.num;
     }
 
-    function naturalSequenceSort(a, b) {
-        // ... 此處放入您最新的 naturalSequenceSort 完整程式碼 ...
+// 【請使用這個全新的、更強大的版本來取代舊的 naturalSequenceSort 函數】
+
+/**
+ * 通用自然排序函數 (終極版)
+ * 可以正確處理各種混合編號，如 "3", "3.1", "3-2", "10", "A-1" 等
+ * @param {object} a - 要比較的第一個項目
+ * @param {object} b - 要比較的第二個項目
+ * @returns {number} - 排序結果
+ */
+function naturalSequenceSort(a, b) {
+    // 取得要比較的 sequence 值，並確保是字串
+    const seqA = String(a.sequence || '');
+    const seqB = String(b.sequence || '');
+
+    // 這個正規表達式會將字串分割成「連續的數字部分」和「連續的非數字部分」
+    // 例如 "A-10.5-C" -> ["A-", "10.5", "-C"]
+    const re = /(\d+(\.\d+)?)|(\D+)/g;
+
+    const partsA = seqA.match(re) || [];
+    const partsB = seqB.match(re) || [];
+
+    const len = Math.min(partsA.length, partsB.length);
+
+    // 逐一比較分割後的部分
+    for (let i = 0; i < len; i++) {
+        const partA = partsA[i];
+        const partB = partsB[i];
+
+        // 嘗試將部分轉為數字
+        const numA = parseFloat(partA);
+        const numB = parseFloat(partB);
+
+        // 如果兩個部分都能成功轉為數字，就用數字大小比較
+        if (!isNaN(numA) && !isNaN(numB)) {
+            if (numA !== numB) {
+                return numA - numB;
+            }
+        } else {
+            // 如果不是數字，就用文字規則比較
+            if (partA !== partB) {
+                return partA.localeCompare(partB);
+            }
+        }
     }
 
+    // 如果所有共通部分都相同（例如 "A-1" 和 "A-1-2"），則較短的排前面
+    return partsA.length - partsB.length;
+}
     // --- 頁面啟動點 ---
     initializePage();
 }
