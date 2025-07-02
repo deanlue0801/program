@@ -109,9 +109,17 @@ function initDistributionPage() {
     }
 
     async function loadDetailItems(majorItemId) {
-        const detailItemDocs = await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: majorItemId }]);
+        const detailItemDocs = await safeFirestoreQuery(
+            "detailItems",
+            [{ field: "majorItemId", operator: "==", value: majorItemId }]
+            // 我們不再依賴 Firestore 的排序，因為它對字串數字的排序不符合預期
+        );
         detailItems = detailItemDocs.docs;
+    
+        // 【關鍵】無論從 Firestore 拿到什麼順序，我們都在前端用新的智慧排序函數強制重排
         detailItems.sort(naturalSequenceSort);
+        
+        console.log(`✅ 載入細項: ${detailItems.length} 個 (已使用終極自然排序)`);
     }
     
     async function loadDistributions(majorItemId) {
