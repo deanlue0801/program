@@ -1,25 +1,18 @@
 /* --- 分配管理頁面專屬樣式 (distribution.css) --- */
-
 /* --- SPA 架構佈局修正 --- */
 /*
- * 這個修正的目標是讓分配頁的內容區塊，取消自身的卡片樣式（如背景、陰影、置中），
- * 完美地融入由 layout.css 控制的主佈局中，從而解決排版被切掉的問題。
+ * 這個修正的目標是讓分配頁的內容區塊，取消自身的卡片樣式（如背景、陰影），
+ * 但「不應該」去影響由 layout.css 控制的最重要的 margin 和 padding。
 */
 .selection-panel,
 main.main-content { /* 這指的是 distribution.html 片段裡的 .main-content class */
-    max-width: none;  /* 取消可能存在的最大寬度限制 */
-    width: auto;      /* 讓寬度自動適應 */
+    max-width: none;  /* 只取消可能存在的最大寬度限制 */
     box-shadow: none; /* 移除自身的陰影 */
     background: none; /* 移除自身的背景色 */
-
-    /* 移除任何可能導致與主佈局衝突的 margin 和 padding */
-    margin-left: 0;
-    margin-right: 0;
-    margin-top: 0;
-    padding: 0;
+    /* 【重要】我們已將產生衝突的 margin 和 padding 相關設定全部移除 */
 }
 
-/* 我們可以單獨保留區塊之間的下邊距 */
+/* 我們可以單獨保留區塊之間的垂直間距 */
 .selection-panel {
     margin-bottom: 20px;
 }
