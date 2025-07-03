@@ -73,21 +73,49 @@
     z-index: 10;
 }
 
-/* 第一欄 (細項名稱) 的特殊樣式 */
+/* --- 請用這整塊新樣式，取代 distribution.css 中對應的舊樣式 --- */
+
+/* 第一欄 (細項名稱) 的固定樣式 */
 .distribution-table th:first-child,
 .distribution-table td:first-child {
     text-align: left;
     padding-left: 15px;
-    min-width: 280px;
-    position: sticky;
-    left: 0;
-    z-index: 5;
-    background: #f8f9fa;
+    min-width: 280px; /* 設定一個最小寬度 */
+    position: sticky; /* 固定住 */
+    left: 0;          /* 貼在最左邊 */
+    z-index: 6;       /* 確保它在第二欄之上 */
     border-right: 2px solid #dee2e6;
 }
+
+.distribution-table td:first-child {
+    background: #f8f9fa; /* 保持第一欄資料格的背景色 */
+}
+
+/* 【新增】第二欄 (總量) 的固定樣式 */
+.distribution-table th:nth-child(2),
+.distribution-table td:nth-child(2) {
+    position: sticky; /* 將第二欄也固定住 */
+    left: 280px;      /* 【關鍵】讓它從左邊 280px 的位置開始貼齊 (等於第一欄的寬度) */
+    z-index: 5;       /* 層級比第一欄低 */
+    border-right: 2px solid #dee2e6;
+}
+
+/* 因為「總量」欄本身就有背景色，我們直接沿用 */
+.distribution-table td:nth-child(2) {
+    background: rgba(102, 126, 234, 0.1); 
+    font-weight: bold;
+}
+
+
+/* 確保左上角固定的儲存格在最上層 */
 .distribution-table thead th:first-child {
     z-index: 11;
-    background: var(--sidebar-bg); /* 確保左上角顏色一致 */
+    background: var(--sidebar-bg); /* 確保與其他表頭顏色一致 */
+}
+/* 【新增】確保第二個表頭也在上層 */
+.distribution-table thead th:nth-child(2) {
+    z-index: 10;
+    background: var(--sidebar-bg); /* 確保與其他表頭顏色一致 */
 }
 .item-info { text-align: left; }
 .item-name { font-weight: 500; white-space: normal; }
