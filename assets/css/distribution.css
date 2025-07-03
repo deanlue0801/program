@@ -1,4 +1,4 @@
-/* --- 分配管理頁面專屬樣式 (distribution.css) - 最終完整版 --- */
+/* --- 分配管理頁面專屬樣式 (distribution.css) --- */
 
 /* 頁面佈局容器 */
 .distribution-page-wrapper {
@@ -29,7 +29,6 @@
     flex-grow: 1; 
     min-height: 0;
 }
-
 .actions-panel { 
     display: flex;
     justify-content: space-between;
@@ -40,11 +39,14 @@
     flex-shrink: 0;
 }
 
-/* 表格容器 (修正滾動問題) */
+/* 表格容器 (最終修正) */
 .table-container {
     border: 1px solid #dee2e6;
     border-radius: 12px;
-    overflow: auto;
+    flex-grow: 1;
+    
+    /* 【關鍵修正】使用 !important 強制執行滾動 */
+    overflow: auto !important; 
 }
 
 /* 分配表主體 */
@@ -80,14 +82,12 @@
     position: sticky;
     left: 0;
     z-index: 5;
-    border-right: 2px solid #dee2e6;
-}
-.distribution-table td:first-child {
     background: #f8f9fa;
-    font-weight: 500;
+    border-right: 2px solid #dee2e6;
 }
 .distribution-table thead th:first-child {
     z-index: 11;
+    background: var(--sidebar-bg); /* 確保左上角顏色一致 */
 }
 .item-info { text-align: left; }
 .item-name { font-weight: 500; white-space: normal; }
