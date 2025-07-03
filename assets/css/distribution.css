@@ -1,4 +1,11 @@
-/* --- 分配管理頁面專屬樣式 (distribution.css) - 最終簡化版 --- */
+/* --- 分配管理頁面專屬樣式 (distribution.css) --- */
+
+/* 頁面佈局容器 */
+.distribution-page-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%; 
+}
 
 /* 頂部選擇區塊 */
 .selection-panel {
@@ -7,6 +14,7 @@
     border-radius: 12px;
     margin-bottom: 20px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    flex-shrink: 0; 
 }
 .selection-grid { 
     display: grid;
@@ -14,12 +22,17 @@
     gap: 20px;
 }
 
-/* 主要內容卡片 */
-.content-card.distribution-body {
-    padding: 25px;
+/* 主要內容體 */
+.distribution-body {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1; 
+    min-height: 0;
+    background: var(--header-bg);
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
 }
-
-/* 操作按鈕區塊 */
 .actions-panel { 
     display: flex;
     justify-content: space-between;
@@ -27,6 +40,7 @@
     flex-wrap: wrap;
     gap: 15px;
     margin-bottom: 20px;
+    flex-shrink: 0;
 }
 .action-buttons {
     display: flex;
@@ -34,29 +48,30 @@
     gap: 10px;
 }
 
-/* 【關鍵修正】表格容器只負責「水平」滾動 */
+
+/* 表格容器 (處理滾動) */
 .table-container {
-    overflow-x: auto;
+    overflow: auto;
     border: 1px solid #dee2e6;
     border-radius: 12px;
+    flex-grow: 1;
+    min-height: 0; /* 解決 flex + overflow 的關鍵 */
 }
 
 /* 分配表主體 */
 .distribution-table {
-    width: 100%;
     border-collapse: collapse;
 }
-
 .distribution-table th, 
 .distribution-table td {
     padding: 12px 10px;
     text-align: center;
-    border-bottom: 1px solid #e9ecef;
+    border: 1px solid #e9ecef;
     font-size: 13px;
     white-space: nowrap;
 }
 
-/* 表格頭部 - 垂直方向固定 */
+/* 表格頭部 */
 .distribution-table th {
     background: var(--sidebar-bg);
     color: white;
@@ -96,14 +111,35 @@
 .item-details { font-size: 12px; color: #6c757d; margin-top: 4px; }
 .quantity-input { width: 50px; text-align: center; padding: 4px; border: 1px solid #ddd; border-radius: 4px; }
 .quantity-input.has-value { background: #e8f5e8; border-color: #28a745; font-weight: bold; }
-.summary-row td { background: #e9ecef; font-weight: bold; }
+.summary-row td { background: #e9ecef; font-weight: bold; position: sticky; bottom: -1px; z-index: 10; border-top: 2px solid var(--color-primary); }
 .total-column { font-weight: bold; }
 .status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-left: 8px; }
 .status-complete { background-color: var(--color-success); }
 .status-partial { background-color: var(--color-warning); }
 .status-none { background-color: var(--color-danger); }
 
-/* Modal 彈出視窗相關樣式 */
-.modal-overlay { /* ... 省略 ... */ }
-.modal-content { /* ... 省略 ... */ }
-/* ... 此處省略 Modal 其他細節樣式，沿用您 distribution.css 中已有的即可 ... */
+/* Modal 彈出視窗樣式 */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+.modal-content { background: #f8f9fa; padding: 30px; border-radius: 15px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+.modal-content h3 { margin-bottom: 10px; color: #333; }
+.modal-content p { color: #666; margin-bottom: 20px; font-size: 14px; }
+.modal-section { margin-bottom: 25px; }
+.modal-section h4 { margin-bottom: 15px; color: #333; border-left: 4px solid var(--color-primary); padding-left: 10px;}
+.modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 30px; }
+
+/* 樓層設定 Modal */
+.template-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+.template-buttons button { background: #e7f3ff; color: #0066cc; border: 1px solid #b3d9ff; }
+.custom-add-section { display: flex; gap: 10px; align-items: center; }
+.custom-add-section input { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ddd; }
+#currentFloorsList { display: flex; flex-wrap: wrap; gap: 10px; background: white; border: 1px solid #ddd; padding: 15px; border-radius: 8px; min-height: 50px; }
+.floor-tag { display: inline-flex; align-items: center; background: #e8f5e8; color: #155724; padding: 6px 12px; border-radius: 20px; font-weight: 500;}
+.floor-tag button { background: none; border: none; color: #721c24; cursor: pointer; font-size: 16px; margin-left: 8px; line-height: 1; }
+
+/* 順序管理 Modal */
+.sequence-list-container { max-height: 50vh; overflow-y: auto; background: white; border: 1px solid #ddd; padding: 10px; border-radius: 8px;}
+.sequence-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff; border-radius: 6px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.drag-handle { cursor: grab; color: #999; padding: 5px; }
+.drag-handle:active { cursor: grabbing; }
+.sequence-input { width: 60px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; margin-right: 15px; }
+.sequence-name { flex-grow: 1; }
