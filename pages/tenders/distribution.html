@@ -1,51 +1,51 @@
-<section class="selection-panel">
-    <div class="selection-grid">
-        <div>
-            <label class="selection-label" for="projectSelect">📁 選擇專案</label>
-            <select class="form-select" id="projectSelect" onchange="window.exposedDistributionFuncs.onProjectChange()">
-                <option value="">請選擇專案...</option>
-            </select>
+<div class="distribution-page-wrapper">
+    <section class="selection-panel">
+        <div class="selection-grid">
+            <div>
+                <label class="selection-label" for="projectSelect">📁 選擇專案</label>
+                <select class="form-select" id="projectSelect" onchange="window.exposedDistributionFuncs.onProjectChange()">
+                    <option value="">請選擇專案...</option>
+                </select>
+            </div>
+            <div>
+                <label class="selection-label" for="tenderSelect">📋 選擇標單</label>
+                <select class="form-select" id="tenderSelect" onchange="window.exposedDistributionFuncs.onTenderChange()" disabled>
+                    <option value="">請先選擇專案</option>
+                </select>
+            </div>
+            <div>
+                <label class="selection-label" for="majorItemSelect">🔧 選擇大項目</label>
+                <select class="form-select" id="majorItemSelect" onchange="window.exposedDistributionFuncs.onMajorItemChange()" disabled>
+                    <option value="">請先選擇標單</option>
+                </select>
+            </div>
         </div>
-        <div>
-            <label class="selection-label" for="tenderSelect">📋 選擇標單</label>
-            <select class="form-select" id="tenderSelect" onchange="window.exposedDistributionFuncs.onTenderChange()" disabled>
-                <option value="">請先選擇專案</option>
-            </select>
-        </div>
-        <div>
-            <label class="selection-label" for="majorItemSelect">🔧 選擇大項目</label>
-            <select class="form-select" id="majorItemSelect" onchange="window.exposedDistributionFuncs.onMajorItemChange()" disabled>
-                <option value="">請先選擇標單</option>
-            </select>
-        </div>
-    </div>
-</section>
+    </section>
 
-<div class="distribution-body" id="mainContent" style="display: none;">
-    <div class="actions-panel">
-        <h2 style="color: #333; font-size: 20px;">📊 樓層分配表</h2>
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <button class="btn btn-success" onclick="window.exposedDistributionFuncs.saveAllDistributions()">💾 儲存分配</button>
-            <button class="btn btn-primary" onclick="window.exposedDistributionFuncs.clearAllDistributions()">🧹 清空所有</button>
-            <button class="btn" onclick="window.exposedDistributionFuncs.triggerImport()" style="background: linear-gradient(135deg, #007bff, #0056b3); color: white;">📥 匯入分配</button>
-            <input type="file" id="importInput" accept=".xlsx, .xls" style="display: none;" onchange="window.exposedDistributionFuncs.handleFileImport(event)">
-            <button class="btn btn-warning" onclick="window.exposedDistributionFuncs.exportToExcel()">📤 匯出 Excel</button>
-            <button class="btn" onclick="window.exposedDistributionFuncs.showSequenceManager()" style="background: linear-gradient(135deg, #6f42c1, #e83e8c); color: white;">🔢 調整順序</button>
-            <button class="btn" onclick="window.exposedDistributionFuncs.showFloorManager()" style="background: linear-gradient(135deg, #17a2b8, #138496); color: white;">🏢 樓層設定</button>
+    <div class="distribution-body" id="mainContent" style="display: none;">
+        <div class="actions-panel">
+            <h2 style="color: #333; font-size: 20px;">📊 樓層分配表</h2>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn btn-success" onclick="window.exposedDistributionFuncs.saveAllDistributions()">💾 儲存分配</button>
+                <button class="btn btn-primary" onclick="window.exposedDistributionFuncs.clearAllDistributions()">🧹 清空所有</button>
+                <button class="btn" onclick="window.exposedDistributionFuncs.triggerImport()" style="background: linear-gradient(135deg, #007bff, #0056b3); color: white;">📥 匯入分配</button>
+                <input type="file" id="importInput" accept=".xlsx, .xls" style="display: none;" onchange="window.exposedDistributionFuncs.handleFileImport(event)">
+                <button class="btn btn-warning" onclick="window.exposedDistributionFuncs.exportToExcel()">📤 匯出 Excel</button>
+                <button class="btn" onclick="window.exposedDistributionFuncs.showSequenceManager()" style="background: linear-gradient(135deg, #6f42c1, #e83e8c); color: white;">🔢 調整順序</button>
+                <button class="btn" onclick="window.exposedDistributionFuncs.showFloorManager()" style="background: linear-gradient(135deg, #17a2b8, #138496); color: white;">🏢 樓層設定</button>
+            </div>
         </div>
-    </div>
 
-    <div class="table-container">
-        <table class="distribution-table" id="distributionTable">
-            <thead id="tableHeader">
-            </thead>
-            <tbody id="tableBody">
-            </tbody>
-        </table>
-    </div>
-     <div id="emptyState" class="empty-state" style="padding: 60px 20px;">
-        <div class="empty-state-icon">↖️</div>
-        <p>請從上方的下拉選單選擇「專案」、「標單」及「大項目」以開始作業</p>
+        <div class="table-container">
+            <table class="distribution-table" id="distributionTable">
+                <thead id="tableHeader"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+         <div id="emptyState" class="empty-state" style="padding: 60px 20px;">
+            <div class="empty-state-icon">↖️</div>
+            <p>請從上方的下拉選單選擇「專案」、「標單」及「大項目」以開始作業</p>
+        </div>
     </div>
 </div>
 
