@@ -57,11 +57,13 @@
     overflow: auto;   /* 自動處理垂直和水平滾動 */
     border: 1px solid #dee2e6;
     border-radius: 12px;
+    height: 600px;
 }
 
 /* 分配表主體 */
 .distribution-table {
     border-collapse: collapse;
+    min-width: 1200px;/* 根據你的欄位數量調整 */
 }
 .distribution-table th, 
 .distribution-table td {
@@ -97,6 +99,13 @@
 .distribution-table th:nth-child(2) { background-color: var(--sidebar-bg); }
 .distribution-table thead th:first-child { z-index: 11; }
 .distribution-table thead th:nth-child(2) { z-index: 10; }
+
+/* 重要：z-index層級設定 */
+.distribution-table th:first-child { z-index: 11; }
+.distribution-table th:nth-child(2) { z-index: 10; }
+.distribution-table th { z-index: 10; }
+.distribution-table td:first-child { z-index: 6; }
+.distribution-table td:nth-child(2) { z-index: 5; }
 
 /* 其他細節樣式 */
 .item-info { text-align: left; }
