@@ -1,13 +1,11 @@
-/* --- 分配管理頁面專屬樣式 (distribution.css) --- */
+/* --- 分配管理頁面專屬樣式 (distribution.css) - 最終佈局修正版 --- */
 
 /* 頁面佈局容器 */
 .distribution-page-wrapper {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: 100%; 
 }
-
-/* 頂部選擇區塊 */
 .selection-panel {
     background: var(--header-bg);
     padding: 20px;
@@ -39,19 +37,26 @@
     flex-shrink: 0;
 }
 
-/* 表格容器 (處理滾動) */
+/* 【關鍵修正】使用父層相對定位、子層絕對定位的技巧來處理滾動 */
+.table-wrapper {
+    flex-grow: 1;
+    position: relative; /* 設定為相對定位，作為滾動區的基準 */
+    min-height: 0;
+}
 .table-container {
+    position: absolute; /* 設定為絕對定位 */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: auto;   /* 讓這個絕對定位的容器負責滾動 */
     border: 1px solid #dee2e6;
     border-radius: 12px;
-    overflow: auto;
-    flex-grow: 1;
-    /* 【關鍵新增】解決 Flexbox 環境下的水平滾動問題 */
-    min-width: 0; 
 }
 
 /* 分配表主體 */
 .distribution-table {
-    border-collapse: collapse; /* sticky 的最佳實踐 */
+    border-collapse: collapse;
 }
 .distribution-table th, 
 .distribution-table td {
@@ -72,7 +77,7 @@
     z-index: 10;
 }
 
-/* 第一欄 (細項名稱) 的固定樣式 */
+/* 凍結欄位樣式 */
 .distribution-table th:first-child,
 .distribution-table td:first-child {
     position: sticky;
@@ -83,55 +88,24 @@
     padding-left: 15px;
     border-right: 2px solid #dee2e6;
 }
-
-/* 第二欄 (總量) 的固定樣式 */
 .distribution-table th:nth-child(2),
 .distribution-table td:nth-child(2) {
     position: sticky;
-    left: 280px; /* 等於第一欄的 min-width */
+    left: 280px;
     z-index: 5;
     border-right: 2px solid #dee2e6;
 }
-
-/* 為所有固定的儲存格提供不透明背景 */
-.distribution-table td:first-child {
-    background-color: #f8f9fa;
-}
-.distribution-table td:nth-child(2) {
-    background-color: rgba(102, 126, 234, 0.1);
-    font-weight: bold;
-}
+.distribution-table td:first-child { background-color: #f8f9fa; font-weight: 500; }
+.distribution-table td:nth-child(2) { background-color: rgba(102, 126, 234, 0.1); font-weight: bold; }
 .distribution-table th:first-child,
-.distribution-table th:nth-child(2) {
-    background-color: var(--sidebar-bg);
-}
-.distribution-table thead th:first-child {
-    z-index: 11; /* 確保左上角在最上層 */
-}
-.distribution-table thead th:nth-child(2) {
-    z-index: 10;
-}
+.distribution-table th:nth-child(2) { background-color: var(--sidebar-bg); }
+.distribution-table thead th:first-child { z-index: 11; }
+.distribution-table thead th:nth-child(2) { z-index: 10; }
 
-/* 表格其他細節樣式 */
+/* 其他細節樣式 */
 .item-info { text-align: left; }
 .item-name { font-weight: 500; white-space: normal; }
 .item-details { font-size: 12px; color: #6c757d; margin-top: 4px; }
 .quantity-input { width: 50px; text-align: center; padding: 4px; border: 1px solid #ddd; border-radius: 4px; }
 .quantity-input.has-value { background: #e8f5e8; border-color: #28a745; font-weight: bold; }
-.summary-row td {
-    background: #e9ecef;
-    font-weight: bold;
-    position: sticky;
-    bottom: -1px; /* 修正滾動條可能蓋住邊框的問題 */
-    z-index: 10;
-    border-top: 2px solid var(--color-primary);
-}
-.total-column { font-weight: bold; }
-.status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-left: 8px; }
-.status-complete { background-color: var(--color-success); }
-.status-partial { background-color: var(--color-warning); }
-.status-none { background-color: var(--color-danger); }
-
-/* 順序管理 Modal 內的輸入框 */
-.sequence-input { width: 60px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; margin-right: 15px; }
-.sequence-name { flex-grow: 1; }
+.summary-row td { background: #e9ecef; font-weight: bold; position: sticky; bottom: -1px; z-index: 10; border-top: 2px solid var(--color-primary); }
