@@ -1,56 +1,98 @@
-<div class="distribution-page-wrapper">
-    <section class="selection-panel">
-        <div class="selection-grid">
-            <div>
-                <label class="selection-label" for="projectSelect">📁 選擇專案</label>
-                <select class="form-select" id="projectSelect" onchange="window.exposedDistributionFuncs.onProjectChange()">
-                    <option value="">請選擇專案...</option>
-                </select>
-            </div>
-            <div>
-                <label class="selection-label" for="tenderSelect">📋 選擇標單</label>
-                <select class="form-select" id="tenderSelect" onchange="window.exposedDistributionFuncs.onTenderChange()" disabled>
-                    <option value="">請先選擇專案</option>
-                </select>
-            </div>
-            <div>
-                <label class="selection-label" for="majorItemSelect">🔧 選擇大項目</label>
-                <select class="form-select" id="majorItemSelect" onchange="window.exposedDistributionFuncs.onMajorItemChange()" disabled>
-                    <option value="">請先選擇標單</option>
-                </select>
-            </div>
+<section class="selection-panel">
+    <div class="selection-grid">
+        <div>
+            <label class="selection-label" for="projectSelect">📁 選擇專案</label>
+            <select class="form-select" id="projectSelect" onchange="window.exposedDistributionFuncs.onProjectChange()">
+                <option value="">請選擇專案...</option>
+            </select>
         </div>
-    </section>
-
-    <div class="content-card distribution-body" id="mainContent" style="display: none;">
-        <div class="actions-panel">
-            <h2 style="color: #333; font-size: 20px;">📊 樓層分配表</h2>
-            <div class="action-buttons">
-                <button class="btn btn-success" onclick="window.exposedDistributionFuncs.saveAllDistributions()">💾 儲存分配</button>
-                <button class="btn btn-primary" onclick="window.exposedDistributionFuncs.clearAllDistributions()">🧹 清空所有</button>
-                <button class="btn" onclick="window.exposedDistributionFuncs.triggerImport()">📥 匯入分配</button>
-                <input type="file" id="importInput" accept=".xlsx, .xls" style="display: none;" onchange="window.exposedDistributionFuncs.handleFileImport(event)">
-                <button class="btn btn-warning" onclick="window.exposedDistributionFuncs.exportToExcel()">📤 匯出 Excel</button>
-                <button class="btn" onclick="window.exposedDistributionFuncs.showSequenceManager()">🔢 調整順序</button>
-                <button class="btn" onclick="window.exposedDistributionFuncs.showFloorManager()">🏢 樓層設定</button>
-            </div>
+        <div>
+            <label class="selection-label" for="tenderSelect">📋 選擇標單</label>
+            <select class="form-select" id="tenderSelect" onchange="window.exposedDistributionFuncs.onTenderChange()" disabled>
+                <option value="">請先選擇專案</option>
+            </select>
         </div>
-
-        <div class="table-container">
-            <table class="distribution-table" id="distributionTable">
-                <thead id="tableHeader"></thead>
-                <tbody id="tableBody"></tbody>
-            </table>
+        <div>
+            <label class="selection-label" for="majorItemSelect">🔧 選擇大項目</label>
+            <select class="form-select" id="majorItemSelect" onchange="window.exposedDistributionFuncs.onMajorItemChange()" disabled>
+                <option value="">請先選擇標單</option>
+            </select>
         </div>
     </div>
-    
-    <div id="emptyState" class="empty-state" style="display: none; padding: 60px 20px;">
-        <div class="empty-state-icon">↖️</div>
-        <p>請從上方的下拉選單選擇「專案」、「標單」及「大項目」以開始作業</p>
+</section>
+
+<div class="content-card" id="mainContent" style="display: none;">
+    <div class="actions-panel">
+        <h2 style="color: #333; font-size: 20px;">📊 樓層分配表</h2>
+        <div class="action-buttons">
+            <button class="btn btn-success" onclick="window.exposedDistributionFuncs.saveAllDistributions()">💾 儲存分配</button>
+            <button class="btn btn-primary" onclick="window.exposedDistributionFuncs.clearAllDistributions()">🧹 清空所有</button>
+            <button class="btn" onclick="window.exposedDistributionFuncs.triggerImport()">📥 匯入分配</button>
+            <input type="file" id="importInput" accept=".xlsx, .xls" style="display: none;" onchange="window.exposedDistributionFuncs.handleFileImport(event)">
+            <button class="btn btn-warning" onclick="window.exposedDistributionFuncs.exportToExcel()">📤 匯出 Excel</button>
+            <button class="btn" onclick="window.exposedDistributionFuncs.showSequenceManager()">🔢 調整順序</button>
+            <button class="btn" onclick="window.exposedDistributionFuncs.showFloorManager()">🏢 樓層設定</button>
+        </div>
     </div>
+
+    <div class="table-container">
+        <table class="distribution-table" id="distributionTable">
+            <thead id="tableHeader"></thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+ 
+<div id="emptyState" class="empty-state" style="display: none;">
+    <div class="empty-state-icon">↖️</div>
+    <p>請從上方的下拉選單選擇「專案」、「標單」及「大項目」以開始作業</p>
 </div>
 
 <div id="floorModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <h3>🏢 <span id="currentTenderName"></span> - 樓層設定管理</h3>
+        <p>設定此標單的樓層配置，可以使用預設範本或自訂樓層。</p>
+        <div class="modal-section template-section">
+            <h4>📋 快速範本</h4>
+            <div class="template-buttons">
+                <button onclick="window.exposedDistributionFuncs.applyFloorTemplate('standard')">🏢 標準高樓</button>
+                <button onclick="window.exposedDistributionFuncs.applyFloorTemplate('simple')">🏠 簡單建築</button>
+                <button onclick="window.exposedDistributionFuncs.applyFloorTemplate('basement')">🕳️ 地下室</button>
+                <button onclick="window.exposedDistributionFuncs.applyFloorTemplate('building')">🌆 辦公大樓</button>
+            </div>
+        </div>
+        <div class="modal-section">
+            <h4>🎯 目前樓層設定</h4>
+            <div id="currentFloorsList"></div>
+        </div>
+        <div class="modal-section">
+            <h4>✏️ 自訂樓層</h4>
+            <div class="custom-add-section">
+                <input type="text" id="newFloorInput" placeholder="例如：1F-10F, B1F, R1F">
+                <button class="btn btn-success" onclick="window.exposedDistributionFuncs.addCustomFloor()">➕ 新增</button>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-danger" onclick="window.exposedDistributionFuncs.clearAllFloors()">🗑️ 清空所有</button>
+            <div>
+                <button class="btn btn-success" onclick="window.exposedDistributionFuncs.saveFloorSettings()">💾 儲存設定</button>
+                <button class="btn btn-secondary" onclick="window.exposedDistributionFuncs.closeModal('floorModal')">❌ 取消</button>
+            </div>
+        </div>
     </div>
+</div>
+
 <div id="sequenceModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <h3>🔢 調整細項順序</h3>
+        <p>拖拽項目來調整順序，或手動輸入數字。</p>
+        <div class="modal-actions" style="justify-content: flex-start;">
+            <button class="btn btn-warning" onclick="window.exposedDistributionFuncs.resetToOriginalOrder()">↩️ 恢復編號排序</button>
+        </div>
+        <div id="sequenceList" class="sequence-list-container"></div>
+        <div class="modal-actions">
+            <button class="btn btn-success" onclick="window.exposedDistributionFuncs.saveSequenceChanges()">💾 儲存順序</button>
+            <button class="btn btn-secondary" onclick="window.exposedDistributionFuncs.closeModal('sequenceModal')">❌ 取消</button>
+        </div>
     </div>
+</div>
