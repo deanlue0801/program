@@ -5,16 +5,17 @@
 // 專案在 GitHub Pages 上的基礎路徑 (您的專案名稱)
 const GHP_BASE_PATH = 'program';
 
-// --- 路由表：使用相對路徑，不含 base path ---
+// 【請用這個全新的 routes 物件，取代 router.js 中舊的】
 const routes = {
-    '/': { html: 'pages/dashboard.html', init: 'initDashboardPage' },
-    '/index.html': { html: 'pages/dashboard.html', init: 'initDashboardPage' },
-    '/dashboard.html': { html: 'pages/dashboard.html', init: 'initDashboardPage' },
-    '/tenders/list.html': { html: 'pages/tenders/list.html', init: 'initTendersListPage' },
-    '/tenders/detail.html': { html: 'pages/tenders/detail.html', init: 'initTenderDetailPage' },
-    '/tenders/distribution.html': { html: 'pages/tenders/distribution.html', init: 'initDistributionPage' },
-    '/tenders/import.html': { html: 'pages/tenders/import.html', init: 'initImportPage' },
-    '404': { html: 'pages/404.html' }
+    // 路由路徑 (鍵)：已移除 .html
+    // HTML片段檔案路徑 (html 屬性)：維持不變，因為它指向真實的檔案
+    '/': { html: '/pages/dashboard.html', init: 'initDashboardPage' },
+    '/dashboard': { html: '/pages/dashboard.html', init: 'initDashboardPage' },
+    '/tenders/list': { html: '/pages/tenders/list.html', init: 'initTendersListPage' },
+    '/tenders/detail': { html: '/pages/tenders/detail.html', init: 'initTenderDetailPage' },
+    '/tenders/distribution': { html: '/pages/tenders/distribution.html', init: 'initDistributionPage' },
+    '/tenders/import': { html: '/pages/tenders/import.html', init: 'initImportPage' },
+    '404': { html: '/pages/404.html' }
 };
 
 // --- 路由核心邏輯 ---
