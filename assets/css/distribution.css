@@ -1,33 +1,119 @@
-/* --- 分配管理頁面專屬樣式 (distribution.css) --- */
+/* --- 分配管理頁面專屬樣式 (distribution.css) - 最終完整版 --- */
 
+/* 頁面佈局容器 */
+.distribution-page-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%; 
+}
+
+/* 頂部選擇區塊 */
 .selection-panel {
     background: var(--header-bg);
     padding: 20px;
     border-radius: 12px;
     margin-bottom: 20px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    flex-shrink: 0; 
 }
-
-.selection-grid {
+.selection-grid { 
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 20px;
 }
 
-.actions-panel {
+/* 主要內容體 */
+.distribution-body {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1; 
+    min-height: 0;
+}
+
+.actions-panel { 
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
     gap: 15px;
     margin-bottom: 20px;
+    flex-shrink: 0;
 }
 
+/* 表格容器 (修正滾動問題) */
 .table-container {
     border: 1px solid #dee2e6;
     border-radius: 12px;
-    max-height: 70vh;
     overflow: auto;
+    flex-grow: 1;
 }
 
-/* ... 此處省略其他與您原始檔案相同的樣式 ... */
+/* 分配表主體 */
+.distribution-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+.distribution-table th, 
+.distribution-table td {
+    padding: 12px 10px;
+    text-align: center;
+    border-bottom: 1px solid #e9ecef;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+/* 表格頭部 */
+.distribution-table th {
+    background: var(--sidebar-bg);
+    color: white;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* 第一欄 (細項名稱) 的特殊樣式 */
+.distribution-table th:first-child,
+.distribution-table td:first-child {
+    text-align: left;
+    padding-left: 15px;
+    min-width: 280px;
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    border-right: 2px solid #dee2e6;
+}
+.distribution-table td:first-child {
+    background: #f8f9fa;
+    font-weight: 500;
+}
+.distribution-table thead th:first-child {
+    z-index: 11;
+}
+.item-info { text-align: left; }
+.item-name { font-weight: 500; white-space: normal; }
+.item-details { font-size: 12px; color: #6c757d; margin-top: 4px; }
+
+/* 數量輸入框 */
+.quantity-input { width: 50px; text-align: center; padding: 4px; border: 1px solid #ddd; border-radius: 4px; }
+.quantity-input.has-value { background: #e8f5e8; border-color: #28a745; font-weight: bold; }
+
+/* 合計與狀態列 */
+.summary-row td {
+    background: #e9ecef;
+    font-weight: bold;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    border-top: 2px solid var(--color-primary);
+}
+.total-column { background: rgba(102, 126, 234, 0.1); font-weight: bold; }
+.status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-left: 8px; }
+.status-complete { background-color: var(--color-success); }
+.status-partial { background-color: var(--color-warning); }
+.status-none { background-color: var(--color-danger); }
+
+/* 順序管理 Modal 內的輸入框 */
+.sequence-input { width: 60px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; margin-right: 15px; }
+.sequence-name { flex-grow: 1; }
