@@ -103,13 +103,17 @@ body, html {
 
 /* --- 主要內容區 (Main Content) --- */
 .main-content {
-    flex-grow: 1;
+    flex-grow: 1; /* 仍然讓它在 flex 佈局中成長 */
     margin-left: 240px; /* 側邊欄寬度 */
     padding: 25px;
-    overflow-y: auto;
     transition: margin-left 0.3s ease-in-out;
-    min-width: 0; /* 【關鍵新增】這個屬性是解決 Flexbox/Grid 佈局中內容溢出的關鍵 */
-    overflow: auto; /* 這會同時智能地管理垂直和水平的滾動條 */
+
+    /* 【關鍵修正】 */
+    /* 1. 強制計算寬度：螢幕總寬度(100vw) 減去側邊欄的寬度 */
+    width: calc(100vw - 240px); 
+    
+    /* 2. 智能處理溢出：寬度或高度超出時，自動產生滾動條 */
+    overflow: auto; 
 }
 
 /* --- 響應式設計 (Responsive Web Design) --- */
