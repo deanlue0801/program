@@ -45,6 +45,8 @@
     border-radius: 12px;
     overflow: auto;
     flex-grow: 1;
+    /* 【關鍵新增】解決 Flexbox 環境下的水平滾動問題 */
+    min-width: 0; 
 }
 
 /* 分配表主體 */
