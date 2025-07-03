@@ -50,7 +50,6 @@
 
 /* 分配表主體 */
 .distribution-table {
-    width: 100%;
     border-collapse: separate;
     border-spacing: 0;
 }
