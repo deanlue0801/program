@@ -1,18 +1,24 @@
-/* --- 分配管理頁面專屬樣式 (distribution.css) - 最終佈局修正版 --- */
+/* --- 分配管理頁面專屬樣式 (distribution.css) - 最終簡化版 --- */
 
-/* 頁面佈局容器 */
-.distribution-page-wrapper {
+.distribution-page-wrapper,
+.distribution-body {
     display: flex;
     flex-direction: column;
-    height: 100%; 
+    height: 100%;
 }
+
+.distribution-body {
+    flex-grow: 1;
+    min-height: 0; /* flex 佈局中的重要技巧 */
+}
+
 .selection-panel {
     background: var(--header-bg);
     padding: 20px;
     border-radius: 12px;
     margin-bottom: 20px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    flex-shrink: 0; 
+    flex-shrink: 0;
 }
 .selection-grid { 
     display: grid;
@@ -20,13 +26,6 @@
     gap: 20px;
 }
 
-/* 主要內容體 */
-.distribution-body {
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1; 
-    min-height: 0;
-}
 .actions-panel { 
     display: flex;
     justify-content: space-between;
@@ -34,22 +33,15 @@
     flex-wrap: wrap;
     gap: 15px;
     margin-bottom: 20px;
-    flex-shrink: 0;
+    padding: 20px;
+    background: var(--header-bg);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
-/* 【關鍵修正】使用父層相對定位、子層絕對定位的技巧來處理滾動 */
-.table-wrapper {
-    flex-grow: 1;
-    position: relative; /* 設定為相對定位，作為滾動區的基準 */
-    min-height: 0;
-}
 .table-container {
-    position: absolute; /* 設定為絕對定位 */
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    overflow: auto;   /* 讓這個絕對定位的容器負責滾動 */
+    flex-grow: 1; /* 讓表格容器填滿剩餘的垂直空間 */
+    overflow: auto;   /* 【關鍵】當內容超出時，自動產生滾動條 */
     border: 1px solid #dee2e6;
     border-radius: 12px;
 }
