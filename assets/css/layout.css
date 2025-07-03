@@ -109,6 +109,7 @@ body, html {
     overflow-y: auto;
     transition: margin-left 0.3s ease-in-out;
     min-width: 0; /* 【關鍵新增】這個屬性是解決 Flexbox/Grid 佈局中內容溢出的關鍵 */
+    overflow: auto; /* 這會同時智能地管理垂直和水平的滾動條 */
 }
 
 /* --- 響應式設計 (Responsive Web Design) --- */
