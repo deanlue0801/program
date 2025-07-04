@@ -1,4 +1,3 @@
-```javascript
 /**
  * 簡易前端路由器 (SPA Router) - v4.0 (GitHub Pages SPA 最終解決方案)
  */
