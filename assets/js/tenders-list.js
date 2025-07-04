@@ -57,17 +57,26 @@ function initTendersListPage() {
     }
 
     function updateSummary() {
-        document.getElementById('totalTenders').textContent = allTenders.length;
-        const totalAmount = allTenders.reduce((sum, tender) => sum + (tender.totalAmount || 0), 0);
-        document.getElementById('totalAmount').textContent = formatCurrency(totalAmount);
-        document.getElementById('activeTenders').textContent = allTenders.filter(t => t.status === 'active').length;
-        document.getElementById('completedTenders').textContent = allTenders.filter(t => t.status === 'completed').length;
+        const totalTendersEl = document.getElementById('totalTenders');
+        const totalAmountEl = document.getElementById('totalAmount');
+        const activeTendersEl = document.getElementById('activeTenders');
+        const completedTendersEl = document.getElementById('completedTenders');
+
+        if(totalTendersEl) totalTendersEl.textContent = allTenders.length;
+        if(totalAmountEl) {
+             const totalAmount = allTenders.reduce((sum, tender) => sum + (tender.totalAmount || 0), 0);
+             totalAmountEl.textContent = formatCurrency(totalAmount);
+        }
+        if(activeTendersEl) activeTendersEl.textContent = allTenders.filter(t => t.status === 'active').length;
+        if(completedTendersEl) completedTendersEl.textContent = allTenders.filter(t => t.status === 'completed').length;
     }
 
     function renderTenders() {
         const tbody = document.getElementById('tendersTableBody');
         const emptyState = document.getElementById('emptyState');
         const tableContainer = document.querySelector('.table-container');
+
+        if (!tbody) return;
 
         if (filteredTenders.length === 0) {
             tbody.innerHTML = '';
@@ -79,9 +88,10 @@ function initTendersListPage() {
         if(tableContainer) tableContainer.style.display = 'block';
         if(emptyState) emptyState.style.display = 'none';
 
+        // 【修正處】這裡的 href 路徑移除了 .html，並確保路徑是絕對路徑
         tbody.innerHTML = filteredTenders.map(tender => `
             <tr>
-                <td><a href="/tenders/detail.html?id=${tender.id}" data-route>${escapeHtml(tender.name || '未命名標單')}</a></td>
+                <td><a href="/program/tenders/detail?id=${tender.id}" data-route>${escapeHtml(tender.name || '未命名標單')}</a></td>
                 <td><code>${escapeHtml(tender.code || 'N/A')}</code></td>
                 <td>${escapeHtml(tender.projectName)}</td>
                 <td><strong>${formatCurrency(tender.totalAmount || 0)}</strong></td>
@@ -129,12 +139,14 @@ function initTendersListPage() {
         applyFilters();
     }
     
+    // 【修正處】navigateTo 的路徑移除了 .html
     function viewTender(tenderId) {
-        navigateTo(`/tenders/detail.html?id=${tenderId}`);
+        navigateTo(`/program/tenders/detail?id=${tenderId}`);
     }
 
+    // 【修正處】navigateTo 的路徑移除了 .html
     function editTender(tenderId) {
-        navigateTo(`/tenders/edit.html?id=${tenderId}`);
+        navigateTo(`/program/tenders/edit?id=${tenderId}`);
     }
 
     async function deleteTender(tenderId, tenderName) {
@@ -142,13 +154,10 @@ function initTendersListPage() {
         
         try {
             showLoading(true, '刪除中...');
-            // 【優化】直接呼叫核心模組中更強大、更完整的刪除函數
             await deleteTenderAndRelatedData(tenderId);
             
-            // 從前端陣列中移除該筆資料，避免重新查詢，畫面反應更快
             allTenders = allTenders.filter(t => t.id !== tenderId);
             
-            // 重新應用篩選並更新畫面
             applyFilters();
             updateSummary();
             
@@ -164,12 +173,12 @@ function initTendersListPage() {
     // --- 輔助函數 ---
 
     function getStatusText(status) {
-        const statusMap = { 'planning': '規劃中', 'active': '進行中', 'completed': '已完成', 'paused': '暫停' };
+        const statusMap = { 'planning': '規劃中', 'bidding': '招標中', 'awarded': '得標', 'active': '進行中', 'completed': '已完成', 'paused': '暫停' };
         return statusMap[status] || '未設定';
     }
 
     function escapeHtml(text) {
-        if (!text) return '';
+        if (typeof text !== 'string') return '';
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
@@ -181,13 +190,13 @@ function initTendersListPage() {
         if (loadingEl) loadingEl.style.display = isLoading ? 'flex' : 'none';
         if (mainContentEl) mainContentEl.style.display = isLoading ? 'none' : 'block';
         if (isLoading && loadingEl) {
-            loadingEl.querySelector('p').textContent = message;
+            const p = loadingEl.querySelector('p');
+            if (p) p.textContent = message;
         }
     }
     
     // --- 函數暴露與頁面啟動 ---
     
-    // 將需要在 HTML onchange/onclick 中呼叫的函數，暴露到全局
     window.exposedListFuncs = {
         applyFilters,
         clearFilters,
@@ -196,7 +205,6 @@ function initTendersListPage() {
         deleteTender
     };
     
-    // 頁面啟動點
     console.log("🚀 初始化標單列表頁面...");
     loadAllData();
 }
