@@ -11,16 +11,6 @@
     <link rel="stylesheet" href="/program/assets/css/distribution.css">
     <link rel="stylesheet" href="/program/assets/css/import.css">
     <link rel="stylesheet" href="/program/assets/css/edit.css">
-<script>
-  // 這個腳本是為了解決 GitHub Pages 作為 SPA (單頁應用) 的路由問題
-  (function(){
-    var redirect = sessionStorage.redirect;
-    delete sessionStorage.redirect;
-    if (redirect && redirect != location.href) {
-      history.replaceState(null, null, redirect);
-    }
-  })();
-</script>
 
 </head>
 <body>
