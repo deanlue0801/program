@@ -6,17 +6,15 @@
     <title>專案管理系統</title>
     <link rel="stylesheet" href="/program/assets/css/layout.css">
     <link rel="stylesheet" href="/program/assets/css/dashboard.css">
-    <link rel="stylesheet" href="/program/assets/css/detail.css">
-    <link rel="stylesheet" href="/program/assets/css/import.css">
-    <link rel="stylesheet" href="/program/assets/css/distribution.css">
     <link rel="stylesheet" href="/program/assets/css/tenders-list.css">
+    <link rel="stylesheet" href="/program/assets/css/detail.css">
+    <link rel="stylesheet" href="/program/assets/css/distribution.css">
+    <link rel="stylesheet" href="/program/assets/css/import.css">
 </head>
 <body>
     <div class="app-layout">
         <nav class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <h3>🏗️ 專案管理</h3>
-            </div>
+            <div class="sidebar-header"><h3>🏗️ 專案管理</h3></div>
             <ul class="nav-list">
                 <li><a href="/program/dashboard" data-route>📊 儀表板</a></li>
                 <li>
@@ -32,23 +30,19 @@
                 <button onclick="logout()">登出</button>
             </div>
         </nav>
-
         <main class="main-content" id="app-content"></main>
     </div>
-
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-
-    <script src="assets/js/firebase-config.js"></script> 
-    <script src="assets/js/router.js"></script>
-
-    <script src="assets/js/dashboard.js"></script>
-    <script src="assets/js/tenders-list.js"></script> 
-    <script src="assets/js/tenders-detail.js"></script>
-    <script src="assets/js/tenders-distribution.js"></script>
-    <script src="assets/js/tenders-import.js"></script>
+    <script src="/program/assets/js/firebase-config.js"></script> 
+    <script src="/program/assets/js/router.js"></script>
+    <script src="/program/assets/js/dashboard.js"></script>
+    <script src="/program/assets/js/tenders-list.js"></script> 
+    <script src="/program/assets/js/tenders-detail.js"></script>
+    <script src="/program/assets/js/tenders-distribution.js"></script>
+    <script src="/program/assets/js/tenders-import.js"></script>
 </body>
 </html>
