@@ -10,8 +10,8 @@ const routes = {
     '/tenders/detail': { html: 'pages/tenders/detail.html', init: 'initTenderDetailPage' },
     '/tenders/distribution': { html: 'pages/tenders/distribution.html', init: 'initDistributionPage' },
     '/tenders/import': { html: 'pages/tenders/import.html', init: 'initImportPage' },
-    // 注意：編輯頁的路由尚未建立，點擊會導向 404
-    '/tenders/edit': { html: 'pages/404.html' },
+    '/tenders/detail': { html: 'pages/tenders/detail.html', init: 'initTenderDetailPage' },
+    '/tenders/edit': { html: 'pages/tenders/edit.html', init: 'initTenderEditPage' },
     '404': { html: 'pages/404.html' }
 };
 
