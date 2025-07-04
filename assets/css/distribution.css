@@ -57,7 +57,7 @@
     overflow: auto;   /* 自動處理垂直和水平滾動 */
     border: 1px solid #dee2e6;
     border-radius: 12px;
-    height: 600px;
+    height: 100vh;
 }
 
 /* 分配表主體 */
