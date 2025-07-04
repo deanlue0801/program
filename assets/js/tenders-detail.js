@@ -136,7 +136,6 @@ function initTenderDetailPage() {
         statusBadge.textContent = statusLabel;
         statusBadge.className = `status-badge ${statusClass}`;
         
-        // 【修正處】動態設定按鈕的 href，確保路徑正確
         const editBtn = document.getElementById('editBtn');
         const importBtn = document.getElementById('importBtn');
         const distBtn = document.getElementById('distributionBtn');
@@ -152,7 +151,7 @@ function initTenderDetailPage() {
         const distributedMajorItems = calculateDistributedMajorItems();
         const distributionProgress = majorItemsCount > 0 ? (distributedMajorItems / majorItemsCount) * 100 : 0;
         const overallProgress = 0; // 暫時為0，待實作
-        const billingAmount = totalAmount * (overallProgress / 100); // 假設可請款金額與進度掛鉤
+        const billingAmount = totalAmount * (overallProgress / 100);
 
         document.getElementById('totalAmount').textContent = formatCurrency(totalAmount);
         document.getElementById('majorItemsCount').textContent = majorItemsCount;
@@ -230,13 +229,18 @@ function initTenderDetailPage() {
 
     function createDetailItemsSummary(details, distributions) {
         if (details.length === 0) return '<div class="empty-state" style="padding:1rem"><p>此大項目尚無細項</p></div>';
-        const totalQuantity = details.reduce((sum, item) => sum + (item.totalQuantity || 0), 0);
-        const totalAmount = details.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
-        const distributedQuantity = distributions.reduce((sum, dist) => sum + (dist.quantity || 0), 0);
+        
+        const totalQuantity = details.reduce((sum, item) => sum + (parseFloat(item.totalQuantity) || 0), 0);
+        const totalAmount = details.reduce((sum, item) => sum + (parseFloat(item.totalPrice) || 0), 0);
+        const distributedQuantity = distributions.reduce((sum, dist) => sum + (parseFloat(dist.quantity) || 0), 0);
+        
+        // 【修正處】修正已分配金額的計算邏輯
         const distributedAmount = distributions.reduce((sum, dist) => {
              const detail = details.find(d => d.id === dist.detailItemId);
-             return sum + (dist.quantity * (detail?.unitPrice || 0));
+             const unitPrice = detail ? (parseFloat(detail.unitPrice) || 0) : 0;
+             return sum + ((parseFloat(dist.quantity) || 0) * unitPrice);
         }, 0);
+
         return `<div class="summary-grid">
             <div><div>${details.length}</div><div>細項總數</div></div>
             <div><div>${totalQuantity}</div><div>總數量</div></div>
@@ -259,7 +263,7 @@ function initTenderDetailPage() {
         document.getElementById('infoCreatedAt').textContent = formatDateTime(currentTender.createdAt);
         document.getElementById('infoUpdatedAt').textContent = formatDateTime(currentTender.updatedAt);
         const amount = currentTender.totalAmount || 0;
-        const tax = currentTender.tax || Math.round(amount / 1.05 * 0.05); // 推算稅額
+        const tax = currentTender.tax || 0;
         const subtotal = amount - tax;
         document.getElementById('infoAmount').textContent = formatCurrency(subtotal);
         document.getElementById('infoTax').textContent = formatCurrency(tax);
@@ -280,14 +284,22 @@ function initTenderDetailPage() {
         return new Set(distributionData.map(dist => dist.areaName).filter(Boolean)).size;
     }
 
+    // 【修正處】強化計算邏輯，確保所有值都被當作數字處理
     function calculateMajorItemDistributionProgress(majorItemId) {
         const relatedDetails = detailItems.filter(item => item.majorItemId === majorItemId);
-        if (relatedDetails.length === 0) return 0;
-        const totalQuantity = relatedDetails.reduce((sum, item) => sum + (item.totalQuantity || 0), 0);
-        if (totalQuantity === 0) return 0;
-        const distributedQuantity = distributionData
-            .filter(dist => relatedDetails.some(detail => detail.id === dist.detailItemId))
-            .reduce((sum, dist) => sum + (dist.quantity || 0), 0);
+        if (relatedDetails.length === 0) {
+            return 0;
+        }
+
+        const totalQuantity = relatedDetails.reduce((sum, item) => sum + (parseFloat(item.totalQuantity) || 0), 0);
+        if (totalQuantity === 0) {
+            return 0;
+        }
+
+        const relatedDetailIds = new Set(relatedDetails.map(item => item.id));
+        const relatedDistributions = distributionData.filter(dist => relatedDetailIds.has(dist.detailItemId));
+        const distributedQuantity = relatedDistributions.reduce((sum, dist) => sum + (parseFloat(dist.quantity) || 0), 0);
+
         return (distributedQuantity / totalQuantity) * 100;
     }
 
@@ -341,7 +353,6 @@ function initTenderDetailPage() {
 
     // --- 頁面跳轉 ---
     
-    // 【修正處】navigateTo 的路徑已修正
     function goToDistribution(majorItemId) {
         navigateTo(`/program/tenders/distribution?tenderId=${tenderId}&majorItemId=${majorItemId}`);
     }
@@ -358,7 +369,6 @@ function initTenderDetailPage() {
         if (el) el.style.display = 'block';
     }
     
-    // 【修正處】確保暴露的物件名稱與 HTML 中使用的名稱一致
     window.exposedFunctions = {
         switchTab,
         toggleAllMajorItems,
