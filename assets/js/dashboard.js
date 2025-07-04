@@ -91,7 +91,7 @@ function initDashboardPage() {
     // --- UI 更新與顯示 ---
 
     function updateStatsDisplay(stats) {
-        // 【修改點】移除 ?. 語法，改用傳統 if 判斷
+        // 【修正處】移除 ?. 語法，改用傳統 if 判斷
         const projectCountEl = document.getElementById('projectCount');
         if (projectCountEl) projectCountEl.textContent = stats.projectCount;
 
@@ -160,7 +160,7 @@ function initDashboardPage() {
     }
 
     function showMainContent() {
-        // 【修改點】移除 ?. 語法，改用傳統 if 判斷
+        // 【修正處】移除 ?. 語法，改用傳統 if 判斷
         const loadingEl = document.getElementById('loading');
         if (loadingEl) loadingEl.style.display = 'none';
         
