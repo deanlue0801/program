@@ -7,6 +7,25 @@ function initTenderEditPage() {
     let currentTender = null;
     let projects = [];
 
+    // 【新增的輔助函數】用來安全地處理多種日期格式
+    function safeFormatDateForInput(dateField) {
+        if (!dateField) {
+            return '';
+        }
+        // 如果是 Firestore Timestamp 物件，它會有 toDate 方法
+        if (typeof dateField.toDate === 'function') {
+            return dateField.toDate().toISOString().split('T')[0];
+        }
+        // 如果是字串或其他格式，嘗試用 new Date() 解析
+        const date = new Date(dateField);
+        // 檢查解析出來的是否為有效日期
+        if (!isNaN(date.getTime())) {
+            return date.toISOString().split('T')[0];
+        }
+        // 如果都不是，返回空字串
+        return '';
+    }
+
     async function loadPageData() {
         showLoading(true);
         const urlParams = new URLSearchParams(window.location.search);
@@ -61,8 +80,11 @@ function initTenderEditPage() {
         document.getElementById('tenderName').value = currentTender.name || '';
         document.getElementById('tenderCode').value = currentTender.code || '';
         document.getElementById('statusSelect').value = currentTender.status || 'planning';
-        document.getElementById('startDate').value = currentTender.startDate?.toDate().toISOString().split('T')[0] || '';
-        document.getElementById('endDate').value = currentTender.endDate?.toDate().toISOString().split('T')[0] || '';
+        
+        // 【修正處】使用新的輔助函數來安全地設定日期
+        document.getElementById('startDate').value = safeFormatDateForInput(currentTender.startDate);
+        document.getElementById('endDate').value = safeFormatDateForInput(currentTender.endDate);
+        
         document.getElementById('contractorName').value = currentTender.contractorName || '';
         document.getElementById('contractorContact').value = currentTender.contractorContact || '';
         document.getElementById('description').value = currentTender.description || '';
@@ -113,7 +135,7 @@ function initTenderEditPage() {
         const loadingEl = document.getElementById('loading');
         const formEl = document.getElementById('editTenderForm');
         if (isLoading) {
-            if (loadingEl) { loadingEl.style.display = 'flex'; loadingEl.querySelector('p').textContent = message; }
+            if (loadingEl) { loadingEl.style.display = 'flex'; if(loadingEl.querySelector('p')) loadingEl.querySelector('p').textContent = message; }
             if (formEl) formEl.style.display = 'none';
         } else {
             if (loadingEl) loadingEl.style.display = 'none';
