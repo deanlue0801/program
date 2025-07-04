@@ -25,7 +25,7 @@ function initTenderDetailPage() {
         tenderId = urlParams.get('id');
         if (!tenderId) {
             showAlert('無效的標單ID', 'error');
-            navigateTo('/tenders/list.html');
+            navigateTo('/program/tenders/list');
             return false;
         }
         return true;
@@ -39,7 +39,7 @@ function initTenderDetailPage() {
             const tenderDoc = await db.collection('tenders').doc(tenderId).get();
             if (!tenderDoc.exists || tenderDoc.data().createdBy !== currentUser.email) {
                 showAlert('找不到指定的標單或無權限查看', 'error');
-                navigateTo('/tenders/list.html');
+                navigateTo('/program/tenders/list');
                 return;
             }
             currentTender = { id: tenderDoc.id, ...tenderDoc.data() };
@@ -86,6 +86,7 @@ function initTenderDetailPage() {
         }
         const majorItemIds = majorItems.map(item => item.id);
         const detailPromises = [];
+        // Firestore 'in' 查詢每次最多10個元素
         for (let i = 0; i < majorItemIds.length; i += 10) {
             const chunk = majorItemIds.slice(i, i + 10);
             detailPromises.push(safeFirestoreQuery('detailItems', [{ field: 'majorItemId', operator: 'in', value: chunk }]));
@@ -102,6 +103,7 @@ function initTenderDetailPage() {
         }
         const detailItemIds = detailItems.map(item => item.id);
         const distPromises = [];
+        // Firestore 'in' 查詢每次最多10個元素
         for (let i = 0; i < detailItemIds.length; i += 10) {
             const chunk = detailItemIds.slice(i, i + 10);
             distPromises.push(safeFirestoreQuery('distributionTable', [{ field: 'detailItemId', operator: 'in', value: chunk }]));
@@ -110,7 +112,7 @@ function initTenderDetailPage() {
         distributionData = distChunks.flatMap(chunk => chunk.docs);
     }
 
-    // --- 畫面渲染與計算 (完整版) ---
+    // --- 畫面渲染與計算 ---
 
     function renderAllData() {
         renderTenderHeader();
@@ -124,21 +126,23 @@ function initTenderDetailPage() {
         const projectName = currentProject ? currentProject.name : '未知專案';
         const statusClass = `status-${currentTender.status || 'planning'}`;
         const statusLabel = statusText[currentTender.status] || currentTender.status;
+        
         document.getElementById('tenderName').textContent = currentTender.name || '未命名標單';
         document.getElementById('tenderCode').textContent = currentTender.code || '-';
         document.getElementById('projectName').textContent = projectName;
         document.getElementById('createdInfo').textContent = `建立於 ${formatDate(currentTender.createdAt)} by ${currentTender.createdBy || '未知'}`;
+        
         const statusBadge = document.getElementById('statusBadge');
         statusBadge.textContent = statusLabel;
         statusBadge.className = `status-badge ${statusClass}`;
         
-        // 將按鈕的 href 改為 data-route 以配合 router
+        // 【修正處】動態設定按鈕的 href，確保路徑正確
         const editBtn = document.getElementById('editBtn');
         const importBtn = document.getElementById('importBtn');
         const distBtn = document.getElementById('distributionBtn');
-        if(editBtn) { editBtn.href = `/tenders/edit.html?id=${tenderId}`; editBtn.setAttribute('data-route', ''); }
-        if(importBtn) { importBtn.href = `/tenders/import.html?tenderId=${tenderId}`; importBtn.setAttribute('data-route', ''); }
-        if(distBtn) { distBtn.href = `/tenders/distribution.html?tenderId=${tenderId}`; distBtn.setAttribute('data-route', ''); }
+        if(editBtn) editBtn.href = `/program/tenders/edit?id=${tenderId}`;
+        if(importBtn) importBtn.href = `/program/tenders/import?tenderId=${tenderId}`;
+        if(distBtn) distBtn.href = `/program/tenders/distribution?tenderId=${tenderId}`;
     }
 
     function renderStatistics() {
@@ -147,8 +151,9 @@ function initTenderDetailPage() {
         const detailItemsCount = detailItems.length;
         const distributedMajorItems = calculateDistributedMajorItems();
         const distributionProgress = majorItemsCount > 0 ? (distributedMajorItems / majorItemsCount) * 100 : 0;
-        const overallProgress = 0;
-        const billingAmount = totalAmount * 0.3;
+        const overallProgress = 0; // 暫時為0，待實作
+        const billingAmount = totalAmount * (overallProgress / 100); // 假設可請款金額與進度掛鉤
+
         document.getElementById('totalAmount').textContent = formatCurrency(totalAmount);
         document.getElementById('majorItemsCount').textContent = majorItemsCount;
         document.getElementById('detailItemsCount').textContent = detailItemsCount;
@@ -192,7 +197,7 @@ function initTenderDetailPage() {
         const relatedDistributions = distributionData.filter(dist => relatedDetails.some(detail => detail.id === dist.detailItemId));
         const distributionProgress = calculateMajorItemDistributionProgress(majorItem.id);
         const totalDetails = relatedDetails.length;
-        const distributedDetails = relatedDistributions.length; // 這裡的計算可能需要修正，暫時保留
+        
         const majorItemDiv = document.createElement('div');
         majorItemDiv.className = 'major-item-card';
         majorItemDiv.id = `major-item-${majorItem.id}`;
@@ -203,7 +208,7 @@ function initTenderDetailPage() {
                         <h4>${majorItem.sequence || 'N/A'}. ${majorItem.name || '未命名大項目'}</h4>
                         <div class="major-item-meta">
                             <span>📋 ${totalDetails} 個細項</span>
-                            <span>🔧 ${new Set(relatedDistributions.map(d=>d.detailItemId)).size} 已分配</span>
+                            <span>🔧 ${new Set(relatedDistributions.map(d=>d.detailItemId)).size} 已分配細項</span>
                             <span>📊 狀態: ${statusText[majorItem.status] || majorItem.status || '未設定'}</span>
                         </div>
                     </div>
@@ -215,7 +220,6 @@ function initTenderDetailPage() {
                     <div class="progress-item"><div class="progress-value">0%</div><div class="progress-label">完成進度</div></div>
                 </div>
                 <div class="major-item-actions">
-                    <button class="btn btn-primary" onclick="window.exposedFunctions.goToMajorItemDetail('${majorItem.id}')">📋 查看詳情</button>
                     <button class="btn btn-warning" onclick="window.exposedFunctions.goToDistribution('${majorItem.id}')">🔧 設定分配</button>
                     <button class="btn btn-secondary" onclick="window.exposedFunctions.toggleMajorItemSummary('${majorItem.id}')">👁️ 細項預覽</button>
                 </div>
@@ -229,7 +233,10 @@ function initTenderDetailPage() {
         const totalQuantity = details.reduce((sum, item) => sum + (item.totalQuantity || 0), 0);
         const totalAmount = details.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
         const distributedQuantity = distributions.reduce((sum, dist) => sum + (dist.quantity || 0), 0);
-        const distributedAmount = distributions.reduce((sum, dist) => sum + (dist.amount || 0), 0);
+        const distributedAmount = distributions.reduce((sum, dist) => {
+             const detail = details.find(d => d.id === dist.detailItemId);
+             return sum + (dist.quantity * (detail?.unitPrice || 0));
+        }, 0);
         return `<div class="summary-grid">
             <div><div>${details.length}</div><div>細項總數</div></div>
             <div><div>${totalQuantity}</div><div>總數量</div></div>
@@ -243,7 +250,22 @@ function initTenderDetailPage() {
     function renderInfoTab() {
         document.getElementById('infoTenderCode').textContent = currentTender.code || '-';
         document.getElementById('infoProjectName').textContent = currentProject ? currentProject.name : '未知專案';
-        //... 此處省略其他 info... 的賦值，與您版本相同
+        document.getElementById('infoStatus').textContent = statusText[currentTender.status] || currentTender.status;
+        document.getElementById('infoStartDate').textContent = formatDate(currentTender.startDate);
+        document.getElementById('infoEndDate').textContent = formatDate(currentTender.endDate);
+        document.getElementById('infoContractorName').textContent = currentTender.contractorName || '-';
+        document.getElementById('infoContractorContact').textContent = currentTender.contractorContact || '-';
+        document.getElementById('infoCreatedBy').textContent = currentTender.createdBy || '-';
+        document.getElementById('infoCreatedAt').textContent = formatDateTime(currentTender.createdAt);
+        document.getElementById('infoUpdatedAt').textContent = formatDateTime(currentTender.updatedAt);
+        const amount = currentTender.totalAmount || 0;
+        const tax = currentTender.tax || Math.round(amount / 1.05 * 0.05); // 推算稅額
+        const subtotal = amount - tax;
+        document.getElementById('infoAmount').textContent = formatCurrency(subtotal);
+        document.getElementById('infoTax').textContent = formatCurrency(tax);
+        document.getElementById('infoTotalAmount').textContent = formatCurrency(amount);
+        document.getElementById('infoDescription').textContent = currentTender.description || '-';
+        document.getElementById('infoNotes').textContent = currentTender.notes || '-';
     }
 
     function calculateDistributedMajorItems() {
@@ -272,7 +294,9 @@ function initTenderDetailPage() {
     function calculateExecutedDays() {
         if (!currentTender.startDate) return 0;
         const startDate = currentTender.startDate.toDate ? currentTender.startDate.toDate() : new Date(currentTender.startDate);
-        return Math.ceil(Math.abs(new Date() - startDate) / (1000 * 60 * 60 * 24));
+        const today = new Date();
+        if (startDate > today) return 0;
+        return Math.ceil(Math.abs(today - startDate) / (1000 * 60 * 60 * 24));
     }
 
     function calculateRemainingDays() {
@@ -289,9 +313,6 @@ function initTenderDetailPage() {
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
         document.querySelector(`.tab-btn[onclick*="'${tabName}'"]`).classList.add('active');
         document.getElementById(`tab-${tabName}`).classList.add('active');
-        if (tabName === 'major-items') {
-            refreshMajorItems();
-        }
     }
 
     function toggleMajorItemSummary(majorItemId) {
@@ -320,16 +341,9 @@ function initTenderDetailPage() {
 
     // --- 頁面跳轉 ---
     
-    function goToMajorItemDetail(majorItemId) {
-        navigateTo(`/major-items/detail.html?id=${majorItemId}`);
-    }
-
+    // 【修正處】navigateTo 的路徑已修正
     function goToDistribution(majorItemId) {
-        navigateTo(`/tenders/distribution.html?tenderId=${tenderId}&majorItemId=${majorItemId}`);
-    }
-
-    function goToProgress(majorItemId) {
-        navigateTo(`/progress/checklist.html?majorItemId=${majorItemId}`);
+        navigateTo(`/program/tenders/distribution?tenderId=${tenderId}&majorItemId=${majorItemId}`);
     }
 
     function showLoading(message = '載入中...') {
@@ -343,17 +357,13 @@ function initTenderDetailPage() {
         if (loadingEl) loadingEl.style.display = 'none';
         if (el) el.style.display = 'block';
     }
-
-    // --- 函數暴露與頁面啟動 ---
     
-    // 將需要在 HTML onclick 中呼叫的函數，暴露到一個全局物件下
+    // 【修正處】確保暴露的物件名稱與 HTML 中使用的名稱一致
     window.exposedFunctions = {
         switchTab,
         toggleAllMajorItems,
         refreshMajorItems,
-        goToMajorItemDetail,
         goToDistribution,
-        goToProgress,
         toggleMajorItemSummary
     };
 
@@ -367,9 +377,9 @@ function initTenderDetailPage() {
 function naturalSequenceSort(a, b) {
     const seqA = String(a.sequence || '');
     const seqB = String(b.sequence || '');
-    const re = /(\d+(\.\d+)?)/g;
-    const partsA = seqA.split(re).filter(Boolean);
-    const partsB = seqB.split(re).filter(Boolean);
+    const re = /(\d+(\.\d+)?)|(\D+)/g;
+    const partsA = seqA.match(re) || [];
+    const partsB = seqB.match(re) || [];
     const len = Math.min(partsA.length, partsB.length);
     for (let i = 0; i < len; i++) {
         const partA = partsA[i];
