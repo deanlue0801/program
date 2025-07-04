@@ -31,6 +31,7 @@ function initTenderDetailPage() {
         return true;
     }
 
+    // 【修正處】調整了資料載入順序，解決非同步問題
     async function loadAllData() {
         if (!getTenderIdFromUrl()) return;
 
@@ -44,12 +45,14 @@ function initTenderDetailPage() {
             }
             currentTender = { id: tenderDoc.id, ...tenderDoc.data() };
 
-            await Promise.all([
-                loadProjectData(),
-                loadMajorAndDetailItems(),
-                loadDistributionData()
-            ]);
+            // 必須先載入專案和主要項目/細項
+            await loadProjectData();
+            await loadMajorAndDetailItems();
             
+            // 然後才能根據細項去載入分配資料
+            await loadDistributionData();
+            
+            // 最後才渲染所有畫面
             renderAllData();
             showMainContent();
             console.log('標單詳情頁面載入完成');
@@ -86,7 +89,6 @@ function initTenderDetailPage() {
         }
         const majorItemIds = majorItems.map(item => item.id);
         const detailPromises = [];
-        // Firestore 'in' 查詢每次最多10個元素
         for (let i = 0; i < majorItemIds.length; i += 10) {
             const chunk = majorItemIds.slice(i, i + 10);
             detailPromises.push(safeFirestoreQuery('detailItems', [{ field: 'majorItemId', operator: 'in', value: chunk }]));
@@ -103,7 +105,6 @@ function initTenderDetailPage() {
         }
         const detailItemIds = detailItems.map(item => item.id);
         const distPromises = [];
-        // Firestore 'in' 查詢每次最多10個元素
         for (let i = 0; i < detailItemIds.length; i += 10) {
             const chunk = detailItemIds.slice(i, i + 10);
             distPromises.push(safeFirestoreQuery('distributionTable', [{ field: 'detailItemId', operator: 'in', value: chunk }]));
@@ -150,7 +151,7 @@ function initTenderDetailPage() {
         const detailItemsCount = detailItems.length;
         const distributedMajorItems = calculateDistributedMajorItems();
         const distributionProgress = majorItemsCount > 0 ? (distributedMajorItems / majorItemsCount) * 100 : 0;
-        const overallProgress = 0; // 暫時為0，待實作
+        const overallProgress = 0;
         const billingAmount = totalAmount * (overallProgress / 100);
 
         document.getElementById('totalAmount').textContent = formatCurrency(totalAmount);
@@ -234,7 +235,6 @@ function initTenderDetailPage() {
         const totalAmount = details.reduce((sum, item) => sum + (parseFloat(item.totalPrice) || 0), 0);
         const distributedQuantity = distributions.reduce((sum, dist) => sum + (parseFloat(dist.quantity) || 0), 0);
         
-        // 【修正處】修正已分配金額的計算邏輯
         const distributedAmount = distributions.reduce((sum, dist) => {
              const detail = details.find(d => d.id === dist.detailItemId);
              const unitPrice = detail ? (parseFloat(detail.unitPrice) || 0) : 0;
@@ -284,7 +284,6 @@ function initTenderDetailPage() {
         return new Set(distributionData.map(dist => dist.areaName).filter(Boolean)).size;
     }
 
-    // 【修正處】強化計算邏輯，確保所有值都被當作數字處理
     function calculateMajorItemDistributionProgress(majorItemId) {
         const relatedDetails = detailItems.filter(item => item.majorItemId === majorItemId);
         if (relatedDetails.length === 0) {
