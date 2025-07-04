@@ -8,10 +8,15 @@ function initTenderDetailPage() {
     let currentTender = null;
     let currentProject = null;
     let majorItems = [];
-    let detailItems = [];
-    let distributionData = [];
+    let detailItems = [];       // <-- 內部變數
+    let distributionData = [];  // <-- 內部變數
     let tenderId = null;
     let allMajorExpanded = false;
+
+    // 【新增除錯機制】將內部變數暴露到 window 全域，方便從 console 存取
+    window.detailItems = detailItems;
+    window.distributionData = distributionData;
+
 
     const statusText = {
         'planning': '規劃中', 'active': '進行中', 'completed': '已完成',
@@ -28,10 +33,10 @@ function initTenderDetailPage() {
             navigateTo('/program/tenders/list');
             return false;
         }
+        console.log(`[DEBUG] 成功從網址取得 Tender ID: ${tenderId}`);
         return true;
     }
 
-    // 【修正處】調整了資料載入順序，解決非同步問題
     async function loadAllData() {
         if (!getTenderIdFromUrl()) return;
 
@@ -44,20 +49,17 @@ function initTenderDetailPage() {
                 return;
             }
             currentTender = { id: tenderDoc.id, ...tenderDoc.data() };
+            console.log('[DEBUG] 1. 成功載入標單本身 (Tender)', currentTender);
 
-            // 必須先載入專案和主要項目/細項
             await loadProjectData();
             await loadMajorAndDetailItems();
-            
-            // 然後才能根據細項去載入分配資料
             await loadDistributionData();
-            
-            // 最後才渲染所有畫面
+
             renderAllData();
             showMainContent();
-            console.log('標單詳情頁面載入完成');
+            console.log('✅ 標單詳情頁面載入完成');
         } catch (error) {
-            console.error('載入標單詳情頁失敗:', error);
+            console.error('❌ 載入標單詳情頁失敗:', error);
             showAlert('載入資料失敗: ' + error.message, 'error');
             showMainContent();
         }
@@ -66,11 +68,13 @@ function initTenderDetailPage() {
     async function loadProjectData() {
         if (!currentTender.projectId) {
             currentProject = null;
+            console.log('[DEBUG] 2. 此標單未關聯專案');
             return;
         }
         try {
             const projectDoc = await db.collection('projects').doc(currentTender.projectId).get();
             currentProject = projectDoc.exists ? { id: projectDoc.id, ...projectDoc.data() } : null;
+            console.log('[DEBUG] 2. 成功載入所屬專案 (Project)', currentProject);
         } catch (error) {
             console.warn('載入專案資料失敗:', error);
             currentProject = null;
@@ -79,12 +83,16 @@ function initTenderDetailPage() {
 
     async function loadMajorAndDetailItems() {
         const majorItemsResult = await safeFirestoreQuery('majorItems',
-            [{ field: 'tenderId', operator: '==', value: tenderId }],
-            { field: 'sequence', direction: 'asc' }
+            [{ field: 'tenderId', operator: '==', value: tenderId }]
         );
         majorItems = majorItemsResult.docs;
+        console.log(`[DEBUG] 3. 找到 ${majorItems.length} 個工程大項 (Major Items)`);
+        console.table(majorItems.map(m => ({id: m.id, name: m.name, tenderId: m.tenderId})));
+
         if (majorItems.length === 0) {
             detailItems = [];
+            window.detailItems = detailItems; // 更新全域變數
+            console.log('[DEBUG] 4. 因沒有大項，細項 (Detail Items) 為空');
             return;
         }
         const majorItemIds = majorItems.map(item => item.id);
@@ -96,11 +104,16 @@ function initTenderDetailPage() {
         const detailChunks = await Promise.all(detailPromises);
         detailItems = detailChunks.flatMap(chunk => chunk.docs);
         detailItems.sort(naturalSequenceSort);
+        window.detailItems = detailItems; // 更新全域變數
+        console.log(`[DEBUG] 4. 根據大項，共找到 ${detailItems.length} 個工程細項 (Detail Items)`);
+        console.table(detailItems.map(d => ({id: d.id, name: d.name, totalQuantity: d.totalQuantity, majorItemId: d.majorItemId})));
     }
 
     async function loadDistributionData() {
         if (detailItems.length === 0) {
             distributionData = [];
+            window.distributionData = distributionData; // 更新全域變數
+            console.log('[DEBUG] 5. 因沒有細項，分配資料 (Distribution Data) 為空');
             return;
         }
         const detailItemIds = detailItems.map(item => item.id);
@@ -111,10 +124,12 @@ function initTenderDetailPage() {
         }
         const distChunks = await Promise.all(distPromises);
         distributionData = distChunks.flatMap(chunk => chunk.docs);
+        window.distributionData = distributionData; // 更新全域變數
+        console.log(`[DEBUG] 5. 根據細項，共找到 ${distributionData.length} 筆分配資料 (Distribution Data)`);
+        console.table(distributionData.map(d => ({id: d.id, quantity: d.quantity, areaName: d.areaName, detailItemId: d.detailItemId})));
     }
 
-    // --- 畫面渲染與計算 ---
-
+    // --- 畫面渲染與計算 (省略未修改部分) ---
     function renderAllData() {
         renderTenderHeader();
         renderStatistics();
@@ -127,16 +142,16 @@ function initTenderDetailPage() {
         const projectName = currentProject ? currentProject.name : '未知專案';
         const statusClass = `status-${currentTender.status || 'planning'}`;
         const statusLabel = statusText[currentTender.status] || currentTender.status;
-        
+
         document.getElementById('tenderName').textContent = currentTender.name || '未命名標單';
         document.getElementById('tenderCode').textContent = currentTender.code || '-';
         document.getElementById('projectName').textContent = projectName;
         document.getElementById('createdInfo').textContent = `建立於 ${formatDate(currentTender.createdAt)} by ${currentTender.createdBy || '未知'}`;
-        
+
         const statusBadge = document.getElementById('statusBadge');
         statusBadge.textContent = statusLabel;
         statusBadge.className = `status-badge ${statusClass}`;
-        
+
         const editBtn = document.getElementById('editBtn');
         const importBtn = document.getElementById('importBtn');
         const distBtn = document.getElementById('distributionBtn');
@@ -197,7 +212,7 @@ function initTenderDetailPage() {
         const relatedDistributions = distributionData.filter(dist => relatedDetails.some(detail => detail.id === dist.detailItemId));
         const distributionProgress = calculateMajorItemDistributionProgress(majorItem.id);
         const totalDetails = relatedDetails.length;
-        
+
         const majorItemDiv = document.createElement('div');
         majorItemDiv.className = 'major-item-card';
         majorItemDiv.id = `major-item-${majorItem.id}`;
@@ -230,15 +245,15 @@ function initTenderDetailPage() {
 
     function createDetailItemsSummary(details, distributions) {
         if (details.length === 0) return '<div class="empty-state" style="padding:1rem"><p>此大項目尚無細項</p></div>';
-        
+
         const totalQuantity = details.reduce((sum, item) => sum + (parseFloat(item.totalQuantity) || 0), 0);
         const totalAmount = details.reduce((sum, item) => sum + (parseFloat(item.totalPrice) || 0), 0);
         const distributedQuantity = distributions.reduce((sum, dist) => sum + (parseFloat(dist.quantity) || 0), 0);
-        
+
         const distributedAmount = distributions.reduce((sum, dist) => {
-             const detail = details.find(d => d.id === dist.detailItemId);
-             const unitPrice = detail ? (parseFloat(detail.unitPrice) || 0) : 0;
-             return sum + ((parseFloat(dist.quantity) || 0) * unitPrice);
+            const detail = details.find(d => d.id === dist.detailItemId);
+            const unitPrice = detail ? (parseFloat(detail.unitPrice) || 0) : 0;
+            return sum + ((parseFloat(dist.quantity) || 0) * unitPrice);
         }, 0);
 
         return `<div class="summary-grid">
@@ -292,7 +307,7 @@ function initTenderDetailPage() {
 
         const totalQuantity = relatedDetails.reduce((sum, item) => sum + (parseFloat(item.totalQuantity) || 0), 0);
         if (totalQuantity === 0) {
-            return 0;
+            return 100; // 如果總數為0，可以視為100%完成或0%，這裡定為100%
         }
 
         const relatedDetailIds = new Set(relatedDetails.map(item => item.id));
@@ -351,7 +366,7 @@ function initTenderDetailPage() {
     }
 
     // --- 頁面跳轉 ---
-    
+
     function goToDistribution(majorItemId) {
         navigateTo(`/program/tenders/distribution?tenderId=${tenderId}&majorItemId=${majorItemId}`);
     }
@@ -367,7 +382,7 @@ function initTenderDetailPage() {
         if (loadingEl) loadingEl.style.display = 'none';
         if (el) el.style.display = 'block';
     }
-    
+
     window.exposedFunctions = {
         switchTab,
         toggleAllMajorItems,
@@ -403,3 +418,6 @@ function naturalSequenceSort(a, b) {
     }
     return partsA.length - partsB.length;
 }
+
+// 立即啟動頁面邏輯
+initTenderDetailPage();
