@@ -1,29 +1,27 @@
 /**
- * 簡易前端路由器 (SPA Router) - v3.0 (GitHub Pages 子目錄最終相容版)
+ * 簡易前端路由器 (SPA Router) - v3.1 (乾淨連結最終版)
  */
 
-// 專案在 GitHub Pages 上的基礎路徑 (您的專案名稱)
-const GHP_BASE_PATH = 'program';
-
-// 【請用這個全新的 routes 物件，取代 router.js 中舊的】
+// 【重要修正】路由表的「鍵」現在是不含 .html 的乾淨路徑
 const routes = {
-    // 路由路徑 (鍵)：已移除 .html
-    // HTML片段檔案路徑 (html 屬性)：維持不變，因為它指向真實的檔案
-    '/': { html: '/pages/dashboard.html', init: 'initDashboardPage' },
-    '/dashboard': { html: '/pages/dashboard.html', init: 'initDashboardPage' },
-    '/tenders/list': { html: '/pages/tenders/list.html', init: 'initTendersListPage' },
-    '/tenders/detail': { html: '/pages/tenders/detail.html', init: 'initTenderDetailPage' },
-    '/tenders/distribution': { html: '/pages/tenders/distribution.html', init: 'initDistributionPage' },
-    '/tenders/import': { html: '/pages/tenders/import.html', init: 'initImportPage' },
-    '404': { html: '/pages/404.html' }
+    '/': { html: 'pages/dashboard.html', init: 'initDashboardPage' },
+    '/dashboard': { html: 'pages/dashboard.html', init: 'initDashboardPage' },
+    '/tenders/list': { html: 'pages/tenders/list.html', init: 'initTendersListPage' },
+    '/tenders/detail': { html: 'pages/tenders/detail.html', init: 'initTenderDetailPage' },
+    '/tenders/distribution': { html: 'pages/tenders/distribution.html', init: 'initDistributionPage' },
+    '/tenders/import': { html: 'pages/tenders/import.html', init: 'initImportPage' },
+    // 注意：編輯頁的路由尚未建立，點擊會導向 404
+    '/tenders/edit': { html: 'pages/404.html' },
+    '404': { html: 'pages/404.html' }
 };
 
-// --- 路由核心邏輯 ---
+// --- 路由核心邏輯 (與之前版本相同，但為了完整性一併提供) ---
 
-// 獲取當前環境的基礎 URL
-function getBaseUrl() {
+const GHP_BASE_PATH = 'program';
+
+function getBasePath() {
     const isGitHubPages = window.location.hostname.includes('github.io');
-    return isGitHubPages ? `/${GHP_BASE_PATH}/` : '/';
+    return isGitHubPages ? `/${GHP_BASE_PATH}` : '';
 }
 
 const navigateTo = url => {
@@ -32,18 +30,19 @@ const navigateTo = url => {
 };
 
 async function handleLocation() {
-    const baseUrl = getBaseUrl();
+    const basePath = getBasePath();
     // 從 URL 中移除基礎路徑，得到乾淨的路由鍵
-    let path = window.location.pathname.replace(baseUrl, '/').replace('//', '/');
-    if (path === '' || path === baseUrl) path = '/';
+    let path = window.location.pathname.replace(basePath, '');
+    if (path === '' || path === '/') path = '/dashboard'; // 預設頁面
     
-    const route = routes[path] || routes['404'];
+    // 移除 URL 參數以便匹配路由表
+    const cleanPath = path.split('?')[0];
+    
+    const route = routes[cleanPath] || routes['404'];
     
     try {
-        // 構建正確的檔案抓取路徑
-        const fetchPath = `${baseUrl}${route.html}`;
+        const fetchPath = `${basePath}/${route.html}`;
         const response = await fetch(fetchPath);
-
         if (!response.ok) throw new Error(`頁面載入失敗: ${fetchPath}`);
         
         document.getElementById('app-content').innerHTML = await response.text();
@@ -52,7 +51,6 @@ async function handleLocation() {
             window[route.init]();
         }
         updateSidebarActiveState();
-        
     } catch (error) {
         console.error('路由載入錯誤:', error);
         document.getElementById('app-content').innerHTML = `<h1>無法載入頁面</h1>`;
@@ -60,7 +58,7 @@ async function handleLocation() {
 }
 
 function updateSidebarActiveState() {
-    const currentPath = window.location.pathname;
+    const currentPath = window.location.pathname.split('?')[0];
     document.querySelectorAll('#sidebar a[data-route]').forEach(link => {
         if (link.pathname === currentPath) {
             link.classList.add('active');
@@ -90,9 +88,9 @@ document.addEventListener('DOMContentLoaded', () => {
             handleLocation();
         },
         () => {
-            // 【關鍵修正】跳轉到 login_page.html
-            const baseUrl = getBaseUrl();
-            const loginUrl = `${baseUrl}login_page.html`;
+            const baseUrl = getBasePath();
+            // 注意：這裡的 login_page.html 是一個真實的檔案，所以路徑要正確
+            const loginUrl = `${baseUrl}/login_page.html`;
             if (!window.location.pathname.endsWith('login_page.html')) {
                 window.location.href = loginUrl;
             }
