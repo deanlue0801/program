@@ -30,6 +30,7 @@ function initProjectEditPage() {
         }
 
         try {
+            // 操作 projects 集合
             const projectDoc = await db.collection('projects').doc(projectId).get();
 
             if (!projectDoc.exists || projectDoc.data().createdBy !== auth.currentUser.email) {
@@ -45,37 +46,37 @@ function initProjectEditPage() {
 
         } catch (error) {
             console.error("載入專案資料失敗:", error);
-            showAlert("載入資料失敗: " + error.message, "error");
+            showAlert("載入專案資料失敗: " + error.message, "error");
             showLoading(false);
         }
     }
 
-    // 【修正處】這個函數現在會去操作您 HTML 中實際存在的 ID
+    // 【修正處】這個函數現在會去操作您 HTML 中實際存在的元素
     function populateForm(project) {
-        // 動態更新 h1 標題
+        // 使用 querySelector 尋找 class 為 page-title 的元素，因為您的 h1 沒有 ID
         const pageTitleEl = document.querySelector('.page-title');
-        if(pageTitleEl) pageTitleEl.textContent = `✏️ 編輯專案：${project.name || ''}`;
+        if (pageTitleEl) pageTitleEl.textContent = `✏️ 編輯專案：${project.name || ''}`;
         
         // 隱藏不需要的「所屬專案」下拉選單
         const projectSelectGroup = document.getElementById('projectSelect')?.parentElement;
-        if(projectSelectGroup) projectSelectGroup.style.display = 'none';
+        if (projectSelectGroup) projectSelectGroup.style.display = 'none';
 
-        // 將專案資料填入對應的表單欄位
+        // 將專案資料填入對應的表單欄位 (欄位ID與標單共用)
         document.getElementById('tenderName').value = project.name || '';
         document.getElementById('tenderCode').value = project.code || '';
         document.getElementById('statusSelect').value = project.status || 'planning';
+        
+        // 為了通用性，我們假設專案也有這些欄位，如果沒有則填入空值
         document.getElementById('startDate').value = safeFormatDateForInput(project.startDate);
         document.getElementById('endDate').value = safeFormatDateForInput(project.endDate);
         document.getElementById('contractorName').value = project.contractorName || '';
         document.getElementById('contractorContact').value = project.contractorContact || '';
-        
-        // 為了通用性，我們假設專案也有這些欄位，如果沒有則填入空值
         document.getElementById('description').value = project.description || '';
         document.getElementById('notes').value = project.notes || '';
     }
     
     function setupEventListeners() {
-        // 這部分功能保留，即使專案頁面沒有金額欄位也沒關係
+        // 保留，即使專案頁面沒有金額欄位也沒關係，不會出錯
     }
 
     async function handleFormSubmit(event) {
@@ -121,7 +122,7 @@ function initProjectEditPage() {
         }
     }
 
-    // 【修正處】操作您 HTML 中實際存在的 ID
+    // 【修正處】操作您 HTML 中實際存在的 id="loading" 和 id="editTenderForm"
     function showLoading(isLoading, message = '處理中...') {
         const loadingEl = document.getElementById('loading');
         const formEl = document.getElementById('editTenderForm');
@@ -134,7 +135,7 @@ function initProjectEditPage() {
         }
     }
     
-    // 【修正處】將暴露的函數名稱改回 exposedEditFuncs，以匹配您的 onsubmit
+    // 【修正處】將暴露的函數名稱改回 exposedEditFuncs，以匹配您 HTML 中的 onsubmit
     window.exposedEditFuncs = {
         handleFormSubmit,
         cancelEdit
