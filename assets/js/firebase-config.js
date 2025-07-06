@@ -37,7 +37,7 @@ function initFirebase(onAuthSuccess, onAuthFail) {
 
         auth.onAuthStateChanged(async (user) => {
             if (user) {
-                currentUser = user;
+                currentUser = user; // 這裡仍然可以設定，供其他地方非同步使用
                 console.log('✅ Firebase 核心：用戶已登入', user.email);
                 if (onAuthSuccess) await onAuthSuccess(user);
             } else {
@@ -81,7 +81,6 @@ async function safeFirestoreQuery(collection, whereConditions = [], orderBy = nu
             });
             const snapshot = await fallbackQuery.get();
             let docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            // 在此省略複雜的客戶端排序邏輯，因為大部分情況 Firestore 索引應被建立
             return { docs, serverSorted: false };
         } else {
             throw indexError;
@@ -98,10 +97,8 @@ async function deleteTenderAndRelatedData(tenderId) {
         const batch = db.batch();
         const collectionsToDelete = ['majorItems', 'detailItems', 'distributionTable', 'floorSettings'];
         
-        // 刪除標單本身
         batch.delete(db.collection('tenders').doc(tenderId));
         
-        // 並行查詢所有相關集合
         const promises = collectionsToDelete.map(coll => 
             db.collection(coll).where('tenderId', '==', tenderId).get()
         );
@@ -121,18 +118,28 @@ async function deleteTenderAndRelatedData(tenderId) {
 }
 
 // --- 標準化資料載入函數 ---
+// 【修正處】將 currentUser.email 改為 auth.currentUser.email
 async function loadProjects() {
-    return (await safeFirestoreQuery('projects', [{ field: 'createdBy', operator: '==', value: currentUser.email }], { field: 'name', direction: 'asc' })).docs;
+    if (!auth.currentUser) {
+        console.error("loadProjects: 用戶未登入，無法載入專案");
+        return [];
+    }
+    return (await safeFirestoreQuery('projects', [{ field: 'createdBy', operator: '==', value: auth.currentUser.email }], { field: 'name', direction: 'asc' })).docs;
 }
 
+// 【修正處】將 currentUser.email 改為 auth.currentUser.email
 async function loadTenders() {
-    return (await safeFirestoreQuery('tenders', [{ field: 'createdBy', operator: '==', value: currentUser.email }], { field: 'createdAt', direction: 'desc' })).docs;
+    if (!auth.currentUser) {
+        console.error("loadTenders: 用戶未登入，無法載入標單");
+        return [];
+    }
+    return (await safeFirestoreQuery('tenders', [{ field: 'createdBy', operator: '==', value: auth.currentUser.email }], { field: 'createdAt', direction: 'desc' })).docs;
 }
 
 // --- 通用工具函數 ---
 function formatCurrency(amount) {
-    if (amount === null || amount === undefined) return 'NT$ 0';
-    return 'NT$ ' + parseInt(amount).toLocaleString();
+    if (amount === null || amount === undefined || isNaN(amount)) return 'NT$ 0';
+    return 'NT$ ' + parseInt(amount, 10).toLocaleString();
 }
 
 function formatDate(timestamp) {
@@ -150,16 +157,17 @@ function formatDateTime(timestamp) {
 }
 
 function showAlert(message, type = 'info') {
-    // 省略 showAlert 的具體實現，可沿用您之前的版本
+    // 這裡可以使用您專案中更美觀的提示框，但 alert 是最簡單可靠的
     console.log(`[${type.toUpperCase()}] ${message}`);
-    alert(message);
+    // 暫時不使用 alert 以免打斷流程
+    // alert(message); 
 }
 
 async function logout() {
     if (confirm('確定要登出嗎？')) {
         try {
             await auth.signOut();
-            window.location.href = '/login_page.html';
+            // 登出後，onAuthStateChanged 會自動觸發頁面跳轉邏輯
         } catch (error) {
             console.error('登出失敗:', error);
             showAlert('登出失敗', 'error');
