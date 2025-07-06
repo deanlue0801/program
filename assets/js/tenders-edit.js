@@ -21,7 +21,6 @@ function initTenderEditPage() {
         try {
             const [tenderDoc, itemsResult] = await Promise.all([
                 db.collection('tenders').doc(tenderId).get(),
-                // 一次性獲取所有相關項目
                 safeFirestoreQuery('detailItems', [{ field: 'tenderId', operator: '==', value: tenderId }])
             ]);
 
@@ -55,9 +54,11 @@ function initTenderEditPage() {
         const originalAmount = originalItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
         const additionAmount = additionalItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
         const totalAmount = originalAmount + additionAmount;
-
-        document.querySelector('.page-title').textContent = `📋 標單編輯: ${currentTender.name}`;
-        document.querySelector('.page-subtitle').textContent = `專案: ${currentTender.projectName || '未指定'}`;
+        
+        const pageTitleEl = document.querySelector('.page-title');
+        const pageSubtitleEl = document.querySelector('.page-subtitle');
+        if(pageTitleEl) pageTitleEl.textContent = `📋 標單編輯: ${currentTender.name}`;
+        if(pageSubtitleEl) pageSubtitleEl.textContent = `專案: ${currentTender.projectName || '未指定'}`;
         
         document.getElementById('infoTenderName').textContent = currentTender.name || 'N/A';
         document.getElementById('infoContractorName').textContent = currentTender.contractorName || 'N/A';
@@ -67,7 +68,7 @@ function initTenderEditPage() {
     }
 
     function renderItems() {
-        const originalContainer = document.getElementById('hierarchicalItemsContainer');
+        const originalContainer = document.getElementById('originalItemsContainer');
         const additionalContainer = document.getElementById('additionalItemsContainer');
         if (!originalContainer || !additionalContainer) return;
 
@@ -88,8 +89,6 @@ function initTenderEditPage() {
                 <div>${item.totalQuantity || 0}</div>
                 <div class="item-price">${formatCurrency(item.unitPrice)}</div>
                 <div class="item-total">${formatCurrency(item.totalPrice)}</div>
-                <div></div>
-                <div></div>
             </div>
         `;
     }
@@ -102,30 +101,34 @@ function initTenderEditPage() {
         const cancelBtn = document.getElementById('cancelAddItemBtn');
         const addItemForm = document.getElementById('addItemForm');
 
-        showBtn.onclick = () => { modal.style.display = 'block'; };
-        closeBtn.onclick = () => { modal.style.display = 'none'; };
-        cancelBtn.onclick = () => { modal.style.display = 'none'; };
+        if(showBtn) showBtn.onclick = () => { if(modal) modal.style.display = 'block'; };
+        if(closeBtn) closeBtn.onclick = () => { if(modal) modal.style.display = 'none'; };
+        if(cancelBtn) cancelBtn.onclick = () => { if(modal) modal.style.display = 'none'; };
         window.onclick = (event) => { if (event.target == modal) { modal.style.display = 'none'; } };
         
-        addItemForm.onsubmit = handleAddItemSubmit;
+        if(addItemForm) addItemForm.onsubmit = handleAddItemSubmit;
 
-        // 計算總價
         const quantityInput = document.getElementById('itemQuantity');
         const unitPriceInput = document.getElementById('itemUnitPrice');
         const totalPriceInput = document.getElementById('itemTotalPrice');
         const calculateTotal = () => {
+            if(!quantityInput || !unitPriceInput || !totalPriceInput) return;
             const quantity = parseFloat(quantityInput.value) || 0;
             const unitPrice = parseFloat(unitPriceInput.value) || 0;
-            totalPriceInput.value = quantity * unitPrice;
+            totalPriceInput.value = (quantity * unitPrice).toFixed(2);
         };
-        quantityInput.addEventListener('input', calculateTotal);
-        unitPriceInput.addEventListener('input', calculateTotal);
+        if(quantityInput) quantityInput.addEventListener('input', calculateTotal);
+        if(unitPriceInput) unitPriceInput.addEventListener('input', calculateTotal);
     }
 
     async function handleAddItemSubmit(event) {
         event.preventDefault();
+        const majorItems = await safeFirestoreQuery('majorItems', [{ field: 'tenderId', operator: '==', value: tenderId }]);
+        const firstMajorItem = majorItems.docs.length > 0 ? majorItems.docs[0] : null;
+
         const newItem = {
             tenderId: tenderId,
+            majorItemId: firstMajorItem ? firstMajorItem.id : null, // 預設關聯到第一個大項
             isAddition: true, // 標記為追加項目
             sequence: document.getElementById('itemSequence').value,
             name: document.getElementById('itemName').value,
@@ -133,6 +136,7 @@ function initTenderEditPage() {
             totalQuantity: parseFloat(document.getElementById('itemQuantity').value) || 0,
             unitPrice: parseFloat(document.getElementById('itemUnitPrice').value) || 0,
             totalPrice: parseFloat(document.getElementById('itemTotalPrice').value) || 0,
+            createdBy: auth.currentUser.email,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
