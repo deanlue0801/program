@@ -1,15 +1,18 @@
 <style>
     .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; }
     .items-section { margin-top: 30px; }
-    .items-header, .detail-item { display: grid; grid-template-columns: 50px 1fr 80px 80px 100px 100px 100px 100px; gap: 10px; align-items: center; padding: 12px 15px; border-bottom: 1px solid #e9ecef; }
+    .items-header, .detail-item { display: grid; grid-template-columns: 50px 1fr 80px 80px 100px 100px 100px 120px; gap: 10px; align-items: center; padding: 12px 15px; border-bottom: 1px solid #e9ecef; }
     .items-header { background: #f8f9fa; font-weight: 600; }
     .major-item-header { background: #495057; color: white; padding: 12px 15px; display: flex; justify-content: space-between; cursor: pointer; }
     .detail-items-container.collapsed { display: none; }
     .item-total, .item-price { text-align: right; }
-    .current-total.changed { color: #ffc107; font-weight: bold; }
-    .addition-table th, .addition-table td { padding: 12px 15px; border-bottom: 1px solid #e9ecef; text-align: left; }
-    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+    .current-total.changed { color: #e67e22; font-weight: bold; }
+    .addition-table th, .addition-table td { padding: 12px 15px; border-bottom: 1px solid #e9ecef; text-align: left; vertical-align: middle; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
     .summary-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .summary-card .summary-item-name { font-weight: 600; margin-bottom: 15px; }
+    .summary-card .summary-detail { display: flex; justify-content: space-between; font-size: 14px; padding: 4px 0; }
+    .summary-card .summary-detail .total { font-weight: bold; border-top: 1px solid #eee; padding-top: 8px; margin-top: 4px; }
     .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
     .modal-content { background-color: #fefefe; margin: 10% auto; padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; }
     .modal-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #dee2e6; margin-bottom: 20px; }
@@ -33,9 +36,9 @@
 
         <div class="items-section">
             <h3 class="section-title">追加項目明細</h3>
-            <table class="table" id="additionTable">
-                <thead><tr><th>追加日期</th><th>關聯項目</th><th>追加數量</th><th>追加單價</th><th>追加原因</th><th>狀態</th></tr></thead>
-                <tbody></tbody>
+            <table class="table addition-table">
+                <thead><tr><th>追加日期</th><th>關聯項目</th><th>追加數量</th><th>追加單價</th><th>追加原因</th><th>狀態</th><th>操作</th></tr></thead>
+                <tbody id="additionTableBody"></tbody>
             </table>
         </div>
 
@@ -51,12 +54,13 @@
         <div class="modal-header"><h2 class="modal-title" id="modalTitle">追加項目數量</h2><span class="close-btn">&times;</span></div>
         <form id="additionForm">
             <input type="hidden" id="relatedItemId">
-            <div class="form-group"><label>項目名稱</label><input type="text" id="modalItemName" class="form-control" disabled></div>
+            <input type="hidden" id="editAdditionId">
+            <div class="form-group"><label>關聯項目</label><input type="text" id="modalItemName" class="form-control" disabled></div>
             <div class="form-group"><label for="additionQuantity">追加數量 *</label><input type="number" id="additionQuantity" class="form-control" required></div>
             <div class="form-group"><label for="additionReason">追加原因 *</label><textarea id="additionReason" class="form-control" required></textarea></div>
             <div class="form-actions" style="text-align: right; margin-top: 20px;">
                 <button type="button" class="btn btn-secondary" id="cancelAdditionBtn">取消</button>
-                <button type="submit" class="btn btn-success">確認追加</button>
+                <button type="submit" class="btn btn-success">確認</button>
             </div>
         </form>
     </div>
