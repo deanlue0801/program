@@ -3,6 +3,7 @@
  */
 function initTenderEditPage() {
     let tenderId, currentTender, majorItems, detailItems, additionItems;
+    let allMajorExpanded = false; // 新增一個狀態來追蹤是否全部展開
 
     async function init() {
         showLoading(true);
@@ -85,6 +86,7 @@ function initTenderEditPage() {
         const additionsForThisItem = additionItems.filter(add => add.relatedItemId === item.id);
         const additionalQty = additionsForThisItem.reduce((sum, add) => sum + (add.totalQuantity || 0), 0);
         const currentTotal = (item.totalQuantity || 0) + additionalQty;
+        // **修改點**：初始狀態為收合，所以加上 'collapsed' class
         return `
             <tr class="detail-item-row collapsed" data-major-id="${majorId}">
                 <td>${item.sequence || ''}</td>
@@ -203,6 +205,17 @@ function initTenderEditPage() {
             document.querySelectorAll(`tr[data-major-id="${majorId}"]`).forEach(row => {
                 row.classList.toggle('collapsed');
             });
+        },
+        // **新增功能**：切換全部展開或收合
+        toggleAll: () => {
+            allMajorExpanded = !allMajorExpanded;
+            document.querySelectorAll('tr.detail-item-row').forEach(row => {
+                row.classList.toggle('collapsed', !allMajorExpanded);
+            });
+            const toggleBtn = document.getElementById('toggleAllBtnText');
+            if (toggleBtn) {
+                toggleBtn.textContent = allMajorExpanded ? '全部收合' : '全部展開';
+            }
         },
         showAdditionModal: (itemId, itemName) => {
             const modal = document.getElementById('additionModal');
