@@ -51,8 +51,14 @@ function initTenderEditPage() {
     // --- 畫面渲染函數 ---
 
     function renderTenderInfo() {
-        document.getElementById('pageTitle').textContent = `📋 標單編輯: ${currentTender.name}`;
-        document.getElementById('pageSubtitle').textContent = `專案: ${currentTender.projectName || '未指定'}`;
+        // 【修正處】使用 querySelector 來尋找 class，而不是 ID
+        const pageTitleEl = document.querySelector('.page-title');
+        const pageSubtitleEl = document.querySelector('.page-subtitle');
+        
+        if (pageTitleEl) pageTitleEl.textContent = `📋 標單編輯: ${currentTender.name}`;
+        if (pageSubtitleEl) pageSubtitleEl.textContent = `專案: ${currentTender.projectName || '未指定'}`;
+        
+        // 以下使用 ID 的部分是正確的，因為 HTML 中有這些 ID
         document.getElementById('infoTenderName').textContent = currentTender.name || 'N/A';
         document.getElementById('infoContractorName').textContent = currentTender.contractorName || 'N/A';
         document.getElementById('infoOriginalAmount').textContent = formatCurrency(currentTender.totalAmount);
@@ -63,7 +69,7 @@ function initTenderEditPage() {
         if (!container) return;
 
         if (majorItems.length === 0) {
-            container.innerHTML = '<div class="empty-state" style="padding: 2rem;">此標單沒有工程項目</div>';
+            container.innerHTML = '<div style="padding: 2rem; text-align: center;">此標單沒有工程項目</div>';
             return;
         }
 
