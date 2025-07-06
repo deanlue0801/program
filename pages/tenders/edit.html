@@ -1,55 +1,15 @@
-<div class="container">
-    <div id="loading" class="loading" style="display: flex;"><div class="spinner"></div><p>載入標單資料中...</p></div>
+<!DOCTYPE html>
+<div id="loading" class="loading" style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 4rem;">
+    <div class="spinner"></div>
+    <p style="margin-top: 1rem; font-size: 1rem; color: #666;">載入編輯資料中...</p>
+</div>
 
-    <div id="editTenderContent" style="display:none;">
-        <div class="header-card">
-            <h1 class="page-title" id="pageTitle"></h1>
-        </div>
+<div id="editTenderContent" class="content" style="display: none;">
+    <div id="tender-header-container"></div>
 
-        <div class="tender-info-section info-grid" id="infoGrid"></div>
+    <div id="items-list-container" class="items-list-card"></div>
 
-        <div class="items-section card">
-    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-        <h3>工程項目</h3>
-        <button id="toggleAllItemsBtn" class="btn btn-secondary btn-sm">
-        <span id="toggleAllBtnText">全部展開</span>
-        </button>
-    </div>
-            <div class="table-wrapper">
-                <table class="table" id="hierarchicalItemsTable">
-                    <thead>
-                        <tr>
-                            <th>項次</th>
-                            <th>項目名稱</th>
-                            <th>單位</th>
-                            <th>數量</th>
-                            <th>單價</th>
-                            <th>小計</th>
-                            <th>目前總數</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody id="hierarchicalItemsTbody">
-                        </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="items-section card">
-            <h3 class="card-header">追加項目明細</h3>
-            <div class="table-wrapper">
-                <table class="table" id="additionTable">
-                    <thead><tr><th>追加日期</th><th>關聯項目</th><th>追加數量</th><th>追加單價</th><th>追加原因</th><th>狀態</th><th>操作</th></tr></thead>
-                    <tbody id="additionTableBody"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="items-section">
-            <h3 class="section-title">數量統計總覽</h3>
-            <div class="summary-grid" id="summaryGrid"></div>
-        </div>
-    </div>
+    <div id="addition-details-container" class="items-list-card"></div>
 </div>
 
 <div id="additionModal" class="modal">
@@ -61,14 +21,13 @@
         <form id="additionForm" novalidate>
             <input type="hidden" id="relatedItemId">
             <input type="hidden" id="editAdditionId">
-
             <div class="form-group">
                 <label for="modalItemName" class="form-label">關聯項目</label>
                 <input type="text" id="modalItemName" class="form-control" disabled>
             </div>
             <div class="form-group">
                 <label for="additionQuantity" class="form-label">追加數量 *</label>
-                <input type="number" id="additionQuantity" class="form-control" required min="0">
+                <input type="number" id="additionQuantity" class="form-control" required min="0" step="any">
             </div>
             <div class="form-group">
                 <label for="additionReason" class="form-label">追加原因</label>
