@@ -53,4 +53,31 @@
 </div>
 
 <div id="additionModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h4 class="modal-title" id="modalTitle">追加項目數量</h4>
+            <button type="button" class="modal-close">&times;</button>
+        </div>
+        <form id="additionForm" novalidate>
+            <input type="hidden" id="relatedItemId">
+            <input type="hidden" id="editAdditionId">
+
+            <div class="form-group">
+                <label for="modalItemName" class="form-label">關聯項目</label>
+                <input type="text" id="modalItemName" class="form-control" disabled>
+            </div>
+            <div class="form-group">
+                <label for="additionQuantity" class="form-label">追加數量 *</label>
+                <input type="number" id="additionQuantity" class="form-control" required min="0">
+            </div>
+            <div class="form-group">
+                <label for="additionReason" class="form-label">追加原因</label>
+                <textarea id="additionReason" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" id="cancelAdditionBtn" class="btn btn-secondary">取消</button>
+                <button type="submit" class="btn btn-primary">儲存</button>
+            </div>
+        </form>
     </div>
+</div>
