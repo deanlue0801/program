@@ -1,5 +1,5 @@
 /**
- * 編輯標單頁面 (tenders-edit.js) (SPA 版本) - 最終對齊修正版
+ * 編輯標單頁面 (tenders/edit.js) (SPA 版本) - 恢復展開收合功能
  */
 function initTenderEditPage() {
     let tenderId, currentTender, majorItems, detailItems, additionItems;
@@ -37,7 +37,8 @@ function initTenderEditPage() {
     }
 
     function renderAll() {
-        document.getElementById('pageTitle').textContent = `標單編輯: ${currentTender.name}`;
+        const pageTitleEl = document.getElementById('pageTitle');
+        if(pageTitleEl) pageTitleEl.textContent = `標單編輯: ${currentTender.name}`;
         renderTenderInfo();
         renderHierarchicalItems();
         renderAdditionTable();
@@ -47,11 +48,14 @@ function initTenderEditPage() {
     function renderTenderInfo() {
         const originalAmount = detailItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
         const additionAmount = additionItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
-        document.getElementById('infoGrid').innerHTML = `
-            <div class="info-item"><div class="info-label">原始金額</div><div class="info-value amount">${formatCurrency(originalAmount)}</div></div>
-            <div class="info-item"><div class="info-label">追加金額</div><div class="info-value addition">${formatCurrency(additionAmount)}</div></div>
-            <div class="info-item"><div class="info-label">目前總金額</div><div class="info-value total">${formatCurrency(originalAmount + additionAmount)}</div></div>
-        `;
+        const infoGridEl = document.getElementById('infoGrid');
+        if(infoGridEl) {
+            infoGridEl.innerHTML = `
+                <div class="info-item"><div class="info-label">原始金額</div><div class="info-value amount">${formatCurrency(originalAmount)}</div></div>
+                <div class="info-item"><div class="info-label">追加金額</div><div class="info-value addition">${formatCurrency(additionAmount)}</div></div>
+                <div class="info-item"><div class="info-label">目前總金額</div><div class="info-value total">${formatCurrency(originalAmount + additionAmount)}</div></div>
+            `;
+        }
     }
 
     function renderHierarchicalItems() {
@@ -84,7 +88,7 @@ function initTenderEditPage() {
         return `
             <tr class="detail-item-row collapsed" data-major-id="${majorId}">
                 <td>${item.sequence || ''}</td>
-                <td>${item.name}</td>
+                <td style="text-align: left;">${item.name}</td>
                 <td>${item.unit}</td>
                 <td>${item.totalQuantity || 0}</td>
                 <td class="item-price">${formatCurrency(item.unitPrice)}</td>
@@ -94,7 +98,7 @@ function initTenderEditPage() {
             </tr>
         `;
     }
-
+    
     function renderAdditionTable() {
         const tbody = document.querySelector('#additionTable tbody');
         if (!tbody) return;
@@ -102,9 +106,12 @@ function initTenderEditPage() {
             const relatedItem = detailItems.find(d => d.id === add.relatedItemId);
             return `
                 <tr>
-                    <td>${formatDate(add.createdAt)}</td><td>${relatedItem ? relatedItem.name : '未知項目'}</td>
-                    <td>${add.totalQuantity || 0}</td><td>${formatCurrency(add.unitPrice)}</td>
-                    <td>${add.reason || ''}</td><td>${add.status || '待核准'}</td>
+                    <td>${formatDate(add.createdAt)}</td>
+                    <td>${relatedItem ? relatedItem.name : '未知項目'}</td>
+                    <td>${add.totalQuantity || 0}</td>
+                    <td>${formatCurrency(add.unitPrice)}</td>
+                    <td>${add.reason || ''}</td>
+                    <td>${add.status || '待核准'}</td>
                     <td>
                         <button class="btn btn-sm btn-warning" onclick="window.exposedFuncs.editAddition('${add.id}')">編輯</button>
                         <button class="btn btn-sm btn-danger" onclick="window.exposedFuncs.deleteAddition('${add.id}')">刪除</button>
@@ -144,6 +151,7 @@ function initTenderEditPage() {
 
     function setupEventListeners() {
         const modal = document.getElementById('additionModal');
+        if (!modal) return;
         const closeBtn = modal.querySelector('.modal-close');
         const cancelBtn = document.getElementById('cancelAdditionBtn');
         const form = document.getElementById('additionForm');
@@ -189,20 +197,24 @@ function initTenderEditPage() {
         if(loadingEl) loadingEl.style.display = isLoading ? 'flex' : 'none';
         if(contentEl) contentEl.style.display = isLoading ? 'none' : 'block';
     }
-
+    
     window.exposedFuncs = {
         toggle: (majorId) => {
-            document.querySelectorAll(`tr[data-major-id="${majorId}"]`).forEach(row => row.classList.toggle('collapsed'));
+            document.querySelectorAll(`tr[data-major-id="${majorId}"]`).forEach(row => {
+                row.classList.toggle('collapsed');
+            });
         },
         showAdditionModal: (itemId, itemName) => {
             const modal = document.getElementById('additionModal');
-            document.getElementById('editAdditionId').value = '';
-            document.getElementById('relatedItemId').value = itemId;
-            document.getElementById('modalItemName').value = unescape(itemName);
-            document.getElementById('additionQuantity').value = 1;
-            document.getElementById('additionReason').value = '';
-            document.getElementById('modalTitle').textContent = '追加項目數量';
-            if(modal) modal.style.display = 'block';
+            if(modal) {
+                document.getElementById('editAdditionId').value = '';
+                document.getElementById('relatedItemId').value = itemId;
+                document.getElementById('modalItemName').value = unescape(itemName);
+                document.getElementById('additionQuantity').value = 1;
+                document.getElementById('additionReason').value = '';
+                document.getElementById('modalTitle').textContent = '追加項目數量';
+                modal.style.display = 'block';
+            }
         },
         editAddition: (additionId) => {
             const item = additionItems.find(a => a.id === additionId);
@@ -210,13 +222,15 @@ function initTenderEditPage() {
             if (!item || !relatedItem) return showAlert('找不到要編輯的項目', 'error');
             
             const modal = document.getElementById('additionModal');
-            document.getElementById('editAdditionId').value = item.id;
-            document.getElementById('relatedItemId').value = item.relatedItemId;
-            document.getElementById('modalItemName').value = relatedItem.name;
-            document.getElementById('additionQuantity').value = item.totalQuantity;
-            document.getElementById('additionReason').value = item.reason;
-            document.getElementById('modalTitle').textContent = '編輯追加項目';
-            if(modal) modal.style.display = 'block';
+            if(modal) {
+                document.getElementById('editAdditionId').value = item.id;
+                document.getElementById('relatedItemId').value = item.relatedItemId;
+                document.getElementById('modalItemName').value = relatedItem.name;
+                document.getElementById('additionQuantity').value = item.totalQuantity;
+                document.getElementById('additionReason').value = item.reason;
+                document.getElementById('modalTitle').textContent = '編輯追加項目';
+                modal.style.display = 'block';
+            }
         },
         deleteAddition: async (additionId) => {
             if (!confirm('確定要刪除這筆追加項目嗎？此操作無法復原。')) return;
