@@ -1,10 +1,11 @@
 /**
- * 編輯標單頁面 (tenders-edit.js) - v4.3 修正追加後維持展開狀態
+ * 編輯標單頁面 (tenders-edit.js) - v4.4 修正刪除後狀態 & 預設全部展開
  */
 function initTenderEditPage() {
     // --- 頁面級別變數 ---
     let tenderId, currentTender, majorItems = [], detailItems = [], additionItems = [];
-    let allExpanded = false;
+    // 【關鍵修正 1】: 將預設狀態改為「全部展開」
+    let allExpanded = true; 
 
     // --- 主流程 ---
     async function init() {
@@ -84,7 +85,7 @@ function initTenderEditPage() {
         let html = `
             <div class="list-actions">
                 <h3>原始項目</h3>
-                <button id="expand-all-btn" class="btn btn-secondary">全部展開</button>
+                <button id="expand-all-btn" class="btn btn-secondary">全部收合</button>
             </div>
         `;
         majorItems.forEach((majorItem) => {
@@ -93,7 +94,7 @@ function initTenderEditPage() {
 
             html += `
                 <div class="major-item-wrapper">
-                    <div class="major-item-row" data-major-id="${majorItem.id}">
+                    <div class="major-item-row expanded" data-major-id="${majorItem.id}">
                         <div class="item-number-circle">${itemNumber}</div>
                         <div class="item-name">${majorItem.name}</div>
                         <div class="item-analysis">
@@ -102,7 +103,7 @@ function initTenderEditPage() {
                         </div>
                         <div class="item-expand-icon">▶</div>
                     </div>
-                    <div class="detail-items-container" id="details-for-${majorItem.id}">
+                    <div class="detail-items-container expanded" id="details-for-${majorItem.id}">
                         ${renderDetailTable(detailsInMajor)}
                     </div>
                 </div>
@@ -117,10 +118,9 @@ function initTenderEditPage() {
             const originalQuantity = item.totalQuantity || 0;
             const additions = additionItems.filter(add => add.relatedItemId === item.id);
             const additionalQuantity = additions.reduce((s, a) => s + (a.totalQuantity || 0), 0);
-            const currentTotal = originalQuantity + additionalQuantity;
-
+            
             const quantityDisplay = additionalQuantity > 0 
-                ? `${currentTotal} (+${additionalQuantity})`
+                ? `${originalQuantity + additionalQuantity} (+${additionalQuantity})`
                 : originalQuantity;
 
             return `
@@ -259,6 +259,30 @@ function initTenderEditPage() {
             window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
         }
     }
+    
+    // --- 記住與恢復展開狀態的輔助函數 ---
+    function getExpandedState() {
+        const expandedIds = new Set();
+        document.querySelectorAll('.major-item-row.expanded').forEach(row => {
+            if (row.dataset.majorId) {
+                expandedIds.add(row.dataset.majorId);
+            }
+        });
+        return expandedIds;
+    }
+
+    function restoreExpandedState(expandedIds) {
+        if (expandedIds.size > 0) {
+            expandedIds.forEach(id => {
+                const row = document.querySelector(`.major-item-row[data-major-id="${id}"]`);
+                const container = document.getElementById(`details-for-${id}`);
+                if (row && container) {
+                    row.classList.add('expanded');
+                    container.classList.add('expanded');
+                }
+            });
+        }
+    }
 
     // --- Modal 邏輯 ---
     function showAdditionModal(itemId, itemName) {
@@ -293,9 +317,13 @@ function initTenderEditPage() {
 
     async function deleteAddition(additionId) {
         if (!confirm('確定要刪除這筆追加項目嗎？此操作無法復原。')) return;
+        
+        const expandedIds = getExpandedState(); // 記住狀態
+        
         try {
             await db.collection('detailItems').doc(additionId).delete();
-            await init();
+            await init(); // 重新載入
+            restoreExpandedState(expandedIds); // 恢復狀態
             showAlert('刪除成功', 'success');
         } catch (error) { 
             showAlert('刪除失敗: ' + error.message, 'error'); 
@@ -304,14 +332,8 @@ function initTenderEditPage() {
 
     async function handleAdditionSubmit(event) {
         event.preventDefault();
-
-        // 【關鍵修正 1】: 在儲存前，記下哪些項目是展開的
-        const expandedMajorIds = new Set();
-        document.querySelectorAll('.major-item-row.expanded').forEach(row => {
-            if (row.dataset.majorId) {
-                expandedMajorIds.add(row.dataset.majorId);
-            }
-        });
+        
+        const expandedIds = getExpandedState(); // 記住狀態
 
         const relatedItemId = document.getElementById('relatedItemId').value;
         const editId = document.getElementById('editAdditionId').value;
@@ -344,20 +366,8 @@ function initTenderEditPage() {
             }
             document.getElementById('additionModal').style.display = "none";
             
-            // 【關鍵修正 2】: 重新載入和渲染
-            await init();
-            
-            // 【關鍵修正 3】: 恢復之前展開的項目
-            if (expandedMajorIds.size > 0) {
-                expandedMajorIds.forEach(id => {
-                    const row = document.querySelector(`.major-item-row[data-major-id="${id}"]`);
-                    const container = document.getElementById(`details-for-${id}`);
-                    if (row && container) {
-                        row.classList.add('expanded');
-                        container.classList.add('expanded');
-                    }
-                });
-            }
+            await init(); // 重新載入
+            restoreExpandedState(expandedIds); // 恢復狀態
 
             showAlert('儲存成功！', 'success');
         } catch (error) { 
