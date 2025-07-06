@@ -1,107 +1,63 @@
 <style>
-    .tender-info-section { background: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 30px; border-left: 4px solid #667eea; }
-    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 15px; }
-    .info-item { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .info-label { font-size: 14px; color: #6c757d; margin-bottom: 5px; }
-    .info-value { font-size: 18px; font-weight: 600; }
-    .info-value.amount { color: #28a745; }
-    .info-value.addition { color: #ffc107; }
-    .info-value.total { color: #667eea; font-size: 20px; }
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; }
     .items-section { margin-top: 30px; }
-    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-    .hierarchical-items { background: white; border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1); overflow: hidden; }
-    .items-header { display: grid; grid-template-columns: 4px 60px 2fr 80px 100px 120px 120px; gap: 15px; align-items: center; padding: 12px 20px; background: #f8f9fa; border-bottom: 2px solid #dee2e6; font-weight: 600; font-size: 14px; color: #495057; }
-    .major-item-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; font-size: 16px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-    .major-item-left { display: flex; align-items: center; gap: 15px; flex: 1; }
-    .major-item-toggle { font-size: 20px; line-height: 1; }
+    .items-header, .detail-item { display: grid; grid-template-columns: 50px 1fr 80px 80px 100px 100px 100px 100px; gap: 10px; align-items: center; padding: 12px 15px; border-bottom: 1px solid #e9ecef; }
+    .items-header { background: #f8f9fa; font-weight: 600; }
+    .major-item-header { background: #495057; color: white; padding: 12px 15px; display: flex; justify-content: space-between; cursor: pointer; }
     .detail-items-container.collapsed { display: none; }
-    .detail-item { display: grid; grid-template-columns: 4px 60px 2fr 80px 100px 120px 120px; gap: 15px; align-items: center; padding: 15px 20px; border-bottom: 1px solid #e9ecef; }
-    .item-status { width: 4px; height: 40px; background: #28a745; border-radius: 2px; }
-    .item-status.addition { background: #ffc107; }
-    .item-name { font-weight: 500; }
-    .item-price, .item-total { text-align: right; }
-    
-    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
-    .modal-content { background-color: #fefefe; margin: 10% auto; padding: 30px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dee2e6; padding-bottom: 15px; margin-bottom: 20px; }
-    .modal-title { font-size: 24px; font-weight: 600; }
-    .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-    .modal-body .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .modal-body .form-group { margin-bottom: 15px; }
-    .btn { padding: 10px 20px; border-radius: 8px; cursor: pointer; border: none; font-size: 14px; font-weight: 600; }
-    .btn-primary { background-color: #007bff; color: white; }
-    .btn-secondary { background-color: #6c757d; color: white; }
-    .btn-success { background-color: #28a745; color: white; }
+    .item-total, .item-price { text-align: right; }
+    .current-total.changed { color: #ffc107; font-weight: bold; }
+    .addition-table th, .addition-table td { padding: 12px 15px; border-bottom: 1px solid #e9ecef; text-align: left; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+    .summary-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+    .modal-content { background-color: #fefefe; margin: 10% auto; padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #dee2e6; margin-bottom: 20px; }
+    .close-btn { font-size: 24px; cursor: pointer; color: #777; }
 </style>
 
 <div class="content-card">
-    <div id="loading" class="loading" style="display: flex;">
-        <div class="spinner"></div>
-        <p>載入標單編輯資料中...</p>
-    </div>
+    <div id="loading" class="loading" style="display: flex;"><div class="spinner"></div><p>載入標單資料中...</p></div>
 
     <div id="editTenderContent" style="display:none;">
-        <div class="page-header">
-            <h1 class="page-title">📋 標單編輯</h1>
-            <p class="page-subtitle" id="pageSubtitle">管理原始項目與追加項目</p>
-        </div>
+        <div class="page-header"><h1 class="page-title" id="pageTitle"></h1></div>
+        <div class="tender-info-section info-grid" id="infoGrid"></div>
 
-        <div class="tender-info-section">
-            <h3>📊 標單資訊</h3>
-            <div class="info-grid">
-                <div class="info-item"><div class="info-label">標單名稱</div><div class="info-value" id="infoTenderName"></div></div>
-                <div class="info-item"><div class="info-label">承包商</div><div class="info-value" id="infoContractorName"></div></div>
-                <div class="info-item"><div class="info-label">原始合約金額</div><div class="info-value amount" id="infoOriginalAmount"></div></div>
-                <div class="info-item"><div class="info-label">追加項目金額</div><div class="info-value addition" id="infoAdditionAmount"></div></div>
-                <div class="info-item"><div class="info-label">目前總金額</div><div class="info-value total" id="infoTotalAmount"></div></div>
-            </div>
-        </div>
-
-        <div class="content-section items-section">
-            <div class="section-header"><h3 class="section-title">📋 原始項目</h3></div>
+        <div class="items-section">
+            <h3 class="section-title">工程項目</h3>
             <div class="items-header">
-                <div></div><div>項次</div><div style="text-align: left;">項目名稱</div><div>單位</div><div>數量</div><div style="text-align: right;">單價</div><div style="text-align: right;">小計</div>
+                <div>項次</div><div>項目名稱</div><div>單位</div><div>數量</div><div>單價</div><div>小計</div><div>目前總數</div><div>操作</div>
             </div>
-            <div class="hierarchical-items" id="originalItemsContainer"></div>
+            <div id="hierarchicalItemsContainer"></div>
         </div>
 
-        <div class="content-section items-section">
-            <div class="section-header">
-                <h3 class="section-title">➕ 追加項目</h3>
-                <button class="btn btn-primary" id="showAddItemModalBtn">
-                    <i class="fas fa-plus"></i> 新增追加項目
-                </button>
-            </div>
-            <div class="items-header">
-                <div></div><div>項次</div><div style="text-align: left;">項目名稱</div><div>單位</div><div>數量</div><div style="text-align: right;">單價</div><div style="text-align: right;">小計</div>
-            </div>
-            <div class="hierarchical-items" id="additionalItemsContainer"></div>
+        <div class="items-section">
+            <h3 class="section-title">追加項目明細</h3>
+            <table class="table" id="additionTable">
+                <thead><tr><th>追加日期</th><th>關聯項目</th><th>追加數量</th><th>追加單價</th><th>追加原因</th><th>狀態</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="items-section">
+            <h3 class="section-title">數量統計總覽</h3>
+            <div class="summary-grid" id="summaryGrid"></div>
         </div>
     </div>
 </div>
 
-<div id="addItemModal" class="modal">
+<div id="additionModal" class="modal">
     <div class="modal-content">
-        <div class="modal-header">
-            <h2 class="modal-title" id="modalTitle">新增追加項目</h2>
-            <span class="close-btn" id="closeModalBtn">&times;</span>
-        </div>
-        <div class="modal-body">
-            <form id="addItemForm">
-                <input type="hidden" id="editItemId">
-                <div class="form-group"><label for="itemSequence">項次</label><input type="text" id="itemSequence" class="form-control" placeholder="例如：A-1"></div>
-                <div class="form-group"><label for="itemName">項目名稱 *</label><input type="text" id="itemName" class="form-control" required></div>
-                <div class="form-grid">
-                    <div class="form-group"><label for="itemUnit">單位</label><input type="text" id="itemUnit" class="form-control"></div>
-                    <div class="form-group"><label for="itemQuantity">數量 *</label><input type="number" id="itemQuantity" class="form-control" required value="1" step="any"></div>
-                    <div class="form-group"><label for="itemUnitPrice">單價 *</label><input type="number" id="itemUnitPrice" class="form-control" required value="0" step="any"></div>
-                    <div class="form-group"><label for="itemTotalPrice">總價</label><input type="number" id="itemTotalPrice" class="form-control" disabled></div>
-                </div>
-                <div class="form-actions" style="text-align: right; margin-top: 20px;">
-                    <button type="button" class="btn btn-secondary" id="cancelAddItemBtn">取消</button>
-                    <button type="submit" class="btn btn-success">儲存項目</button>
-                </div>
-            </form>
-        </div>
+        <div class="modal-header"><h2 class="modal-title" id="modalTitle">追加項目數量</h2><span class="close-btn">&times;</span></div>
+        <form id="additionForm">
+            <input type="hidden" id="relatedItemId">
+            <div class="form-group"><label>項目名稱</label><input type="text" id="modalItemName" class="form-control" disabled></div>
+            <div class="form-group"><label for="additionQuantity">追加數量 *</label><input type="number" id="additionQuantity" class="form-control" required></div>
+            <div class="form-group"><label for="additionReason">追加原因 *</label><textarea id="additionReason" class="form-control" required></textarea></div>
+            <div class="form-actions" style="text-align: right; margin-top: 20px;">
+                <button type="button" class="btn btn-secondary" id="cancelAdditionBtn">取消</button>
+                <button type="submit" class="btn btn-success">確認追加</button>
+            </div>
+        </form>
     </div>
 </div>
