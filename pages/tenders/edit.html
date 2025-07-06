@@ -10,26 +10,28 @@
     .items-section { margin-top: 30px; }
     .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     .hierarchical-items { background: white; border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1); overflow: hidden; }
-    .items-header { display: grid; grid-template-columns: 4px 60px 2fr 80px 100px 120px 120px 100px 100px; gap: 15px; align-items: center; padding: 12px 20px; background: #f8f9fa; border-bottom: 2px solid #dee2e6; font-weight: 600; font-size: 14px; color: #495057; }
+    .items-header { display: grid; grid-template-columns: 4px 60px 2fr 80px 100px 120px 120px; gap: 15px; align-items: center; padding: 12px 20px; background: #f8f9fa; border-bottom: 2px solid #dee2e6; font-weight: 600; font-size: 14px; color: #495057; }
     .major-item-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; font-size: 16px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
     .major-item-left { display: flex; align-items: center; gap: 15px; flex: 1; }
     .major-item-toggle { font-size: 20px; line-height: 1; }
     .detail-items-container.collapsed { display: none; }
-    .detail-item { display: grid; grid-template-columns: 4px 60px 2fr 80px 100px 120px 120px 100px 100px; gap: 15px; align-items: center; padding: 15px 20px; border-bottom: 1px solid #e9ecef; }
+    .detail-item { display: grid; grid-template-columns: 4px 60px 2fr 80px 100px 120px 120px; gap: 15px; align-items: center; padding: 15px 20px; border-bottom: 1px solid #e9ecef; }
     .item-status { width: 4px; height: 40px; background: #28a745; border-radius: 2px; }
-    .item-status.addition { background: #ffc107; } /* 追加項目的狀態顏色 */
+    .item-status.addition { background: #ffc107; }
     .item-name { font-weight: 500; }
     .item-price, .item-total { text-align: right; }
     
-    /* 【新增樣式】彈出式視窗 (Modal) */
     .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
     .modal-content { background-color: #fefefe; margin: 10% auto; padding: 30px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
     .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dee2e6; padding-bottom: 15px; margin-bottom: 20px; }
     .modal-title { font-size: 24px; font-weight: 600; }
     .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-    .close-btn:hover, .close-btn:focus { color: black; text-decoration: none; }
     .modal-body .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .modal-body .form-group { margin-bottom: 15px; }
+    .btn { padding: 10px 20px; border-radius: 8px; cursor: pointer; border: none; font-size: 14px; font-weight: 600; }
+    .btn-primary { background-color: #007bff; color: white; }
+    .btn-secondary { background-color: #6c757d; color: white; }
+    .btn-success { background-color: #28a745; color: white; }
 </style>
 
 <div class="content-card">
@@ -56,11 +58,11 @@
         </div>
 
         <div class="content-section items-section">
-            <div class="section-header"><h3 class="section-title">📋 原始項目 (不可修改)</h3></div>
+            <div class="section-header"><h3 class="section-title">📋 原始項目</h3></div>
             <div class="items-header">
-                <div></div><div>項次</div><div style="text-align: left;">項目名稱</div><div>單位</div><div>數量</div><div style="text-align: right;">單價</div><div style="text-align: right;">小計</div><div></div><div></div>
+                <div></div><div>項次</div><div style="text-align: left;">項目名稱</div><div>單位</div><div>數量</div><div style="text-align: right;">單價</div><div style="text-align: right;">小計</div>
             </div>
-            <div class="hierarchical-items" id="hierarchicalItemsContainer"></div>
+            <div class="hierarchical-items" id="originalItemsContainer"></div>
         </div>
 
         <div class="content-section items-section">
@@ -71,7 +73,7 @@
                 </button>
             </div>
             <div class="items-header">
-                <div></div><div>項次</div><div style="text-align: left;">項目名稱</div><div>單位</div><div>數量</div><div style="text-align: right;">單價</div><div style="text-align: right;">小計</div><div></div><div></div>
+                <div></div><div>項次</div><div style="text-align: left;">項目名稱</div><div>單位</div><div>數量</div><div style="text-align: right;">單價</div><div style="text-align: right;">小計</div>
             </div>
             <div class="hierarchical-items" id="additionalItemsContainer"></div>
         </div>
@@ -87,31 +89,13 @@
         <div class="modal-body">
             <form id="addItemForm">
                 <input type="hidden" id="editItemId">
-                <div class="form-group">
-                    <label for="itemSequence">項次</label>
-                    <input type="text" id="itemSequence" class="form-control" placeholder="例如：A-1">
-                </div>
-                <div class="form-group">
-                    <label for="itemName">項目名稱 *</label>
-                    <input type="text" id="itemName" class="form-control" required>
-                </div>
+                <div class="form-group"><label for="itemSequence">項次</label><input type="text" id="itemSequence" class="form-control" placeholder="例如：A-1"></div>
+                <div class="form-group"><label for="itemName">項目名稱 *</label><input type="text" id="itemName" class="form-control" required></div>
                 <div class="form-grid">
-                    <div class="form-group">
-                        <label for="itemUnit">單位</label>
-                        <input type="text" id="itemUnit" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="itemQuantity">數量 *</label>
-                        <input type="number" id="itemQuantity" class="form-control" required value="1">
-                    </div>
-                    <div class="form-group">
-                        <label for="itemUnitPrice">單價 *</label>
-                        <input type="number" id="itemUnitPrice" class="form-control" required value="0">
-                    </div>
-                    <div class="form-group">
-                        <label for="itemTotalPrice">總價</label>
-                        <input type="number" id="itemTotalPrice" class="form-control" disabled>
-                    </div>
+                    <div class="form-group"><label for="itemUnit">單位</label><input type="text" id="itemUnit" class="form-control"></div>
+                    <div class="form-group"><label for="itemQuantity">數量 *</label><input type="number" id="itemQuantity" class="form-control" required value="1" step="any"></div>
+                    <div class="form-group"><label for="itemUnitPrice">單價 *</label><input type="number" id="itemUnitPrice" class="form-control" required value="0" step="any"></div>
+                    <div class="form-group"><label for="itemTotalPrice">總價</label><input type="number" id="itemTotalPrice" class="form-control" disabled></div>
                 </div>
                 <div class="form-actions" style="text-align: right; margin-top: 20px;">
                     <button type="button" class="btn btn-secondary" id="cancelAddItemBtn">取消</button>
