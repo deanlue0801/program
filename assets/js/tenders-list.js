@@ -1,5 +1,5 @@
 /**
- * 標單列表頁面 (tenders/list.js) (SPA 版本)
+ * 專案列表頁面 (tenders/list.js) (SPA 版本)
  * 由 router.js 呼叫 initTendersListPage() 函數來啟動
  */
 function initTendersListPage() {
@@ -7,31 +7,26 @@ function initTendersListPage() {
     // --- 頁面狀態管理 ---
     let allTenders = [];
     let allProjects = [];
-    let filteredTenders = [];
+    let filteredAndGroupedData = []; // 新的、用於分組的資料結構
 
     // --- 資料載入 ---
 
     async function loadAllData() {
         showLoading(true);
         try {
-            // 並行載入標單和專案資料，速度更快
             const [tenders, projects] = await Promise.all([
-                loadTenders(),   // 來自 firebase-config.js
-                loadProjects()   // 來自 firebase-config.js
+                loadTenders(),
+                loadProjects()
             ]);
 
             allProjects = projects;
-            // 將專案名稱合併到標單資料中，方便顯示
-            allTenders = tenders.map(tender => {
-                const project = allProjects.find(p => p.id === tender.projectId);
-                return {
-                    ...tender,
-                    projectName: project ? project.name : '未歸屬專案'
-                };
-            });
+            allTenders = tenders.map(tender => ({
+                ...tender,
+                projectName: projects.find(p => p.id === tender.projectId)?.name || '未歸屬專案'
+            }));
             
             updateProjectFilter();
-            applyFilters(); // 初始載入時，不過濾，直接顯示全部
+            applyFiltersAndGroup(); // 使用新的過濾與分組函數
             updateSummary();
 
         } catch (error) {
@@ -71,6 +66,7 @@ function initTendersListPage() {
         if(completedTendersEl) completedTendersEl.textContent = allTenders.filter(t => t.status === 'completed').length;
     }
 
+    // 【重寫】新的渲染函數，會產生分組標頭
     function renderTenders() {
         const tbody = document.getElementById('tendersTableBody');
         const emptyState = document.getElementById('emptyState');
@@ -78,7 +74,7 @@ function initTendersListPage() {
 
         if (!tbody) return;
 
-        if (filteredTenders.length === 0) {
+        if (filteredAndGroupedData.length === 0) {
             tbody.innerHTML = '';
             if(tableContainer) tableContainer.style.display = 'none';
             if(emptyState) emptyState.style.display = 'block';
@@ -88,34 +84,56 @@ function initTendersListPage() {
         if(tableContainer) tableContainer.style.display = 'block';
         if(emptyState) emptyState.style.display = 'none';
 
-        // 【修正處】這裡的 href 路徑移除了 .html，並確保路徑是絕對路徑
-        tbody.innerHTML = filteredTenders.map(tender => `
-            <tr>
-                <td><a href="/program/tenders/detail?id=${tender.id}" data-route>${escapeHtml(tender.name || '未命名標單')}</a></td>
-                <td><code>${escapeHtml(tender.code || 'N/A')}</code></td>
-                <td>${escapeHtml(tender.projectName)}</td>
-                <td><strong>${formatCurrency(tender.totalAmount || 0)}</strong></td>
-                <td><span class="status-badge ${tender.status || 'planning'}">${getStatusText(tender.status)}</span></td>
-                <td>${formatDate(tender.createdAt)}</td>
-                <td>
-                    <div class="action-buttons">
-                        <button class="btn btn-sm btn-view" onclick="window.exposedListFuncs.viewTender('${tender.id}')">查看</button>
-                        <button class="btn btn-sm btn-edit" onclick="window.exposedListFuncs.editTender('${tender.id}')">編輯</button>
-                        <button class="btn btn-sm btn-delete" onclick="window.exposedListFuncs.deleteTender('${tender.id}', '${escapeHtml(tender.name)}')">刪除</button>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
+        let html = '';
+        filteredAndGroupedData.forEach(group => {
+            // 渲染專案的標題列
+            html += `
+                <tr class="project-group-header">
+                    <td colspan="7">
+                        <strong>📁 專案：${escapeHtml(group.project.name)}</strong>
+                        <span class="project-code">(${escapeHtml(group.project.code || 'N/A')})</span>
+                    </td>
+                </tr>
+            `;
+
+            // 渲染這個專案底下的標單
+            if (group.tenders && group.tenders.length > 0) {
+                group.tenders.forEach(tender => {
+                    html += `
+                        <tr class="tender-row">
+                            <td><a href="/program/tenders/detail?id=${tender.id}" data-route>${escapeHtml(tender.name || '未命名標單')}</a></td>
+                            <td><code>${escapeHtml(tender.code || 'N/A')}</code></td>
+                            <td>${escapeHtml(tender.projectName)}</td>
+                            <td><strong>${formatCurrency(tender.totalAmount || 0)}</strong></td>
+                            <td><span class="status-badge ${tender.status || 'planning'}">${getStatusText(tender.status)}</span></td>
+                            <td>${formatDate(tender.createdAt)}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn btn-sm btn-view" onclick="window.exposedListFuncs.viewTender('${tender.id}')">查看</button>
+                                    <button class="btn btn-sm btn-edit" onclick="window.exposedListFuncs.editTender('${tender.id}')">編輯</button>
+                                    <button class="btn btn-sm btn-delete" onclick="window.exposedListFuncs.deleteTender('${tender.id}', '${escapeHtml(tender.name)}')">刪除</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } else {
+                 html += `<tr><td colspan="7" class="no-tenders-in-group">此專案下沒有符合篩選條件的標單。</td></tr>`;
+            }
+        });
+        tbody.innerHTML = html;
     }
     
     // --- 事件處理與操作 ---
 
-    function applyFilters() {
+    // 【重寫】新的函數，整合了過濾和分組
+    function applyFiltersAndGroup() {
         const projectFilter = document.getElementById('projectFilter').value;
         const statusFilter = document.getElementById('statusFilter').value;
         const searchInput = document.getElementById('searchInput').value.toLowerCase();
 
-        filteredTenders = allTenders.filter(tender => {
+        // 1. 過濾
+        const filteredTenders = allTenders.filter(tender => {
             if (projectFilter && tender.projectId !== projectFilter) return false;
             if (statusFilter && tender.status !== statusFilter) return false;
             if (searchInput) {
@@ -129,6 +147,21 @@ function initTendersListPage() {
             return true;
         });
 
+        // 2. 分組
+        const groups = {};
+        filteredTenders.forEach(tender => {
+            const projectId = tender.projectId || 'unassigned';
+            if (!groups[projectId]) {
+                const projectInfo = allProjects.find(p => p.id === projectId) || { name: '未歸屬專案', code: 'N/A' };
+                groups[projectId] = {
+                    project: projectInfo,
+                    tenders: []
+                };
+            }
+            groups[projectId].tenders.push(tender);
+        });
+
+        filteredAndGroupedData = Object.values(groups);
         renderTenders();
     }
 
@@ -136,15 +169,13 @@ function initTendersListPage() {
         document.getElementById('projectFilter').value = '';
         document.getElementById('statusFilter').value = '';
         document.getElementById('searchInput').value = '';
-        applyFilters();
+        applyFiltersAndGroup();
     }
     
-    // 【修正處】navigateTo 的路徑移除了 .html
     function viewTender(tenderId) {
         navigateTo(`/program/tenders/detail?id=${tenderId}`);
     }
 
-    // 【修正處】navigateTo 的路徑移除了 .html
     function editTender(tenderId) {
         navigateTo(`/program/tenders/edit?id=${tenderId}`);
     }
@@ -158,7 +189,7 @@ function initTendersListPage() {
             
             allTenders = allTenders.filter(t => t.id !== tenderId);
             
-            applyFilters();
+            applyFiltersAndGroup();
             updateSummary();
             
             showAlert('標單已成功刪除！', 'success');
@@ -184,7 +215,7 @@ function initTendersListPage() {
         return div.innerHTML;
     }
 
-    function showLoading(isLoading, message = '載入標單資料中...') {
+    function showLoading(isLoading, message = '載入專案資料中...') {
         const loadingEl = document.getElementById('loading');
         const mainContentEl = document.getElementById('mainContent');
         if (loadingEl) loadingEl.style.display = isLoading ? 'flex' : 'none';
@@ -198,13 +229,13 @@ function initTendersListPage() {
     // --- 函數暴露與頁面啟動 ---
     
     window.exposedListFuncs = {
-        applyFilters,
+        applyFilters: applyFiltersAndGroup, // 指向新的整合函數
         clearFilters,
         viewTender,
         editTender,
         deleteTender
     };
     
-    console.log("🚀 初始化標單列表頁面...");
+    console.log("🚀 初始化專案列表頁面...");
     loadAllData();
 }
