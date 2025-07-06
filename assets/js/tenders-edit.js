@@ -1,5 +1,5 @@
 /**
- * 編輯標單頁面 (tenders-edit.js) - v4.1 修正主項目排序與數量顯示格式
+ * 編輯標單頁面 (tenders-edit.js) - v4.2 恢復數量統計總覽
  */
 function initTenderEditPage() {
     // --- 頁面級別變數 ---
@@ -38,7 +38,6 @@ function initTenderEditPage() {
             safeFirestoreQuery('detailItems', [{ field: 'tenderId', operator: '==', value: tenderId }])
         ]);
 
-        // 【關鍵修正 1】: 強制在前端使用自然排序法對主項目進行排序
         majorItems = majorItemsData.docs.sort(naturalSequenceSort);
         detailItems = allDetailItemsData.docs.filter(item => !item.isAddition).sort(naturalSequenceSort);
         additionItems = allDetailItemsData.docs.filter(item => item.isAddition).sort((a,b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
@@ -49,6 +48,8 @@ function initTenderEditPage() {
         renderTenderHeader();
         renderMajorItemsList();
         renderAdditionItemsTable();
+        // 【關鍵修正 1】: 重新呼叫 renderSummaryCards 函數
+        renderSummaryCards();
     }
 
     function renderTenderHeader() {
@@ -119,7 +120,6 @@ function initTenderEditPage() {
             const additionalQuantity = additions.reduce((s, a) => s + (a.totalQuantity || 0), 0);
             const currentTotal = originalQuantity + additionalQuantity;
 
-            // 【關鍵修正 2】: 恢復您原本的數量顯示格式
             const quantityDisplay = additionalQuantity > 0 
                 ? `${currentTotal} (+${additionalQuantity})`
                 : originalQuantity;
@@ -178,6 +178,45 @@ function initTenderEditPage() {
             </table>
         `;
         container.innerHTML = html;
+    }
+    
+    // 【關鍵修正 2】: 將 renderSummaryCards 函數加回來
+    function renderSummaryCards() {
+        const summaryContainer = document.getElementById('summaryGrid');
+        if(!summaryContainer) return;
+        
+        const summarizedItems = {};
+        // 只統計有追加項目的項目
+        additionItems.forEach(add => {
+            if (!summarizedItems[add.relatedItemId]) {
+                const originalItem = detailItems.find(d => d.id === add.relatedItemId);
+                if (originalItem) {
+                    summarizedItems[add.relatedItemId] = {
+                        name: originalItem.name,
+                        unit: originalItem.unit,
+                        originalQty: originalItem.totalQuantity || 0,
+                        additionalQty: 0,
+                    };
+                }
+            }
+            if (summarizedItems[add.relatedItemId]) {
+                summarizedItems[add.relatedItemId].additionalQty += (add.totalQuantity || 0);
+            }
+        });
+
+        if (Object.keys(summarizedItems).length === 0) {
+            summaryContainer.innerHTML = '<div style="color: #888;">無追加項目可供統計。</div>';
+            return;
+        }
+
+        summaryContainer.innerHTML = Object.values(summarizedItems).map(summary => `
+            <div class="summary-card">
+                <div class="summary-item-name">${summary.name}</div>
+                <div class="summary-detail"><span>原始數量</span><span>${summary.originalQty} ${summary.unit || ''}</span></div>
+                <div class="summary-detail"><span>追加數量</span><span class="addition">+${summary.additionalQty} ${summary.unit || ''}</span></div>
+                <div class="summary-detail total"><span>目前總數</span><span>${summary.originalQty + summary.additionalQty} ${summary.unit || ''}</span></div>
+            </div>
+        `).join('');
     }
 
     // --- 事件處理 ---
