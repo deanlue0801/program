@@ -1,9 +1,13 @@
 /**
  * 編輯標單頁面 (tenders/edit.js) (SPA 版本) - 最終修正版
  */
-function initTenderEditPage() {
-    let tenderId, currentTender, majorItems, detailItems, additionItems;
 
+// 【修正處】將這些變數提升到頂層，讓所有函數都能共用
+let tenderId, currentTender, majorItems, detailItems, additionItems, allItems;
+
+function initTenderEditPage() {
+
+    // --- 主要初始化函數 ---
     async function init() {
         showLoading(true);
         tenderId = new URLSearchParams(window.location.search).get('id');
@@ -13,7 +17,6 @@ function initTenderEditPage() {
         }
 
         try {
-            // 【修正處】將所有需要在 HTML 使用的函數，直接在此定義並暴露到全域
             window.exposedFuncs = {
                 toggle: (majorId) => {
                     const el = document.getElementById(`details-${majorId}`);
@@ -64,8 +67,10 @@ function initTenderEditPage() {
             
             currentTender = { id: tenderDoc.id, ...tenderDoc.data() };
             majorItems = majorItemsDb.docs.sort(naturalSequenceSort);
-            detailItems = allDbItems.docs.filter(item => !item.isAddition).sort(naturalSequenceSort);
-            additionItems = allDbItems.docs.filter(item => item.isAddition).sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+            // 【修正處】這裡為頂層的 allItems 賦值
+            allItems = allDbItems.docs; 
+            detailItems = allItems.filter(item => !item.isAddition).sort(naturalSequenceSort);
+            additionItems = allItems.filter(item => item.isAddition).sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
             
             renderAll();
             setupEventListeners();
@@ -157,6 +162,7 @@ function initTenderEditPage() {
         const summaryContainer = document.getElementById('summaryGrid');
         if(!summaryContainer) return;
         const summarizedItems = {};
+        // 【修正處】直接使用頂層的 allItems 變數
         allItems.filter(i => i.isAddition).forEach(add => {
             if (!summarizedItems[add.relatedItemId]) {
                 const originalItem = detailItems.find(d => d.id === add.relatedItemId);
