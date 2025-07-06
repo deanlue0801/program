@@ -44,8 +44,9 @@ function initTenderEditPage() {
 
     function editAddition(additionId) {
         const item = additionItems.find(a => a.id === additionId);
+        if (!item) return showAlert('找不到要編輯的項目', 'error');
         const relatedItem = detailItems.find(d => d.id === item.relatedItemId);
-        if (!item || !relatedItem) return showAlert('找不到要編輯的項目', 'error');
+        if (!relatedItem) return showAlert('找不到關聯的原始項目', 'error');
         
         const modal = document.getElementById('additionModal');
         if(modal) {
@@ -334,5 +335,6 @@ function initTenderEditPage() {
         return pA.length-pB.length;
     }
 
+    // 啟動頁面
     init();
 }
