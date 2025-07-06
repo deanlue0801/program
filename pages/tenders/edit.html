@@ -1,78 +1,51 @@
 <div class="container">
-    <div id="loading" class="loading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 50vh;">
-        <div class="spinner"></div>
-        <p class="loading-text">載入標單資料中...</p>
-    </div>
+    <div id="loading" class="loading" style="display: flex;"><div class="spinner"></div><p>載入標單資料中...</p></div>
 
     <div id="editTenderContent" style="display:none;">
         <div class="header-card">
             <h1 class="page-title" id="pageTitle"></h1>
-            <p class="page-subtitle" id="pageSubtitle"></p>
         </div>
 
-        <div class="tender-info-section">
-            <h3>📊 標單資訊</h3>
-            <div class="info-grid" id="infoGrid">
-                </div>
+        <div class="tender-info-section info-grid" id="infoGrid"></div>
+
+        <div class="items-section card">
+            <h3 class="card-header">工程項目</h3>
+            <div class="table-wrapper">
+                <table class="table" id="hierarchicalItemsTable">
+                    <thead>
+                        <tr>
+                            <th>項次</th>
+                            <th>項目名稱</th>
+                            <th>單位</th>
+                            <th>數量</th>
+                            <th>單價</th>
+                            <th>小計</th>
+                            <th>目前總數</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hierarchicalItemsTbody">
+                        </tbody>
+                </table>
+            </div>
         </div>
 
         <div class="items-section card">
-            <div class="card-header">
-                <h3 class="card-title">工程項目</h3>
-            </div>
-            <div class="items-header">
-                <div>項次</div><div>項目名稱</div><div>單位</div><div>數量</div><div>單價</div><div>小計</div><div>目前總數</div><div>操作</div>
-            </div>
-            <div id="hierarchicalItemsContainer">
-                </div>
-        </div>
-
-        <div class="items-section card">
-            <div class="card-header">
-                <h3 class="card-title">追加項目明細</h3>
-            </div>
+            <h3 class="card-header">追加項目明細</h3>
             <div class="table-wrapper">
                 <table class="table" id="additionTable">
                     <thead><tr><th>追加日期</th><th>關聯項目</th><th>追加數量</th><th>追加單價</th><th>追加原因</th><th>狀態</th><th>操作</th></tr></thead>
-                    <tbody id="additionTableBody">
-                        </tbody>
+                    <tbody id="additionTableBody"></tbody>
                 </table>
             </div>
         </div>
 
         <div class="items-section">
             <h3 class="section-title">數量統計總覽</h3>
-            <div class="summary-grid" id="summaryGrid">
-                </div>
+            <div class="summary-grid" id="summaryGrid"></div>
         </div>
     </div>
 </div>
 
 <div id="additionModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 class="modal-title" id="modalTitle">追加項目數量</h2>
-            <span class="modal-close" onclick="document.getElementById('additionModal').style.display='none'">&times;</span>
-        </div>
-        <form id="additionForm" class="modal-body">
-            <input type="hidden" id="relatedItemId">
-            <input type="hidden" id="editAdditionId">
-            <div class="form-group">
-                <label class="form-label">關聯項目</label>
-                <input type="text" id="modalItemName" class="form-control" disabled>
-            </div>
-            <div class="form-group">
-                <label class="form-label" for="additionQuantity">追加數量 *</label>
-                <input type="number" id="additionQuantity" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label" for="additionReason">追加原因 *</label>
-                <textarea id="additionReason" class="form-control" required></textarea>
-            </div>
-            <div class="form-actions" style="justify-content: flex-end; gap: 10px;">
-                <button type="button" class="btn btn-secondary" onclick="document.getElementById('additionModal').style.display='none'">取消</button>
-                <button type="submit" class="btn btn-success">確認</button>
-            </div>
-        </form>
     </div>
-</div>
