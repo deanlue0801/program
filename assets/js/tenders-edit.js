@@ -1,10 +1,115 @@
 /**
- * 編輯標單頁面 (tenders/edit.js) (SPA 版本) - 改為直接控制 style
+ * 編輯標單頁面 (tenders/edit.js) (SPA 版本) - 事件監聽重構版
  */
 function initTenderEditPage() {
     let tenderId, currentTender, majorItems, detailItems, additionItems;
     let allMajorExpanded = false;
 
+    // --- 核心邏輯函數 (負責顯示/隱藏) ---
+    function toggle(majorId) {
+        document.querySelectorAll(`tr[data-major-id="${majorId}"]`).forEach(row => {
+            const isCollapsed = row.style.display === 'none';
+            row.style.display = isCollapsed ? '' : 'none';
+        });
+    }
+
+    function toggleAll() {
+        allMajorExpanded = !allMajorExpanded;
+        document.querySelectorAll('tr.detail-item-row').forEach(row => {
+            row.style.display = allMajorExpanded ? '' : 'none';
+        });
+        const toggleBtnText = document.getElementById('toggleAllBtnText');
+        if (toggleBtnText) {
+            toggleBtnText.textContent = allMajorExpanded ? '全部收合' : '全部展開';
+        }
+    }
+    
+    // --- 畫面渲染函數 ---
+
+    function renderHierarchicalItems() {
+        const tbody = document.getElementById('hierarchicalItemsTbody');
+        if(!tbody) return;
+        let html = '';
+        majorItems.forEach(major => {
+            const itemsInMajor = detailItems.filter(detail => detail.majorItemId === major.id);
+            // 【修改點】移除 onclick，改為使用 data- attribute 供事件監聽器識別
+            html += `
+                <tr class="major-item-header-row">
+                    <td colspan="8">
+                        <div class="major-item-header" data-major-id-header="${major.id}">
+                            <span>${major.name}</span>
+                            <span>${itemsInMajor.length} 項 | ${formatCurrency(itemsInMajor.reduce((s, i) => s + (i.totalPrice||0), 0))}</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            itemsInMajor.forEach(item => {
+                html += renderDetailItem(item, major.id);
+            });
+        });
+        tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;padding:2rem;">無原始項目</td></tr>';
+    }
+    
+    function renderDetailItem(item, majorId) {
+        const additionsForThisItem = additionItems.filter(add => add.relatedItemId === item.id);
+        const additionalQty = additionsForThisItem.reduce((sum, add) => sum + (add.totalQuantity || 0), 0);
+        const currentTotal = (item.totalQuantity || 0) + additionalQty;
+        // 初始狀態為隱藏
+        return `
+            <tr class="detail-item-row" data-major-id="${majorId}" style="display: none;">
+                <td>${item.sequence || ''}</td>
+                <td style="text-align: left;">${item.name}</td>
+                <td>${item.unit}</td>
+                <td>${item.totalQuantity || 0}</td>
+                <td class="item-price">${formatCurrency(item.unitPrice)}</td>
+                <td class="item-total">${formatCurrency(item.totalPrice)}</td>
+                <td class="current-total ${additionalQty > 0 ? 'changed' : ''}">${currentTotal} ${additionalQty > 0 ? `(+${additionalQty})` : ''}</td>
+                <td><button class="btn btn-sm btn-primary" onclick="window.exposedFuncs.showAdditionModal('${item.id}', '${escape(item.name)}')">追加</button></td>
+            </tr>
+        `;
+    }
+
+    /**
+     * 【關鍵修改】
+     * 我們在這裡統一設定事件監聽，而不是使用 inline onclick
+     */
+    function setupEventListeners() {
+        // 1. 綁定「全部展開/收合」按鈕的點擊事件
+        const toggleAllBtn = document.getElementById('toggleAllItemsBtn');
+        if (toggleAllBtn) {
+            toggleAllBtn.onclick = toggleAll; // 直接將 toggleAll 函數賦予給 onclick
+        }
+
+        // 2. 使用「事件委派」來處理所有大項的點擊事件
+        const tableBody = document.getElementById('hierarchicalItemsTbody');
+        if (tableBody) {
+            tableBody.addEventListener('click', (event) => {
+                // 檢查被點擊的元素是不是或在不在 .major-item-header 裡面
+                const header = event.target.closest('.major-item-header');
+                if (header) {
+                    const majorId = header.dataset.majorIdHeader; // 從 data- 屬性獲取 ID
+                    if (majorId) {
+                        toggle(majorId); // 呼叫我們的 toggle 函數
+                    }
+                }
+            });
+        }
+        
+        // --- 保留 Modal 相關的事件監聽 ---
+        const modal = document.getElementById('additionModal');
+        if (!modal) return;
+        
+        const closeBtn = modal.querySelector('.modal-close');
+        const cancelBtn = document.getElementById('cancelAdditionBtn');
+        const form = document.getElementById('additionForm');
+
+        if(closeBtn) closeBtn.onclick = () => modal.style.display = "none";
+        if(cancelBtn) cancelBtn.onclick = () => modal.style.display = "none";
+        window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
+        if(form) form.onsubmit = handleAdditionSubmit;
+    }
+    
+    // --- 頁面初始化與資料載入 (init 函數) ---
     async function init() {
         showLoading(true);
         tenderId = new URLSearchParams(window.location.search).get('id');
@@ -27,8 +132,10 @@ function initTenderEditPage() {
             detailItems = allDbItems.docs.filter(item => !item.isAddition).sort(naturalSequenceSort);
             additionItems = allDbItems.docs.filter(item => item.isAddition).sort((a,b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
             
+            // 先渲染畫面，再綁定事件
             renderAll();
             setupEventListeners();
+            
             showLoading(false);
         } catch (error) {
             console.error("載入標單編輯頁面失敗:", error);
@@ -37,62 +144,8 @@ function initTenderEditPage() {
         }
     }
 
-    function renderAll() {
-        const pageTitleEl = document.getElementById('pageTitle');
-        if(pageTitleEl) pageTitleEl.textContent = `標單編輯: ${currentTender.name}`;
-        renderTenderInfo();
-        renderHierarchicalItems();
-        renderAdditionTable();
-        renderSummaryCards();
-    }
-
-    function renderHierarchicalItems() {
-        const tbody = document.getElementById('hierarchicalItemsTbody');
-        if(!tbody) return;
-        let html = '';
-        majorItems.forEach(major => {
-            const itemsInMajor = detailItems.filter(detail => detail.majorItemId === major.id);
-            html += `
-                <tr class="major-item-header-row">
-                    <td colspan="8">
-                        <div class="major-item-header" onclick="window.exposedFuncs.toggle('${major.id}')">
-                            <span>${major.name}</span>
-                            <span>${itemsInMajor.length} 項 | ${formatCurrency(itemsInMajor.reduce((s, i) => s + (i.totalPrice||0), 0))}</span>
-                        </div>
-                    </td>
-                </tr>
-            `;
-            itemsInMajor.forEach(item => {
-                html += renderDetailItem(item, major.id);
-            });
-        });
-        tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;padding:2rem;">無原始項目</td></tr>';
-    }
-
-    /**
-     * 【關鍵修改 1】
-     * 這裡我們不再使用 collapsed class，而是直接在 tr 元素上加上 inline-style `style="display: none;"`
-     * 這樣可以確保它初始就是隱藏的。
-     */
-    function renderDetailItem(item, majorId) {
-        const additionsForThisItem = additionItems.filter(add => add.relatedItemId === item.id);
-        const additionalQty = additionsForThisItem.reduce((sum, add) => sum + (add.totalQuantity || 0), 0);
-        const currentTotal = (item.totalQuantity || 0) + additionalQty;
-        return `
-            <tr class="detail-item-row" data-major-id="${majorId}" style="display: none;">
-                <td>${item.sequence || ''}</td>
-                <td style="text-align: left;">${item.name}</td>
-                <td>${item.unit}</td>
-                <td>${item.totalQuantity || 0}</td>
-                <td class="item-price">${formatCurrency(item.unitPrice)}</td>
-                <td class="item-total">${formatCurrency(item.totalPrice)}</td>
-                <td class="current-total ${additionalQty > 0 ? 'changed' : ''}">${currentTotal} ${additionalQty > 0 ? `(+${additionalQty})` : ''}</td>
-                <td><button class="btn btn-sm btn-primary" onclick="window.exposedFuncs.showAdditionModal('${item.id}', '${escape(item.name)}')">追加</button></td>
-            </tr>
-        `;
-    }
-    
-    // 其他 render 函數 (renderTenderInfo, renderAdditionTable, renderSummaryCards) 維持不變...
+    // --- 其他所有輔助函數 (renderTenderInfo, handleAdditionSubmit 等) 維持不變 ---
+    // ... (此處省略與之前版本相同的函數程式碼，以保持簡潔)
     function renderTenderInfo() {
         const originalAmount = detailItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
         const additionAmount = additionItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
@@ -155,20 +208,6 @@ function initTenderEditPage() {
             </div>
         `).join('');
     }
-    
-    // setupEventListeners 和 handleAdditionSubmit 維持不變...
-    function setupEventListeners() {
-        const modal = document.getElementById('additionModal');
-        if (!modal) return;
-        const closeBtn = modal.querySelector('.modal-close');
-        const cancelBtn = document.getElementById('cancelAdditionBtn');
-        const form = document.getElementById('additionForm');
-
-        if(closeBtn) closeBtn.onclick = () => modal.style.display = "none";
-        if(cancelBtn) cancelBtn.onclick = () => modal.style.display = "none";
-        window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
-        if(form) form.onsubmit = handleAdditionSubmit;
-    }
 
     async function handleAdditionSubmit(event) {
         event.preventDefault();
@@ -206,35 +245,8 @@ function initTenderEditPage() {
         if(contentEl) contentEl.style.display = isLoading ? 'none' : 'block';
     }
     
+    // 我們仍然需要這個來處理追加項目的按鈕
     window.exposedFuncs = {
-        /**
-         * 【關鍵修改 2】
-         * 單項收合/展開：直接修改 style.display。
-         * 如果目前是 'none'，就改成 '' (恢復預設的 table-row)；反之亦然。
-         */
-        toggle: (majorId) => {
-            document.querySelectorAll(`tr[data-major-id="${majorId}"]`).forEach(row => {
-                const isCollapsed = row.style.display === 'none';
-                row.style.display = isCollapsed ? '' : 'none';
-            });
-        },
-        /**
-         * 【關鍵修改 3】
-         * 全部收合/展開：也是直接修改 style.display。
-         * allMajorExpanded 為 true 時，全部展開 (display = '')
-         * allMajorExpanded 為 false 時，全部收合 (display = 'none')
-         */
-        toggleAll: () => {
-            allMajorExpanded = !allMajorExpanded;
-            document.querySelectorAll('tr.detail-item-row').forEach(row => {
-                row.style.display = allMajorExpanded ? '' : 'none';
-            });
-            const toggleBtn = document.getElementById('toggleAllBtnText');
-            if (toggleBtn) {
-                toggleBtn.textContent = allMajorExpanded ? '全部收合' : '全部展開';
-            }
-        },
-        // 其他 exposedFuncs (showAdditionModal, editAddition, deleteAddition) 維持不變
         showAdditionModal: (itemId, itemName) => {
             const modal = document.getElementById('additionModal');
             if(modal) {
@@ -284,5 +296,6 @@ function initTenderEditPage() {
         return pA.length-pB.length;
     }
 
+    // 啟動頁面
     init();
 }
