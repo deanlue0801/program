@@ -1,5 +1,5 @@
 /**
- * 編輯標單頁面 (tenders/edit.js) (SPA 版本) - 恢復展開收合功能
+ * 編輯標單頁面 (tenders/edit.js) (SPA 版本) - 恢復展開收合的最終完整版
  */
 function initTenderEditPage() {
     let tenderId, currentTender, majorItems, detailItems, additionItems;
