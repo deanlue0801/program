@@ -1,5 +1,5 @@
 /**
- * 編輯標單頁面 (tenders-edit.js) - v4.0 修正項目編號讀取問題
+ * 編輯標單頁面 (tenders-edit.js) - v4.1 修正主項目排序與數量顯示格式
  */
 function initTenderEditPage() {
     // --- 頁面級別變數 ---
@@ -33,13 +33,13 @@ function initTenderEditPage() {
         if (!tenderDoc.exists) throw new Error('找不到指定的標單');
         currentTender = { id: tenderDoc.id, ...tenderDoc.data() };
 
-        // 依賴您資料庫中的 'sequence' 欄位進行排序
         const [majorItemsData, allDetailItemsData] = await Promise.all([
-            safeFirestoreQuery('majorItems', [{ field: 'tenderId', operator: '==', value: tenderId }], { field: 'sequence', direction: 'asc' }),
+            safeFirestoreQuery('majorItems', [{ field: 'tenderId', operator: '==', value: tenderId }]),
             safeFirestoreQuery('detailItems', [{ field: 'tenderId', operator: '==', value: tenderId }])
         ]);
 
-        majorItems = majorItemsData.docs;
+        // 【關鍵修正 1】: 強制在前端使用自然排序法對主項目進行排序
+        majorItems = majorItemsData.docs.sort(naturalSequenceSort);
         detailItems = allDetailItemsData.docs.filter(item => !item.isAddition).sort(naturalSequenceSort);
         additionItems = allDetailItemsData.docs.filter(item => item.isAddition).sort((a,b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
     }
@@ -89,8 +89,6 @@ function initTenderEditPage() {
         `;
         majorItems.forEach((majorItem) => {
             const detailsInMajor = detailItems.filter(d => d.majorItemId === majorItem.id);
-            
-            // 【關鍵修正】直接使用資料庫中的 majorItem.sequence 欄位
             const itemNumber = majorItem.sequence || 'N/A';
 
             html += `
@@ -116,17 +114,25 @@ function initTenderEditPage() {
     function renderDetailTable(details) {
         if (details.length === 0) return '<div style="padding: 20px; text-align: center; color: #888;">此主項目下無細項資料。</div>';
         const rows = details.map(item => {
+            const originalQuantity = item.totalQuantity || 0;
             const additions = additionItems.filter(add => add.relatedItemId === item.id);
-            const currentTotal = (item.totalQuantity || 0) + additions.reduce((s, a) => s + (a.totalQuantity || 0), 0);
+            const additionalQuantity = additions.reduce((s, a) => s + (a.totalQuantity || 0), 0);
+            const currentTotal = originalQuantity + additionalQuantity;
+
+            // 【關鍵修正 2】: 恢復您原本的數量顯示格式
+            const quantityDisplay = additionalQuantity > 0 
+                ? `${currentTotal} (+${additionalQuantity})`
+                : originalQuantity;
+
             return `
                 <tr>
                     <td>${item.sequence || ''}</td>
                     <td>${item.name}</td>
                     <td>${item.unit}</td>
-                    <td class="number-cell">${item.totalQuantity || 0}</td>
+                    <td class="number-cell">${originalQuantity}</td>
                     <td class="number-cell">${formatCurrency(item.unitPrice)}</td>
                     <td class="number-cell">${formatCurrency(item.totalPrice)}</td>
-                    <td class="number-cell">${currentTotal}</td>
+                    <td class="number-cell">${quantityDisplay}</td>
                     <td class="action-cell"><button class="btn btn-sm btn-primary" data-action="add-addition" data-item-id="${item.id}" data-item-name="${escape(item.name)}">追加</button></td>
                 </tr>
             `;
