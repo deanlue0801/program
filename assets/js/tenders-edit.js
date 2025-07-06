@@ -1,9 +1,9 @@
 /**
- * 編輯標單頁面 (tenders/edit.js) (SPA 版本) - 恢復展開收合的最終完整版
+ * 編輯標單頁面 (tenders/edit.js) (SPA 版本) - 改為直接控制 style
  */
 function initTenderEditPage() {
     let tenderId, currentTender, majorItems, detailItems, additionItems;
-    let allMajorExpanded = false; // 新增一個狀態來追蹤是否全部展開
+    let allMajorExpanded = false;
 
     async function init() {
         showLoading(true);
@@ -46,19 +46,6 @@ function initTenderEditPage() {
         renderSummaryCards();
     }
 
-    function renderTenderInfo() {
-        const originalAmount = detailItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
-        const additionAmount = additionItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
-        const infoGridEl = document.getElementById('infoGrid');
-        if(infoGridEl) {
-            infoGridEl.innerHTML = `
-                <div class="info-item"><div class="info-label">原始金額</div><div class="info-value amount">${formatCurrency(originalAmount)}</div></div>
-                <div class="info-item"><div class="info-label">追加金額</div><div class="info-value addition">${formatCurrency(additionAmount)}</div></div>
-                <div class="info-item"><div class="info-label">目前總金額</div><div class="info-value total">${formatCurrency(originalAmount + additionAmount)}</div></div>
-            `;
-        }
-    }
-
     function renderHierarchicalItems() {
         const tbody = document.getElementById('hierarchicalItemsTbody');
         if(!tbody) return;
@@ -82,13 +69,17 @@ function initTenderEditPage() {
         tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;padding:2rem;">無原始項目</td></tr>';
     }
 
+    /**
+     * 【關鍵修改 1】
+     * 這裡我們不再使用 collapsed class，而是直接在 tr 元素上加上 inline-style `style="display: none;"`
+     * 這樣可以確保它初始就是隱藏的。
+     */
     function renderDetailItem(item, majorId) {
         const additionsForThisItem = additionItems.filter(add => add.relatedItemId === item.id);
         const additionalQty = additionsForThisItem.reduce((sum, add) => sum + (add.totalQuantity || 0), 0);
         const currentTotal = (item.totalQuantity || 0) + additionalQty;
-        // **修改點**：初始狀態為收合，所以加上 'collapsed' class
         return `
-            <tr class="detail-item-row collapsed" data-major-id="${majorId}">
+            <tr class="detail-item-row" data-major-id="${majorId}" style="display: none;">
                 <td>${item.sequence || ''}</td>
                 <td style="text-align: left;">${item.name}</td>
                 <td>${item.unit}</td>
@@ -99,6 +90,20 @@ function initTenderEditPage() {
                 <td><button class="btn btn-sm btn-primary" onclick="window.exposedFuncs.showAdditionModal('${item.id}', '${escape(item.name)}')">追加</button></td>
             </tr>
         `;
+    }
+    
+    // 其他 render 函數 (renderTenderInfo, renderAdditionTable, renderSummaryCards) 維持不變...
+    function renderTenderInfo() {
+        const originalAmount = detailItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+        const additionAmount = additionItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+        const infoGridEl = document.getElementById('infoGrid');
+        if(infoGridEl) {
+            infoGridEl.innerHTML = `
+                <div class="info-item"><div class="info-label">原始金額</div><div class="info-value amount">${formatCurrency(originalAmount)}</div></div>
+                <div class="info-item"><div class="info-label">追加金額</div><div class="info-value addition">${formatCurrency(additionAmount)}</div></div>
+                <div class="info-item"><div class="info-label">目前總金額</div><div class="info-value total">${formatCurrency(originalAmount + additionAmount)}</div></div>
+            `;
+        }
     }
     
     function renderAdditionTable() {
@@ -150,7 +155,8 @@ function initTenderEditPage() {
             </div>
         `).join('');
     }
-
+    
+    // setupEventListeners 和 handleAdditionSubmit 維持不變...
     function setupEventListeners() {
         const modal = document.getElementById('additionModal');
         if (!modal) return;
@@ -201,22 +207,34 @@ function initTenderEditPage() {
     }
     
     window.exposedFuncs = {
+        /**
+         * 【關鍵修改 2】
+         * 單項收合/展開：直接修改 style.display。
+         * 如果目前是 'none'，就改成 '' (恢復預設的 table-row)；反之亦然。
+         */
         toggle: (majorId) => {
             document.querySelectorAll(`tr[data-major-id="${majorId}"]`).forEach(row => {
-                row.classList.toggle('collapsed');
+                const isCollapsed = row.style.display === 'none';
+                row.style.display = isCollapsed ? '' : 'none';
             });
         },
-        // **新增功能**：切換全部展開或收合
+        /**
+         * 【關鍵修改 3】
+         * 全部收合/展開：也是直接修改 style.display。
+         * allMajorExpanded 為 true 時，全部展開 (display = '')
+         * allMajorExpanded 為 false 時，全部收合 (display = 'none')
+         */
         toggleAll: () => {
             allMajorExpanded = !allMajorExpanded;
             document.querySelectorAll('tr.detail-item-row').forEach(row => {
-                row.classList.toggle('collapsed', !allMajorExpanded);
+                row.style.display = allMajorExpanded ? '' : 'none';
             });
             const toggleBtn = document.getElementById('toggleAllBtnText');
             if (toggleBtn) {
                 toggleBtn.textContent = allMajorExpanded ? '全部收合' : '全部展開';
             }
         },
+        // 其他 exposedFuncs (showAdditionModal, editAddition, deleteAddition) 維持不變
         showAdditionModal: (itemId, itemName) => {
             const modal = document.getElementById('additionModal');
             if(modal) {
