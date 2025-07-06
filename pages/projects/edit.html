@@ -1,37 +1,76 @@
 <div class="content-card">
     <div class="page-header">
-        <h1 class="page-title">📁 編輯專案</h1>
+        <h1 class="page-title">✏️ 編輯專案</h1>
     </div>
 
-    <div id="loadingProject" class="loading" style="display: flex;">
+    <div id="loading" class="loading" style="display: flex;">
         <div class="spinner"></div>
         <p>載入專案資料中...</p>
     </div>
 
-    <form id="projectEditForm" style="display: none;" onsubmit="window.exposedProjectEditFuncs.handleFormSubmit(event)">
+    <form id="editTenderForm" style="display: none;" onsubmit="window.exposedEditFuncs.handleFormSubmit(event)">
         <div class="form-container">
-            <div class="form-section">
-                <h3>專案資訊</h3>
-                <div class="form-group">
-                    <label for="projectName">專案名稱 *</label>
-                    <input type="text" id="projectName" class="form-control" required>
+            <div class="form-grid">
+                <div class="form-section">
+                    <h3>基本資訊</h3>
+                    <div class="form-group">
+                        <label for="tenderName">標單名稱 *</label>
+                        <input type="text" id="tenderName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="tenderCode">標單編號</label>
+                        <input type="text" id="tenderCode" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="projectSelect">所屬專案 *</label>
+                        <select id="projectSelect" class="form-control" required></select>
+                    </div>
+                     <div class="form-group">
+                        <label for="statusSelect">標單狀態</label>
+                        <select id="statusSelect" class="form-control">
+                            <option value="planning">規劃中</option>
+                            <option value="active">進行中</option>
+                            <option value="completed">已完成</option>
+                            <option value="paused">暫停</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="projectCode">專案編號</label>
-                    <input type="text" id="projectCode" class="form-control">
+
+                <div class="form-section">
+                    <h3>時程與承包商</h3>
+                    <div class="form-group">
+                        <label for="startDate">開始日期</label>
+                        <input type="date" id="startDate" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="endDate">結束日期</label>
+                        <input type="date" id="endDate" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="contractorName">承包商名稱</label>
+                        <input type="text" id="contractorName" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="contractorContact">聯絡方式</label>
+                        <input type="text" id="contractorContact" class="form-control">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="projectStatus">專案狀態</label>
-                    <select id="projectStatus" class="form-control">
-                        <option value="planning">規劃中</option>
-                        <option value="active">進行中</option>
-                        <option value="completed">已完成</option>
-                        <option value="paused">暫停</option>
-                    </select>
+
+                <div class="form-section" style="grid-column: 1 / -1;">
+                     <h3>描述與備註</h3>
+                    <div class="form-group">
+                        <label for="description">標單描述</label>
+                        <textarea id="description" class="form-control"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">備註</label>
+                        <textarea id="notes" class="form-control"></textarea>
+                    </div>
                 </div>
             </div>
+
             <div class="form-actions">
-                <button type="button" class="btn btn-secondary" onclick="window.exposedProjectEditFuncs.cancelEdit()">取消</button>
+                <button type="button" class="btn btn-secondary" onclick="window.exposedEditFuncs.cancelEdit()">取消</button>
                 <button type="submit" class="btn btn-success">儲存變更</button>
             </div>
         </div>
