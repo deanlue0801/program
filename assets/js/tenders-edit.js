@@ -1,12 +1,9 @@
 /**
- * 編輯標單頁面 (tenders-edit.js) (SPA 版本) - CONSOLE 除錯模式
+ * 編輯標單頁面 (tenders-edit.js) (SPA 版本) - 最終除錯版
  */
 function initTenderEditPage() {
-
-    // 將所有需要在函數間共用的變數，定義在最頂層的作用域
     let tenderId, currentTender, majorItems, detailItems, additionItems;
 
-    // --- 主要初始化函數 ---
     async function init() {
         showLoading(true);
         tenderId = new URLSearchParams(window.location.search).get('id');
@@ -16,7 +13,6 @@ function initTenderEditPage() {
         }
 
         try {
-            // 將所有可從 HTML 呼叫的函數，統一定義在 window.exposedFuncs 物件中
             window.exposedFuncs = {
                 toggle: (majorId) => {
                     const el = document.getElementById(`details-${majorId}`);
@@ -54,7 +50,7 @@ function initTenderEditPage() {
                     if (!confirm('確定要刪除這筆追加項目嗎？此操作無法復原。')) return;
                     try {
                         await db.collection('detailItems').doc(additionId).delete();
-                        await init(); // 重新載入所有資料
+                        await init();
                         showAlert('刪除成功', 'success');
                     } catch (error) { showAlert('刪除失敗: ' + error.message, 'error'); }
                 }
@@ -68,14 +64,12 @@ function initTenderEditPage() {
 
             if (!tenderDoc.exists) throw new Error('找不到指定的標單');
             
-            // 為頂層變數賦值
             currentTender = { id: tenderDoc.id, ...tenderDoc.data() };
             majorItems = majorItemsDb.docs.sort(naturalSequenceSort);
             const allItems = allDbItems.docs;
             detailItems = allItems.filter(item => !item.isAddition).sort(naturalSequenceSort);
             additionItems = allItems.filter(item => item.isAddition).sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
             
-            // 【監視器】將關鍵資料暴露到全域，方便 CONSOLE 存取
             window.debugData = { currentTender, majorItems, detailItems, additionItems };
 
             renderAll();
@@ -88,7 +82,6 @@ function initTenderEditPage() {
         }
     }
 
-    // --- 畫面渲染總管 ---
     function renderAll() {
         const pageTitleEl = document.getElementById('pageTitle');
         if(pageTitleEl) pageTitleEl.textContent = `標單編輯: ${currentTender.name}`;
@@ -97,7 +90,51 @@ function initTenderEditPage() {
         renderAdditionTable();
         renderSummaryCards();
     }
+    
+    // 【修正處】在 renderAdditionTable 函數中加入詳細的日誌
+    function renderAdditionTable() {
+        console.group("[DEBUG] 正在執行 renderAdditionTable 函數...");
 
+        const tbody = document.querySelector('#additionTable tbody');
+        if(!tbody) {
+            console.error("-> 錯誤：找不到 #additionTable tbody 元素！");
+            console.groupEnd();
+            return;
+        }
+        console.log("-> 步驟 1: 成功找到表格的 tbody。");
+
+        console.log(`-> 步驟 2: 準備用來渲染的 additionItems 陣列，長度為: ${additionItems.length}`);
+        console.table(additionItems);
+
+        const tableRows = additionItems.map(add => {
+            const relatedItem = detailItems.find(d => d.id === add.relatedItemId);
+            const rowHTML = `
+                <tr>
+                    <td>${formatDate(add.createdAt)}</td>
+                    <td>${relatedItem ? relatedItem.name : '未知項目'}</td>
+                    <td>${add.totalQuantity || 0}</td>
+                    <td>${formatCurrency(add.unitPrice)}</td>
+                    <td>${add.reason || ''}</td>
+                    <td>${add.status || '待核准'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" onclick="window.exposedFuncs.editAddition('${add.id}')">編輯</button>
+                        <button class="btn btn-sm btn-danger" onclick="window.exposedFuncs.deleteAddition('${add.id}')">刪除</button>
+                    </td>
+                </tr>
+            `;
+            return rowHTML;
+        });
+
+        console.log(`-> 步驟 3: map 函數已執行完畢，生成了 ${tableRows.length} 個表格列(TR)。`);
+
+        const finalHTML = tableRows.join('');
+        tbody.innerHTML = finalHTML;
+        
+        console.log("-> 步驟 4: 成功將生成的 HTML 寫入 tbody。");
+        console.groupEnd();
+    }
+
+    // --- 其他函數 (省略未修改部分) ---
     function renderTenderInfo() {
         const originalAmount = detailItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
         const additionAmount = additionItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
@@ -123,7 +160,7 @@ function initTenderEditPage() {
                         <span>${major.name}</span><span>${itemsInMajor.length} 項 | ${formatCurrency(itemsInMajor.reduce((s, i) => s + (i.totalPrice||0), 0))}</span>
                     </div>
                     <div class="detail-items-container" id="details-${major.id}">
-                        ${itemsInMajor.map(renderDetailItem).join('')}
+                        ${itemsInMajor.map(item => renderDetailItem(item)).join('')}
                     </div>
                 </div>
             `;
@@ -143,25 +180,6 @@ function initTenderEditPage() {
                 <div><button class="btn btn-sm btn-primary" onclick="window.exposedFuncs.showAdditionModal('${item.id}', '${escape(item.name)}')">追加</button></div>
             </div>
         `;
-    }
-
-    function renderAdditionTable() {
-        const tbody = document.querySelector('#additionTable tbody');
-        if(!tbody) return;
-        tbody.innerHTML = additionItems.map(add => {
-            const relatedItem = detailItems.find(d => d.id === add.relatedItemId);
-            return `
-                <tr>
-                    <td>${formatDate(add.createdAt)}</td><td>${relatedItem ? relatedItem.name : '未知項目'}</td>
-                    <td>${add.totalQuantity || 0}</td><td>${formatCurrency(add.unitPrice)}</td>
-                    <td>${add.reason || ''}</td><td>${add.status || '待核准'}</td>
-                    <td>
-                        <button class="btn btn-sm btn-warning" onclick="window.exposedFuncs.editAddition('${add.id}')">編輯</button>
-                        <button class="btn btn-sm btn-danger" onclick="window.exposedFuncs.deleteAddition('${add.id}')">刪除</button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
     }
 
     function renderSummaryCards() {
@@ -192,7 +210,6 @@ function initTenderEditPage() {
         `).join('');
     }
 
-    // --- Modal 與事件處理 ---
     function setupEventListeners() {
         const modal = document.getElementById('additionModal');
         const closeBtn = modal.querySelector('.close-btn');
