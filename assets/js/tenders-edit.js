@@ -4,6 +4,50 @@
 function initTenderEditPage() {
     let tenderId, currentTender, majorItems, detailItems, additionItems;
 
+    // --- 全域可呼叫函數的定義 ---
+    // 【修正處】先定義好所有需要從 HTML 呼叫的函數
+    const toggle = (majorId) => {
+        const el = document.getElementById(`details-${majorId}`);
+        if (el) el.classList.toggle('collapsed');
+    };
+
+    const showAdditionModal = (itemId, itemName) => {
+        const modal = document.getElementById('additionModal');
+        document.getElementById('editAdditionId').value = '';
+        document.getElementById('relatedItemId').value = itemId;
+        document.getElementById('modalItemName').value = unescape(itemName);
+        document.getElementById('additionQuantity').value = 1;
+        document.getElementById('additionReason').value = '';
+        document.getElementById('modalTitle').textContent = '追加項目數量';
+        modal.style.display = 'block';
+    };
+
+    const editAddition = (additionId) => {
+        const item = additionItems.find(a => a.id === additionId);
+        const relatedItem = detailItems.find(d => d.id === item.relatedItemId);
+        if (!item || !relatedItem) return showAlert('找不到要編輯的項目', 'error');
+        
+        const modal = document.getElementById('additionModal');
+        document.getElementById('editAdditionId').value = item.id;
+        document.getElementById('relatedItemId').value = item.relatedItemId;
+        document.getElementById('modalItemName').value = relatedItem.name;
+        document.getElementById('additionQuantity').value = item.totalQuantity;
+        document.getElementById('additionReason').value = item.reason;
+        document.getElementById('modalTitle').textContent = '編輯追加項目';
+        modal.style.display = 'block';
+    };
+
+    const deleteAddition = async (additionId) => {
+        if (!confirm('確定要刪除這筆追加項目嗎？此操作無法復原。')) return;
+        try {
+            await db.collection('detailItems').doc(additionId).delete();
+            additionItems = additionItems.filter(a => a.id !== additionId);
+            renderAll();
+            showAlert('刪除成功', 'success');
+        } catch (error) { showAlert('刪除失敗: ' + error.message, 'error'); }
+    };
+
+
     // --- 主要初始化函數 ---
     async function init() {
         showLoading(true);
@@ -27,8 +71,8 @@ function initTenderEditPage() {
             detailItems = allDbItems.docs.filter(item => !item.isAddition).sort(naturalSequenceSort);
             additionItems = allDbItems.docs.filter(item => item.isAddition).sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
             
-            // 【修正處】先定義函數，再暴露到全域
-            setupExposedFunctions();
+            // 將定義好的函數暴露到全域
+            window.exposedFuncs = { toggle, showAdditionModal, editAddition, deleteAddition };
 
             renderAll();
             setupEventListeners();
@@ -194,49 +238,6 @@ function initTenderEditPage() {
             renderAll();
             document.getElementById('additionModal').style.display = "none";
         } catch (error) { showAlert('儲存失敗: ' + error.message, 'error'); }
-    }
-
-    // --- 全域可呼叫函數 ---
-    function setupExposedFunctions() {
-        window.exposedFuncs = {
-            toggle: (majorId) => {
-                const el = document.getElementById(`details-${majorId}`);
-                if (el) el.classList.toggle('collapsed');
-            },
-            showAdditionModal: (itemId, itemName) => {
-                const modal = document.getElementById('additionModal');
-                document.getElementById('editAdditionId').value = '';
-                document.getElementById('relatedItemId').value = itemId;
-                document.getElementById('modalItemName').value = unescape(itemName);
-                document.getElementById('additionQuantity').value = 1;
-                document.getElementById('additionReason').value = '';
-                document.getElementById('modalTitle').textContent = '追加項目數量';
-                modal.style.display = 'block';
-            },
-            editAddition: (additionId) => {
-                const item = additionItems.find(a => a.id === additionId);
-                const relatedItem = detailItems.find(d => d.id === item.relatedItemId);
-                if (!item || !relatedItem) return showAlert('找不到要編輯的項目', 'error');
-                
-                const modal = document.getElementById('additionModal');
-                document.getElementById('editAdditionId').value = item.id;
-                document.getElementById('relatedItemId').value = item.relatedItemId;
-                document.getElementById('modalItemName').value = relatedItem.name;
-                document.getElementById('additionQuantity').value = item.totalQuantity;
-                document.getElementById('additionReason').value = item.reason;
-                document.getElementById('modalTitle').textContent = '編輯追加項目';
-                modal.style.display = 'block';
-            },
-            deleteAddition: async (additionId) => {
-                if (!confirm('確定要刪除這筆追加項目嗎？此操作無法復原。')) return;
-                try {
-                    await db.collection('detailItems').doc(additionId).delete();
-                    additionItems = additionItems.filter(a => a.id !== additionId);
-                    renderAll();
-                    showAlert('刪除成功', 'success');
-                } catch (error) { showAlert('刪除失敗: ' + error.message, 'error'); }
-            }
-        };
     }
     
     function showLoading(isLoading) {
