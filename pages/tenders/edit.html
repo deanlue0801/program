@@ -9,7 +9,12 @@
         <div class="tender-info-section info-grid" id="infoGrid"></div>
 
         <div class="items-section card">
-            <h3 class="card-header">工程項目</h3>
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <h3>工程項目</h3>
+        <button class="btn btn-secondary btn-sm" onclick="window.exposedFuncs.toggleAll()">
+            <span id="toggleAllBtnText">全部展開</span>
+        </button>
+    </div>
             <div class="table-wrapper">
                 <table class="table" id="hierarchicalItemsTable">
                     <thead>
