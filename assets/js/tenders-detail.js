@@ -398,4 +398,4 @@ function naturalSequenceSort(a, b) {
     return partsA.length - partsB.length;
 }
 
-initTenderDetailPage();
+
