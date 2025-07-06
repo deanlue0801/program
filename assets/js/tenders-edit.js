@@ -1,5 +1,5 @@
 /**
- * 編輯標單頁面 (tenders-edit.js) (SPA 版本) - 最終除錯版
+ * 編輯標單頁面 (tenders-edit.js) (SPA 版本) - 最終對齊修正版
  */
 function initTenderEditPage() {
     let tenderId, currentTender, majorItems, detailItems, additionItems;
@@ -13,49 +13,6 @@ function initTenderEditPage() {
         }
 
         try {
-            window.exposedFuncs = {
-                toggle: (majorId) => {
-                    const el = document.getElementById(`details-${majorId}`);
-                    if (el) el.classList.toggle('collapsed');
-                },
-                showAdditionModal: (itemId, itemName) => {
-                    const modal = document.getElementById('additionModal');
-                    if(modal) {
-                        document.getElementById('editAdditionId').value = '';
-                        document.getElementById('relatedItemId').value = itemId;
-                        document.getElementById('modalItemName').value = unescape(itemName);
-                        document.getElementById('additionQuantity').value = 1;
-                        document.getElementById('additionReason').value = '';
-                        document.getElementById('modalTitle').textContent = '追加項目數量';
-                        modal.style.display = 'block';
-                    }
-                },
-                editAddition: (additionId) => {
-                    const item = additionItems.find(a => a.id === additionId);
-                    const relatedItem = detailItems.find(d => d.id === item.relatedItemId);
-                    if (!item || !relatedItem) return showAlert('找不到要編輯的項目', 'error');
-                    
-                    const modal = document.getElementById('additionModal');
-                    if(modal) {
-                        document.getElementById('editAdditionId').value = item.id;
-                        document.getElementById('relatedItemId').value = item.relatedItemId;
-                        document.getElementById('modalItemName').value = relatedItem.name;
-                        document.getElementById('additionQuantity').value = item.totalQuantity;
-                        document.getElementById('additionReason').value = item.reason;
-                        document.getElementById('modalTitle').textContent = '編輯追加項目';
-                        modal.style.display = 'block';
-                    }
-                },
-                deleteAddition: async (additionId) => {
-                    if (!confirm('確定要刪除這筆追加項目嗎？此操作無法復原。')) return;
-                    try {
-                        await db.collection('detailItems').doc(additionId).delete();
-                        await init();
-                        showAlert('刪除成功', 'success');
-                    } catch (error) { showAlert('刪除失敗: ' + error.message, 'error'); }
-                }
-            };
-
             const [tenderDoc, allDbItems, majorItemsDb] = await Promise.all([
                 db.collection('tenders').doc(tenderId).get(),
                 safeFirestoreQuery('detailItems', [{ field: 'tenderId', operator: '==', value: tenderId }]),
@@ -66,12 +23,9 @@ function initTenderEditPage() {
             
             currentTender = { id: tenderDoc.id, ...tenderDoc.data() };
             majorItems = majorItemsDb.docs.sort(naturalSequenceSort);
-            const allItems = allDbItems.docs;
-            detailItems = allItems.filter(item => !item.isAddition).sort(naturalSequenceSort);
-            additionItems = allItems.filter(item => item.isAddition).sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+            detailItems = allDbItems.docs.filter(item => !item.isAddition).sort(naturalSequenceSort);
+            additionItems = allDbItems.docs.filter(item => item.isAddition).sort((a,b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
             
-            window.debugData = { currentTender, majorItems, detailItems, additionItems };
-
             renderAll();
             setupEventListeners();
             showLoading(false);
@@ -83,103 +37,81 @@ function initTenderEditPage() {
     }
 
     function renderAll() {
-        const pageTitleEl = document.getElementById('pageTitle');
-        if(pageTitleEl) pageTitleEl.textContent = `標單編輯: ${currentTender.name}`;
+        document.getElementById('pageTitle').textContent = `標單編輯: ${currentTender.name}`;
         renderTenderInfo();
         renderHierarchicalItems();
         renderAdditionTable();
         renderSummaryCards();
     }
-    
-    // 【修正處】在 renderAdditionTable 函數中加入詳細的日誌
+
+    function renderTenderInfo() {
+        const originalAmount = detailItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+        const additionAmount = additionItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+        document.getElementById('infoGrid').innerHTML = `
+            <div class="info-item"><div class="info-label">原始金額</div><div class="info-value amount">${formatCurrency(originalAmount)}</div></div>
+            <div class="info-item"><div class="info-label">追加金額</div><div class="info-value addition">${formatCurrency(additionAmount)}</div></div>
+            <div class="info-item"><div class="info-label">目前總金額</div><div class="info-value total">${formatCurrency(originalAmount + additionAmount)}</div></div>
+        `;
+    }
+
+    function renderHierarchicalItems() {
+        const tbody = document.getElementById('hierarchicalItemsTbody');
+        if(!tbody) return;
+        let html = '';
+        majorItems.forEach(major => {
+            const itemsInMajor = detailItems.filter(detail => detail.majorItemId === major.id);
+            html += `
+                <tr class="major-item-header-row">
+                    <td colspan="8">
+                        <div class="major-item-header" onclick="window.exposedFuncs.toggle('${major.id}')">
+                            <span>${major.name}</span>
+                            <span>${itemsInMajor.length} 項 | ${formatCurrency(itemsInMajor.reduce((s, i) => s + (i.totalPrice||0), 0))}</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            itemsInMajor.forEach(item => {
+                html += renderDetailItem(item, major.id);
+            });
+        });
+        tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;padding:2rem;">無原始項目</td></tr>';
+    }
+
+    function renderDetailItem(item, majorId) {
+        const additionsForThisItem = additionItems.filter(add => add.relatedItemId === item.id);
+        const additionalQty = additionsForThisItem.reduce((sum, add) => sum + (add.totalQuantity || 0), 0);
+        const currentTotal = (item.totalQuantity || 0) + additionalQty;
+        return `
+            <tr class="detail-item-row collapsed" data-major-id="${majorId}">
+                <td>${item.sequence || ''}</td>
+                <td>${item.name}</td>
+                <td>${item.unit}</td>
+                <td>${item.totalQuantity || 0}</td>
+                <td class="item-price">${formatCurrency(item.unitPrice)}</td>
+                <td class="item-total">${formatCurrency(item.totalPrice)}</td>
+                <td class="current-total ${additionalQty > 0 ? 'changed' : ''}">${currentTotal} ${additionalQty > 0 ? `(+${additionalQty})` : ''}</td>
+                <td><button class="btn btn-sm btn-primary" onclick="window.exposedFuncs.showAdditionModal('${item.id}', '${escape(item.name)}')">追加</button></td>
+            </tr>
+        `;
+    }
+
     function renderAdditionTable() {
-        console.group("[DEBUG] 正在執行 renderAdditionTable 函數...");
-
         const tbody = document.querySelector('#additionTable tbody');
-        if(!tbody) {
-            console.error("-> 錯誤：找不到 #additionTable tbody 元素！");
-            console.groupEnd();
-            return;
-        }
-        console.log("-> 步驟 1: 成功找到表格的 tbody。");
-
-        console.log(`-> 步驟 2: 準備用來渲染的 additionItems 陣列，長度為: ${additionItems.length}`);
-        console.table(additionItems);
-
-        const tableRows = additionItems.map(add => {
+        if (!tbody) return;
+        tbody.innerHTML = additionItems.map(add => {
             const relatedItem = detailItems.find(d => d.id === add.relatedItemId);
-            const rowHTML = `
+            return `
                 <tr>
-                    <td>${formatDate(add.createdAt)}</td>
-                    <td>${relatedItem ? relatedItem.name : '未知項目'}</td>
-                    <td>${add.totalQuantity || 0}</td>
-                    <td>${formatCurrency(add.unitPrice)}</td>
-                    <td>${add.reason || ''}</td>
-                    <td>${add.status || '待核准'}</td>
+                    <td>${formatDate(add.createdAt)}</td><td>${relatedItem ? relatedItem.name : '未知項目'}</td>
+                    <td>${add.totalQuantity || 0}</td><td>${formatCurrency(add.unitPrice)}</td>
+                    <td>${add.reason || ''}</td><td>${add.status || '待核准'}</td>
                     <td>
                         <button class="btn btn-sm btn-warning" onclick="window.exposedFuncs.editAddition('${add.id}')">編輯</button>
                         <button class="btn btn-sm btn-danger" onclick="window.exposedFuncs.deleteAddition('${add.id}')">刪除</button>
                     </td>
                 </tr>
             `;
-            return rowHTML;
-        });
-
-        console.log(`-> 步驟 3: map 函數已執行完畢，生成了 ${tableRows.length} 個表格列(TR)。`);
-
-        const finalHTML = tableRows.join('');
-        tbody.innerHTML = finalHTML;
-        
-        console.log("-> 步驟 4: 成功將生成的 HTML 寫入 tbody。");
-        console.groupEnd();
-    }
-
-    // --- 其他函數 (省略未修改部分) ---
-    function renderTenderInfo() {
-        const originalAmount = detailItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
-        const additionAmount = additionItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
-        const totalAmount = originalAmount + additionAmount;
-        const infoGridEl = document.getElementById('infoGrid');
-        if(infoGridEl) {
-            infoGridEl.innerHTML = `
-                <div class="info-item"><div class="info-label">原始金額</div><div class="info-value amount">${formatCurrency(originalAmount)}</div></div>
-                <div class="info-item"><div class="info-label">追加金額</div><div class="info-value addition">${formatCurrency(additionAmount)}</div></div>
-                <div class="info-item"><div class="info-label">目前總金額</div><div class="info-value total">${formatCurrency(totalAmount)}</div></div>
-            `;
-        }
-    }
-
-    function renderHierarchicalItems() {
-        const container = document.getElementById('hierarchicalItemsContainer');
-        if(!container) return;
-        container.innerHTML = majorItems.map(major => {
-            const itemsInMajor = detailItems.filter(detail => detail.majorItemId === major.id);
-            return `
-                <div class="major-item-container">
-                    <div class="major-item-header" onclick="window.exposedFuncs.toggle('${major.id}')">
-                        <span>${major.name}</span><span>${itemsInMajor.length} 項 | ${formatCurrency(itemsInMajor.reduce((s, i) => s + (i.totalPrice||0), 0))}</span>
-                    </div>
-                    <div class="detail-items-container" id="details-${major.id}">
-                        ${itemsInMajor.map(item => renderDetailItem(item)).join('')}
-                    </div>
-                </div>
-            `;
-        }).join('') || '<div style="padding:1rem;text-align:center;">無原始項目</div>';
-    }
-
-    function renderDetailItem(item) {
-        const additionsForThisItem = additionItems.filter(add => add.relatedItemId === item.id);
-        const additionalQty = additionsForThisItem.reduce((sum, add) => sum + (add.totalQuantity || 0), 0);
-        const currentTotal = (item.totalQuantity || 0) + additionalQty;
-        return `
-            <div class="detail-item">
-                <div>${item.sequence || ''}</div><div>${item.name}</div><div>${item.unit}</div>
-                <div>${item.totalQuantity || 0}</div><div class="item-price">${formatCurrency(item.unitPrice)}</div>
-                <div class="item-total">${formatCurrency(item.totalPrice)}</div>
-                <div class="current-total ${additionalQty > 0 ? 'changed' : ''}">${currentTotal} ${additionalQty > 0 ? `(+${additionalQty})` : ''}</div>
-                <div><button class="btn btn-sm btn-primary" onclick="window.exposedFuncs.showAdditionModal('${item.id}', '${escape(item.name)}')">追加</button></div>
-            </div>
-        `;
+        }).join('');
     }
 
     function renderSummaryCards() {
@@ -212,7 +144,7 @@ function initTenderEditPage() {
 
     function setupEventListeners() {
         const modal = document.getElementById('additionModal');
-        const closeBtn = modal.querySelector('.close-btn');
+        const closeBtn = modal.querySelector('.modal-close');
         const cancelBtn = document.getElementById('cancelAdditionBtn');
         const form = document.getElementById('additionForm');
 
@@ -246,7 +178,7 @@ function initTenderEditPage() {
                 data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection('detailItems').add(data);
             }
-            await init();
+            await init(); 
             document.getElementById('additionModal').style.display = "none";
         } catch (error) { showAlert('儲存失敗: ' + error.message, 'error'); }
     }
@@ -257,6 +189,44 @@ function initTenderEditPage() {
         if(loadingEl) loadingEl.style.display = isLoading ? 'flex' : 'none';
         if(contentEl) contentEl.style.display = isLoading ? 'none' : 'block';
     }
+
+    window.exposedFuncs = {
+        toggle: (majorId) => {
+            document.querySelectorAll(`tr[data-major-id="${majorId}"]`).forEach(row => row.classList.toggle('collapsed'));
+        },
+        showAdditionModal: (itemId, itemName) => {
+            const modal = document.getElementById('additionModal');
+            document.getElementById('editAdditionId').value = '';
+            document.getElementById('relatedItemId').value = itemId;
+            document.getElementById('modalItemName').value = unescape(itemName);
+            document.getElementById('additionQuantity').value = 1;
+            document.getElementById('additionReason').value = '';
+            document.getElementById('modalTitle').textContent = '追加項目數量';
+            if(modal) modal.style.display = 'block';
+        },
+        editAddition: (additionId) => {
+            const item = additionItems.find(a => a.id === additionId);
+            const relatedItem = detailItems.find(d => d.id === item.relatedItemId);
+            if (!item || !relatedItem) return showAlert('找不到要編輯的項目', 'error');
+            
+            const modal = document.getElementById('additionModal');
+            document.getElementById('editAdditionId').value = item.id;
+            document.getElementById('relatedItemId').value = item.relatedItemId;
+            document.getElementById('modalItemName').value = relatedItem.name;
+            document.getElementById('additionQuantity').value = item.totalQuantity;
+            document.getElementById('additionReason').value = item.reason;
+            document.getElementById('modalTitle').textContent = '編輯追加項目';
+            if(modal) modal.style.display = 'block';
+        },
+        deleteAddition: async (additionId) => {
+            if (!confirm('確定要刪除這筆追加項目嗎？此操作無法復原。')) return;
+            try {
+                await db.collection('detailItems').doc(additionId).delete();
+                await init();
+                showAlert('刪除成功', 'success');
+            } catch (error) { showAlert('刪除失敗: ' + error.message, 'error'); }
+        }
+    };
     
     function naturalSequenceSort(a, b) {
         const re = /(\d+(\.\d+)?)|(\D+)/g;
