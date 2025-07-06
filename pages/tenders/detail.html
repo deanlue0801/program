@@ -4,7 +4,122 @@
 </div>
 
 <div id="mainContent" class="content" style="display: none;">
-    <div id="tender-header-container"></div>
+    <div class="header-card">
+        <div class="header-content">
+            <div class="header-info">
+                <h1 id="tenderName">載入中...</h1>
+                <div class="header-meta">
+                    <span id="tenderCode"></span>
+                    <span id="projectName"></span>
+                    <span id="createdInfo"></span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div id="statusBadge" class="status-badge"></div>
+                <div class="action-buttons">
+                    <a id="editBtn" href="#" data-route class="btn btn-primary">✏️ 編輯標單</a>
+                    <a id="importBtn" href="#" data-route class="btn btn-success">📊 EXCEL匯入</a>
+                    <a id="distributionBtn" href="#" data-route class="btn btn-warning">🔧 分配設定</a>
+                    <a href="/program/tenders/list" data-route class="btn btn-secondary">← 返回列表</a>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <div id="items-list-container" class="content-card"></div>
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-number amount" id="totalAmount">$0</div><div class="stat-label">標單總金額</div></div>
+        <div class="stat-card"><div class="stat-number" id="majorItemsCount">0</div><div class="stat-label">工程大項</div></div>
+        <div class="stat-card"><div class="stat-number" id="detailItemsCount">0</div><div class="stat-label">細項總數</div></div>
+        <div class="stat-card"><div class="stat-number progress" id="overallProgress">0%</div><div class="stat-label">整體進度</div></div>
+        <div class="stat-card"><div class="stat-number progress" id="distributionProgress">0%</div><div class="stat-label">分配進度</div></div>
+        <div class="stat-card"><div class="stat-number amount" id="billingAmount">$0</div><div class="stat-label">可請款金額</div></div>
+    </div>
+
+    <div class="tab-navigation">
+        <button class="tab-btn active" onclick="window.exposedFunctions.switchTab('overview')">📊 總覽</button>
+        <button class="tab-btn" onclick="window.exposedFunctions.switchTab('major-items')">🔧 工程大項</button>
+        <button class="tab-btn" onclick="window.exposedFunctions.switchTab('progress')">📈 進度報表</button>
+        <button class="tab-btn" onclick="window.exposedFunctions.switchTab('info')">📋 詳細資訊</button>
+    </div>
+
+    <div id="tab-overview" class="tab-content active">
+        <div class="info-grid">
+            <div class="info-card">
+                <h3>📊 進度統計</h3>
+                <div class="info-row"><span class="info-label">整體執行進度</span><span class="info-value" id="executionProgress">0%</span></div>
+                <div class="info-row"><span class="info-label">可請款進度</span><span class="info-value" id="billingProgress">0%</span></div>
+                <div class="info-row"><span class="info-label">設備總數</span><span class="info-value" id="equipmentCount">0</span></div>
+                <div class="info-row"><span class="info-label">已完成設備</span><span class="info-value" id="completedEquipment">0</span></div>
+            </div>
+            <div class="info-card">
+                <h3>🔧 分配狀態</h3>
+                <div class="info-row"><span class="info-label">已分配大項</span><span class="info-value" id="distributedMajorItems">0</span></div>
+                <div class="info-row"><span class="info-label">未分配大項</span><span class="info-value" id="undistributedMajorItems">0</span></div>
+                <div class="info-row"><span class="info-label">分配區域數</span><span class="info-value" id="distributionAreas">0</span></div>
+            </div>
+            <div class="info-card">
+                <h3>📅 時程資訊</h3>
+                <div class="info-row"><span class="info-label">開始日期</span><span class="info-value" id="overviewStartDate">未設定</span></div>
+                <div class="info-row"><span class="info-label">預計完成</span><span class="info-value" id="overviewEndDate">未設定</span></div>
+                <div class="info-row"><span class="info-label">已執行天數</span><span class="info-value" id="executedDays">0</span></div>
+                <div class="info-row"><span class="info-label">剩餘天數</span><span class="info-value" id="remainingDays">-</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-major-items" class="tab-content">
+        <div class="major-items-section">
+            <div class="section-header">
+                <h2 class="section-title">🔧 工程大項管理</h2>
+                <div class="action-buttons">
+                    <button class="btn btn-secondary" onclick="window.exposedFunctions.toggleAllMajorItems()"><span id="toggleMajorText">展開全部</span></button>
+                    <button class="btn btn-primary" onclick="window.exposedFunctions.refreshMajorItems()">🔄 重新載入</button>
+                </div>
+            </div>
+            <div id="majorItemsList"></div>
+            <div id="emptyMajorItemsState" class="empty-state" style="display: none;">
+                <div class="icon">🔧</div><h3>尚無工程大項</h3><p>請先使用 EXCEL 匯入功能建立工程項目</p>
+                <div style="margin-top: 20px;"><a href="/program/tenders/import" data-route class="btn btn-success">📊 立即匯入</a></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-progress" class="tab-content">
+        <div class="info-card">
+            <h3>📈 進度報表</h3>
+            <p style="text-align: center; color: #666; padding: 40px;">進度報表功能開發中...<br>將包含趨勢分析、區域進度、人員效率等功能</p>
+        </div>
+    </div>
+
+    <div id="tab-info" class="tab-content">
+        <div class="info-grid">
+            <div class="info-card">
+                <h3>📋 基本資訊</h3>
+                <div class="info-row"><span class="info-label">標單編號</span><span class="info-value" id="infoTenderCode">-</span></div>
+                <div class="info-row"><span class="info-label">所屬專案</span><span class="info-value" id="infoProjectName">-</span></div>
+                <div class="info-row"><span class="info-label">標單狀態</span><span class="info-value" id="infoStatus">-</span></div>
+                <div class="info-row"><span class="info-label">開始日期</span><span class="info-value" id="infoStartDate">-</span></div>
+                <div class="info-row"><span class="info-label">結束日期</span><span class="info-value" id="infoEndDate">-</span></div>
+            </div>
+            <div class="info-card">
+                <h3>🏢 承包商資訊</h3>
+                <div class="info-row"><span class="info-label">承包商名稱</span><span class="info-value" id="infoContractorName">-</span></div>
+                <div class="info-row"><span class="info-label">聯絡方式</span><span class="info-value" id="infoContractorContact">-</span></div>
+                <div class="info-row"><span class="info-label">建立者</span><span class="info-value" id="infoCreatedBy">-</span></div>
+                <div class="info-row"><span class="info-label">建立時間</span><span class="info-value" id="infoCreatedAt">-</span></div>
+                <div class="info-row"><span class="info-label">最後更新</span><span class="info-value" id="infoUpdatedAt">-</span></div>
+            </div>
+            <div class="info-card">
+                <h3>💰 金額明細</h3>
+                <div class="info-row"><span class="info-label">未稅金額</span><span class="info-value" id="infoAmount">-</span></div>
+                <div class="info-row"><span class="info-label">營業稅額</span><span class="info-value" id="infoTax">-</span></div>
+                <div class="info-row"><span class="info-label">含稅總額</span><span class="info-value" amount" id="infoTotalAmount">-</span></div>
+            </div>
+            <div class="info-card">
+                <h3>📝 描述與備註</h3>
+                <div class="info-row"><span class="info-label">標單描述</span><span class="info-value" id="infoDescription">-</span></div>
+                <div class="info-row"><span class="info-label">備註</span><span class="info-value" id="infoNotes">-</span></div>
+            </div>
+        </div>
+    </div>
 </div>
