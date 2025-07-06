@@ -1,4 +1,4 @@
-        * {
+* {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -338,4 +338,26 @@
             .summary-cards {
                 grid-template-columns: 1fr;
             }
+        }
+
+        /* 【新增樣式】專案分組標頭 */
+        .project-group-header td {
+            background-color: #e9ecef; /* 淡灰色背景 */
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #495057;
+            padding: 12px 15px;
+            border-top: 2px solid #6c757d; /* 上方深色邊框 */
+            border-bottom: 1px solid #dee2e6; /* 下方淺色邊框 */
+        }
+
+        .project-code {
+            font-weight: normal;
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+
+        .tender-row td {
+            padding-left: 25px; /* 標單列向右縮排，營造層級感 */
         }
