@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>專案列表 - 專案管理系統</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif;
+            background: #f5f6fa;
+            line-height: 1.6;
+        }
+
+        /* 頂部導航列 */
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            text-decoration: none;
+            color: white;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: rgba(255,255,255,0.8);
+            font-size: 0.9rem;
+        }
+
+        .breadcrumb a {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .breadcrumb a:hover {
+            color: white;
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+        }
+
+        .back-btn {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .back-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* 主內容區 */
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .page-title {
+            font-size: 2rem;
+            color: #333;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #666;
+            border: 2px solid #e1e5e9;
+        }
+
+        .btn-secondary:hover {
+            background: #e9ecef;
+        }
+
+        /* 專案卡片 */
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+        }
+
+        .project-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            border-left: 4px solid #667eea;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .project-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, transparent 0%, rgba(102,126,234,0.03) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .project-card:hover::before {
+            opacity: 1;
+        }
+
+        .project-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+
+        .project-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .project-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .project-code {
+            font-size: 0.9rem;
+            color: #666;
+            background: #f1f3f4;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .project-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-planning { background: #e3f2fd; color: #1976d2; }
+        .status-ready { background: #f3e5f5; color: #7b1fa2; }
+        .status-in_progress { background: #fff3e0; color: #f57c00; }
+        .status-completed { background: #e8f5e8; color: #388e3c; }
+        .status-paused { background: #ffebee; color: #d32f2f; }
+        .status-active { background: #e8f5e8; color: #388e3c; }
+
+        .project-info {
+            margin-bottom: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .info-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .project-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            border-radius: 6px;
+        }
+
+        .btn-edit {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .btn-edit:hover {
+            background: #ffeaa7;
+        }
+
+        .btn-delete {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .btn-delete:hover {
+            background: #f5c6cb;
+        }
+
+        .btn-view {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .btn-view:hover {
+            background: #bee5eb;
+        }
+
+        /* 空狀態 */
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: #666;
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .empty-title {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .empty-description {
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        /* 載入狀態 */
+        .loading {
+            text-align: center;
+            padding: 50px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 響應式設計 */
+        @media (max-width: 768px) {
+            .nav-container {
+                padding: 10px 15px;
+            }
+            
+            .main-container {
+                padding: 20px 15px;
+            }
+            
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 20px;
+            }
+            
+            .projects-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .project-actions {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 頂部導航列 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="javascript:void(0)" onclick="goToDashboard()" class="logo">
+                    <span>🏗️</span>
+                    <span>專案管理系統</span>
+                </a>
+                
+                <div class="breadcrumb">
+                    <a href="javascript:void(0)" onclick="goToDashboard()">首頁</a>
+                    <span>›</span>
+                    <span>專案管理</span>
+                </div>
+            </div>
+            
+            <div class="nav-right">
+                <div class="user-info">
+                    <span>👤</span>
+                    <span id="currentUser">載入中...</span>
+                </div>
+                <button class="back-btn" onclick="goToDashboard()">
+                    <span>←</span>
+                    <span>返回主頁</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主內容區 -->
+    <div class="main-container">
+        <div class="page-header">
+            <h1 class="page-title">📁 專案管理</h1>
+            <div class="action-buttons">
+                <a href="create.html" class="btn btn-primary">
+                    <span>➕</span>
+                    <span>新增專案</span>
+                </a>
+                <button class="btn btn-secondary" onclick="refreshProjects()">
+                    <span>🔄</span>
+                    <span>重新整理</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 專案列表 -->
+        <div id="projectsContainer">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>載入專案資料中...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // Firebase 配置
+        const firebaseConfig = {
+            apiKey: "AIzaSyDV26PsFl_nH9SkfQAYgbCPjbanDluFrvo",
+            authDomain: "project-management-syste-4c9ce.firebaseapp.com",
+            projectId: "project-management-syste-4c9ce",
+            storageBucket: "project-management-syste-4c9ce.firebasestorage.app",
+            messagingSenderId: "153223609209",
+            appId: "1:153223609209:web:f4504f7ac52fc76b910da8",
+            measurementId: "G-P57N5Y5BE2"
+        };
+
+        // 初始化 Firebase
+        let app, auth, db, currentUser;
+        
+        async function initApp() {
+            try {
+                // 初始化 Firebase
+                app = firebase.initializeApp(firebaseConfig);
+                auth = firebase.auth();
+                db = firebase.firestore();
+
+                console.log('Firebase 初始化成功');
+
+                // 監聽認證狀態
+                auth.onAuthStateChanged(user => {
+                    if (user) {
+                        currentUser = user;
+                        document.getElementById('currentUser').textContent = user.email;
+                        loadProjects();
+                    } else {
+                        window.location.href = '../../login_page.html';
+                    }
+                });
+
+            } catch (error) {
+                console.error('Firebase 初始化失敗:', error);
+                showError('系統初始化失敗，請重新整理頁面');
+            }
+        }
+
+        // 載入專案列表
+        async function loadProjects() {
+            try {
+                console.log('開始載入專案資料...');
+                
+                // 先嘗試簡單查詢，如果失敗再嘗試不排序的查詢
+                let snapshot;
+                try {
+                    snapshot = await db.collection('projects')
+                        .where('createdBy', '==', currentUser.email)
+                        .orderBy('createdAt', 'desc')
+                        .get();
+                } catch (indexError) {
+                    console.warn('複合索引尚未建立，使用簡單查詢:', indexError.message);
+                    // 降級到簡單查詢（不排序）
+                    snapshot = await db.collection('projects')
+                        .where('createdBy', '==', currentUser.email)
+                        .get();
+                }
+                
+                const projects = [];
+                snapshot.forEach(doc => {
+                    projects.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+
+                // 如果沒有使用 orderBy，在客戶端排序
+                projects.sort((a, b) => {
+                    const aTime = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate() : new Date(a.createdAt)) : new Date(0);
+                    const bTime = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate() : new Date(b.createdAt)) : new Date(0);
+                    return bTime - aTime; // 降序排列
+                });
+
+                console.log('載入到的專案數量:', projects.length);
+                renderProjects(projects);
+                
+            } catch (error) {
+                console.error('載入專案失敗:', error);
+                showError('載入專案資料失敗: ' + error.message);
+            }
+        }
+
+        // 渲染專案列表
+        function renderProjects(projects) {
+            const container = document.getElementById('projectsContainer');
+            
+            if (projects.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📁</div>
+                        <h2 class="empty-title">還沒有專案</h2>
+                        <p class="empty-description">
+                            開始建立您的第一個專案，管理建築工程更輕鬆！<br>
+                            點擊上方「新增專案」按鈕開始。
+                        </p>
+                        <a href="create.html" class="btn btn-primary">
+                            <span>🚀</span>
+                            <span>建立第一個專案</span>
+                        </a>
+                    </div>
+                `;
+                return;
+            }
+
+            const projectsHtml = projects.map(project => `
+                <div class="project-card">
+                    <div class="project-header">
+                        <div>
+                            <h3 class="project-title">${escapeHtml(project.name || '未命名專案')}</h3>
+                            <div class="project-code">${escapeHtml(project.code || 'N/A')}</div>
+                        </div>
+                        <div class="project-status status-${project.status || 'planning'}">
+                            ${getStatusText(project.status)}
+                        </div>
+                    </div>
+                    
+                    <div class="project-info">
+                        <div class="info-row">
+                            <span class="info-label">業主：</span>
+                            <span class="info-value">${escapeHtml(project.ownerName || '未設定')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">專案金額：</span>
+                            <span class="info-value">NT$ ${formatCurrency(project.budget || project.amount || 0)}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">狀態：</span>
+                            <span class="info-value">${getStatusText(project.status)}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">建立時間：</span>
+                            <span class="info-value">${formatDate(project.createdAt)}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="project-actions">
+                        <button class="btn btn-small btn-view" onclick="viewProject('${project.id}')">
+                            <span>👁️</span>
+                            <span>查看</span>
+                        </button>
+                        <button class="btn btn-small btn-edit" onclick="editProject('${project.id}')">
+                            <span>✏️</span>
+                            <span>編輯</span>
+                        </button>
+                        <button class="btn btn-small btn-delete" onclick="deleteProject('${project.id}', '${escapeHtml(project.name)}')">
+                            <span>🗑️</span>
+                            <span>刪除</span>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = `<div class="projects-grid">${projectsHtml}</div>`;
+        }
+
+        // 狀態文字轉換
+        function getStatusText(status) {
+            const statusMap = {
+                'planning': '規劃中',
+                'ready': '準備開始',
+                'in_progress': '進行中',
+                'active': '進行中',
+                'paused': '暫停',
+                'completed': '已完成'
+            };
+            return statusMap[status] || '未設定';
+        }
+
+        // 格式化日期
+        function formatDate(timestamp) {
+            if (!timestamp) return '未設定';
+            
+            let date;
+            if (timestamp.toDate) {
+                // Firestore Timestamp
+                date = timestamp.toDate();
+            } else {
+                // 字串或數字
+                date = new Date(timestamp);
+            }
+            
+            if (isNaN(date.getTime())) return '未設定';
+            
+            return date.toLocaleDateString('zh-TW', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+        }
+
+        // 格式化金額
+        function formatCurrency(amount) {
+            if (!amount || amount === 0) return '0';
+            return parseInt(amount).toLocaleString();
+        }
+
+        // HTML 字符轉義
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 查看專案
+        function viewProject(projectId) {
+            // 暫時用 alert，之後會建立詳情頁面
+            alert(`查看專案功能開發中...\n專案 ID: ${projectId}`);
+            // window.location.href = `detail.html?id=${projectId}`;
+        }
+
+        // 編輯專案
+        function editProject(projectId) {
+            window.location.href = `create.html?edit=${projectId}`;
+        }
+
+        // 刪除專案
+        async function deleteProject(projectId, projectName) {
+            if (!confirm(`確定要刪除專案「${projectName}」嗎？\n此操作無法復原！`)) {
+                return;
+            }
+
+            try {
+                // 顯示載入狀態
+                showLoading('刪除中...');
+
+                // 從 Firestore 刪除
+                await db.collection('projects').doc(projectId).delete();
+                
+                console.log('專案已刪除:', projectId);
+                
+                // 重新載入列表
+                await loadProjects();
+                
+                alert('專案已成功刪除！');
+                
+            } catch (error) {
+                console.error('刪除專案失敗:', error);
+                alert('刪除失敗：' + error.message);
+            }
+        }
+
+        // 重新整理專案
+        function refreshProjects() {
+            showLoading('重新載入中...');
+            loadProjects();
+        }
+
+        // 顯示載入狀態
+        function showLoading(message = '載入中...') {
+            const container = document.getElementById('projectsContainer');
+            container.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>${message}</p>
+                </div>
+            `;
+        }
+
+        // 顯示錯誤訊息
+        function showError(message) {
+            const container = document.getElementById('projectsContainer');
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">❌</div>
+                    <h2 class="empty-title">載入失敗</h2>
+                    <p class="empty-description">${message}</p>
+                    <button class="btn btn-primary" onclick="refreshProjects()">
+                        <span>🔄</span>
+                        <span>重試</span>
+                    </button>
+                </div>
+            `;
+        }
+
+		/**
+		 * 導航至儀表板/首頁
+		 * 使用根相對路徑，確保無論從哪個頁面呼叫，都能正確導航。
+		 */
+		function goToDashboard() {
+			// 假設 dashboard.html 檔案就放在您網站的根目錄下。
+			// 這個寫法會讓瀏覽器從 http://您的網域/dashboard.html 載入頁面。
+			window.location.href = '../dashboard.html';
+		}
+
+        // 頁面載入完成
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('專案列表頁面開始初始化...');
+            console.log('當前路徑:', window.location.pathname);
+            initApp();
+        });
+
+        console.log('專案列表頁面腳本已載入');
+    </script>
+</body>
+</html>
