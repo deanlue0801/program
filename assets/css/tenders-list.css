@@ -360,4 +360,21 @@
 
         .tender-row td {
             padding-left: 25px; /* 標單列向右縮排，營造層級感 */
+
+        /* 【新增樣式】專案標頭的操作按鈕 */
+        .project-group-header td {
+            vertical-align: middle;
+        }
+
+        .project-actions {
+            text-align: right; /* 讓按鈕靠右對齊 */
+        }
+
+        .btn-edit-project {
+            background-color: #667eea; /* 按鈕顏色 */
+            color: white;
+        }
+        .btn-edit-project:hover {
+            background-color: #5a6bb5;
+        }
         }
