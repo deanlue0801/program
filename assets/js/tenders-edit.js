@@ -1,5 +1,5 @@
 /**
- * 編輯標單頁面 (tenders-edit.js) - v4.2 恢復數量統計總覽
+ * 編輯標單頁面 (tenders-edit.js) - v4.3 修正追加後維持展開狀態
  */
 function initTenderEditPage() {
     // --- 頁面級別變數 ---
@@ -48,7 +48,6 @@ function initTenderEditPage() {
         renderTenderHeader();
         renderMajorItemsList();
         renderAdditionItemsTable();
-        // 【關鍵修正 1】: 重新呼叫 renderSummaryCards 函數
         renderSummaryCards();
     }
 
@@ -180,13 +179,11 @@ function initTenderEditPage() {
         container.innerHTML = html;
     }
     
-    // 【關鍵修正 2】: 將 renderSummaryCards 函數加回來
     function renderSummaryCards() {
         const summaryContainer = document.getElementById('summaryGrid');
         if(!summaryContainer) return;
         
         const summarizedItems = {};
-        // 只統計有追加項目的項目
         additionItems.forEach(add => {
             if (!summarizedItems[add.relatedItemId]) {
                 const originalItem = detailItems.find(d => d.id === add.relatedItemId);
@@ -254,7 +251,6 @@ function initTenderEditPage() {
             }
         });
         
-        // Modal 內部的事件監聽
         const modal = document.getElementById('additionModal');
         if (modal) {
             modal.querySelector('.modal-close').onclick = () => { modal.style.display = "none"; };
@@ -308,6 +304,15 @@ function initTenderEditPage() {
 
     async function handleAdditionSubmit(event) {
         event.preventDefault();
+
+        // 【關鍵修正 1】: 在儲存前，記下哪些項目是展開的
+        const expandedMajorIds = new Set();
+        document.querySelectorAll('.major-item-row.expanded').forEach(row => {
+            if (row.dataset.majorId) {
+                expandedMajorIds.add(row.dataset.majorId);
+            }
+        });
+
         const relatedItemId = document.getElementById('relatedItemId').value;
         const editId = document.getElementById('editAdditionId').value;
         const relatedItem = detailItems.find(d => d.id === relatedItemId);
@@ -338,7 +343,22 @@ function initTenderEditPage() {
                 await db.collection('detailItems').add(data);
             }
             document.getElementById('additionModal').style.display = "none";
+            
+            // 【關鍵修正 2】: 重新載入和渲染
             await init();
+            
+            // 【關鍵修正 3】: 恢復之前展開的項目
+            if (expandedMajorIds.size > 0) {
+                expandedMajorIds.forEach(id => {
+                    const row = document.querySelector(`.major-item-row[data-major-id="${id}"]`);
+                    const container = document.getElementById(`details-for-${id}`);
+                    if (row && container) {
+                        row.classList.add('expanded');
+                        container.classList.add('expanded');
+                    }
+                });
+            }
+
             showAlert('儲存成功！', 'success');
         } catch (error) { 
             showAlert('儲存失敗: ' + error.message, 'error'); 
