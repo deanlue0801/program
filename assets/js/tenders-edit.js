@@ -1,11 +1,10 @@
 /**
- * 編輯標單頁面 (tenders-edit.js) - v3.0 階層式介面重構最終版
+ * 編輯標單頁面 (tenders-edit.js) - v4.0 修正項目編號讀取問題
  */
 function initTenderEditPage() {
     // --- 頁面級別變數 ---
     let tenderId, currentTender, majorItems = [], detailItems = [], additionItems = [];
     let allExpanded = false;
-    const romanNumerals = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
 
     // --- 主流程 ---
     async function init() {
@@ -34,6 +33,7 @@ function initTenderEditPage() {
         if (!tenderDoc.exists) throw new Error('找不到指定的標單');
         currentTender = { id: tenderDoc.id, ...tenderDoc.data() };
 
+        // 依賴您資料庫中的 'sequence' 欄位進行排序
         const [majorItemsData, allDetailItemsData] = await Promise.all([
             safeFirestoreQuery('majorItems', [{ field: 'tenderId', operator: '==', value: tenderId }], { field: 'sequence', direction: 'asc' }),
             safeFirestoreQuery('detailItems', [{ field: 'tenderId', operator: '==', value: tenderId }])
@@ -87,9 +87,12 @@ function initTenderEditPage() {
                 <button id="expand-all-btn" class="btn btn-secondary">全部展開</button>
             </div>
         `;
-        majorItems.forEach((majorItem, index) => {
+        majorItems.forEach((majorItem) => {
             const detailsInMajor = detailItems.filter(d => d.majorItemId === majorItem.id);
-            const itemNumber = romanNumerals[index + 1] || (index + 1);
+            
+            // 【關鍵修正】直接使用資料庫中的 majorItem.sequence 欄位
+            const itemNumber = majorItem.sequence || 'N/A';
+
             html += `
                 <div class="major-item-wrapper">
                     <div class="major-item-row" data-major-id="${majorItem.id}">
