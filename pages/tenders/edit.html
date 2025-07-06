@@ -1,78 +1,137 @@
-<div class="content-card">
-    <div class="page-header">
-        <h1 class="page-title">✏️ 編輯專案</h1>
-    </div>
+<style>
+    .tender-info-section {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 30px;
+        border-left: 4px solid #667eea;
+    }
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-top: 15px;
+    }
+    .info-item {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .info-label {
+        font-size: 14px;
+        color: #6c757d;
+        margin-bottom: 5px;
+    }
+    .info-value {
+        font-size: 18px;
+        font-weight: 600;
+    }
+    .info-value.amount { color: #28a745; }
+    .info-value.addition { color: #ffc107; }
+    .info-value.total { color: #667eea; font-size: 20px; }
+    .hierarchical-items {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+    .items-header {
+        display: grid;
+        grid-template-columns: 4px 60px 2fr 80px 100px 120px 120px 100px 100px;
+        gap: 15px;
+        align-items: center;
+        padding: 12px 20px;
+        background: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        font-size: 14px;
+        color: #495057;
+    }
+    .major-item-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 20px;
+        font-size: 16px;
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+    }
+    .major-item-left {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex: 1;
+    }
+    .major-item-toggle {
+        font-size: 20px;
+        line-height: 1;
+    }
+    .detail-items-container.collapsed {
+        display: none;
+    }
+    .detail-item {
+        display: grid;
+        grid-template-columns: 4px 60px 2fr 80px 100px 120px 120px 100px 100px;
+        gap: 15px;
+        align-items: center;
+        padding: 15px 20px;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .item-status { width: 4px; height: 40px; background: #28a745; border-radius: 2px; }
+    .item-name { font-weight: 500; }
+    .item-price, .item-total { text-align: right; }
+</style>
 
+<div class="content-card">
     <div id="loading" class="loading" style="display: flex;">
         <div class="spinner"></div>
-        <p>載入專案資料中...</p>
+        <p>載入標單編輯資料中...</p>
     </div>
 
-    <form id="editTenderForm" style="display: none;" onsubmit="window.exposedEditFuncs.handleFormSubmit(event)">
-        <div class="form-container">
-            <div class="form-grid">
-                <div class="form-section">
-                    <h3>基本資訊</h3>
-                    <div class="form-group">
-                        <label for="tenderName">標單名稱 *</label>
-                        <input type="text" id="tenderName" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="tenderCode">標單編號</label>
-                        <input type="text" id="tenderCode" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="projectSelect">所屬專案 *</label>
-                        <select id="projectSelect" class="form-control" required></select>
-                    </div>
-                     <div class="form-group">
-                        <label for="statusSelect">標單狀態</label>
-                        <select id="statusSelect" class="form-control">
-                            <option value="planning">規劃中</option>
-                            <option value="active">進行中</option>
-                            <option value="completed">已完成</option>
-                            <option value="paused">暫停</option>
-                        </select>
-                    </div>
-                </div>
+    <div id="editTenderContent" style="display:none;">
+        <div class="page-header">
+            <h1 class="page-title" id="pageTitle">📋 標單編輯</h1>
+            <p class="page-subtitle" id="pageSubtitle">管理原始項目與追加項目，保持完整的變更歷史記錄</p>
+        </div>
 
-                <div class="form-section">
-                    <h3>時程與承包商</h3>
-                    <div class="form-group">
-                        <label for="startDate">開始日期</label>
-                        <input type="date" id="startDate" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="endDate">結束日期</label>
-                        <input type="date" id="endDate" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="contractorName">承包商名稱</label>
-                        <input type="text" id="contractorName" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="contractorContact">聯絡方式</label>
-                        <input type="text" id="contractorContact" class="form-control">
-                    </div>
+        <div class="tender-info-section">
+            <h3>📊 標單資訊</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">標單名稱</div>
+                    <div class="info-value" id="infoTenderName">載入中...</div>
                 </div>
-
-                <div class="form-section" style="grid-column: 1 / -1;">
-                     <h3>描述與備註</h3>
-                    <div class="form-group">
-                        <label for="description">標單描述</label>
-                        <textarea id="description" class="form-control"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="notes">備註</label>
-                        <textarea id="notes" class="form-control"></textarea>
-                    </div>
+                <div class="info-item">
+                    <div class="info-label">承包商</div>
+                    <div class="info-value" id="infoContractorName">載入中...</div>
                 </div>
-            </div>
-
-            <div class="form-actions">
-                <button type="button" class="btn btn-secondary" onclick="window.exposedEditFuncs.cancelEdit()">取消</button>
-                <button type="submit" class="btn btn-success">儲存變更</button>
+                <div class="info-item">
+                    <div class="info-label">原始合約金額</div>
+                    <div class="info-value amount" id="infoOriginalAmount">NT$ 0</div>
+                </div>
             </div>
         </div>
-    </form>
+
+        <div class="content-section items-section">
+            <div class="section-header">
+                <h3 class="section-title">📋 原始項目 (不可修改)</h3>
+            </div>
+            <div class="items-header">
+                <div></div>
+                <div>項次</div>
+                <div style="text-align: left;">項目名稱</div>
+                <div>單位</div>
+                <div>數量</div>
+                <div style="text-align: right;">單價</div>
+                <div style="text-align: right;">小計</div>
+                <div>&nbsp;</div>
+                <div>&nbsp;</div>
+            </div>
+            <div class="hierarchical-items" id="hierarchicalItemsContainer">
+                </div>
+        </div>
+    </div>
 </div>
