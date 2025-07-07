@@ -1,5 +1,5 @@
 /**
- * 樓層分配管理系統 (distribution.js) (SPA 版本) - v2.1 完整功能與事件監聽重構版
+ * 樓層分配管理系統 (distribution.js) (SPA 版本) - v2.2 智能樓層排序修正
  */
 function initDistributionPage() {
     
@@ -16,7 +16,7 @@ function initDistributionPage() {
         'building': Array.from({ length: 20 }, (_, i) => `${i + 1}F`)
     };
 
-    // --- 初始化與事件綁定 ---
+    // --- 初始化流程 ---
     async function initializePage() {
         console.log("🚀 初始化樓層分配頁面...");
         if (!currentUser) return showAlert("無法獲取用戶資訊", "error");
@@ -25,13 +25,11 @@ function initDistributionPage() {
         await loadProjects();
     }
 
+    // --- 事件綁定 ---
     function setupEventListeners() {
-        // 下拉選單
         document.getElementById('projectSelect')?.addEventListener('change', onProjectChange);
         document.getElementById('tenderSelect')?.addEventListener('change', onTenderChange);
         document.getElementById('majorItemSelect')?.addEventListener('change', onMajorItemChange);
-
-        // 主要功能按鈕
         document.getElementById('saveDistributionsBtn')?.addEventListener('click', saveAllDistributions);
         document.getElementById('clearDistributionsBtn')?.addEventListener('click', clearAllDistributions);
         document.getElementById('importBtn')?.addEventListener('click', () => document.getElementById('importInput').click());
@@ -39,8 +37,6 @@ function initDistributionPage() {
         document.getElementById('exportBtn')?.addEventListener('click', exportToExcel);
         document.getElementById('sequenceManagerBtn')?.addEventListener('click', showSequenceManager);
         document.getElementById('floorManagerBtn')?.addEventListener('click', showFloorManager);
-
-        // 樓層設定 Modal
         document.getElementById('templateButtons')?.addEventListener('click', (e) => {
             if (e.target.tagName === 'BUTTON') applyFloorTemplate(e.target.dataset.template);
         });
@@ -49,12 +45,50 @@ function initDistributionPage() {
         document.getElementById('saveFloorSettingsBtn')?.addEventListener('click', saveFloorSettings);
         document.getElementById('cancelFloorModalBtn')?.addEventListener('click', () => closeModal('floorModal'));
         document.getElementById('floorModal')?.addEventListener('click', (e) => { if(e.target.id === 'floorModal') closeModal('floorModal'); });
-
-        // 順序管理 Modal
         document.getElementById('resetOrderBtn')?.addEventListener('click', resetToOriginalOrder);
         document.getElementById('saveSequenceBtn')?.addEventListener('click', saveSequenceChanges);
         document.getElementById('cancelSequenceModalBtn')?.addEventListener('click', () => closeModal('sequenceModal'));
         document.getElementById('sequenceModal')?.addEventListener('click', (e) => { if(e.target.id === 'sequenceModal') closeModal('sequenceModal'); });
+    }
+
+    // --- 【關鍵修正】: 全新、更智能的樓層排序函數 ---
+    function sortFloors(a, b) {
+        const getFloorParts = (floorStr) => {
+            const s = String(floorStr).toUpperCase();
+            // 匹配 "停1F" 或 "A棟B1F" 中的 "停" 或 "A棟"
+            const buildingPrefixMatch = s.match(/^([^\dBRF]+)/);
+            const buildingPrefix = buildingPrefixMatch ? buildingPrefixMatch[1] : '';
+
+            // 匹配 B, R, 和數字
+            const floorMatch = s.match(/([B|R]?)(\d+)/);
+            if (!floorMatch) return { building: buildingPrefix, type: 2, num: 0, original: s };
+            
+            const [, type, numStr] = floorMatch;
+            const floorType = (type === 'B') ? 0 : (type === 'R') ? 2 : 1; // 0:地下, 1:一般, 2:屋頂
+            
+            return {
+                building: buildingPrefix,
+                type: floorType,
+                num: parseInt(numStr, 10)
+            };
+        };
+
+        const partsA = getFloorParts(a);
+        const partsB = getFloorParts(b);
+
+        // 1. 先依大樓前綴排序 (例如 "停" 會跟 "停" 在一起)
+        if (partsA.building > partsB.building) return 1;
+        if (partsA.building < partsB.building) return -1;
+        
+        // 2. 再依樓層類型排序 (B -> 一般樓層 -> R)
+        if (partsA.type > partsB.type) return 1;
+        if (partsA.type < partsB.type) return -1;
+
+        // 3. 最後依數字排序 (地下室由大到小，其他由小到大)
+        if (partsA.type === 0) { // 如果是地下室
+            return partsB.num - partsA.num; // B3, B2, B1
+        }
+        return partsA.num - partsB.num; // 1F, 2F, 3F
     }
 
     // --- 資料載入 ---
@@ -125,7 +159,7 @@ function initDistributionPage() {
     async function loadFloorSettings(tenderId) {
         try {
             const snapshot = await db.collection("floorSettings").where("tenderId", "==", tenderId).limit(1).get();
-            floors = snapshot.empty ? [] : (snapshot.docs[0].data().floors || []);
+            floors = snapshot.empty ? [] : (snapshot.docs[0].data().floors || []).sort(sortFloors);
         } catch (error) {
             console.error("載入樓層設定失敗", error);
             floors = [];
@@ -259,18 +293,9 @@ function initDistributionPage() {
 
     function exportToExcel() {
         if (!selectedMajorItem || detailItems.length === 0) return showAlert('沒有資料可匯出', 'error');
-        
-        const data = [
-            ['項次', '項目名稱', '單位', '總量', ...floors]
-        ];
-
+        const data = [['項次', '項目名稱', '單位', '總量', ...floors]];
         detailItems.forEach(item => {
-            const row = [
-                item.sequence || '',
-                item.name || '',
-                item.unit || '',
-                item.totalQuantity || 0
-            ];
+            const row = [item.sequence || '', item.name || '', item.unit || '', item.totalQuantity || 0];
             const distributedQuantities = {};
             distributions.filter(d => d.detailItemId === item.id).forEach(d => {
                 distributedQuantities[d.areaName] = d.quantity;
@@ -280,7 +305,6 @@ function initDistributionPage() {
             });
             data.push(row);
         });
-
         const worksheet = XLSX.utils.aoa_to_sheet(data);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, selectedMajorItem.name);
@@ -290,7 +314,6 @@ function initDistributionPage() {
     function handleFileImport(event) {
         const file = event.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
@@ -298,10 +321,7 @@ function initDistributionPage() {
                 const workbook = XLSX.read(data, { type: 'array' });
                 const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-                // 假設第一行為標頭，包含樓層資訊
                 const importedFloors = jsonData[0].slice(4); 
-                
                 jsonData.slice(1).forEach(row => {
                     const sequence = row[0];
                     const targetItem = detailItems.find(item => item.sequence === sequence);
@@ -349,19 +369,21 @@ function initDistributionPage() {
 
     function addCustomFloor() {
         const input = document.getElementById('newFloorInput');
-        const value = input.value.trim();
+        const value = input.value.trim().toUpperCase();
         if (!value) return;
-
         if (value.includes('-')) {
             const [startStr, endStr] = value.split('-');
-            const prefix = startStr.replace(/[0-9]/g, '');
-            const startNum = parseInt(startStr.replace(/[^0-9]/g, ''));
-            const endNum = parseInt(endStr.replace(/[^0-9]/g, ''));
-            if (!isNaN(startNum) && !isNaN(endNum) && startNum <= endNum) {
+            const startPrefix = (startStr.match(/^([^\d]+)/) || ['',''])[1];
+            const endPrefix = (endStr.match(/^([^\d]+)/) || ['',''])[1];
+            const startNum = parseInt(startStr.replace(/^[^\d]+/, ''));
+            const endNum = parseInt(endStr.replace(/^[^\d]+/, ''));
+            if (startPrefix === endPrefix && !isNaN(startNum) && !isNaN(endNum) && startNum <= endNum) {
                 for (let i = startNum; i <= endNum; i++) {
-                    const newFloor = `${prefix}${i}F`; // 修正：確保加上 "F"
+                    const newFloor = `${startPrefix}${i}F`;
                     if (!floors.includes(newFloor)) floors.push(newFloor);
                 }
+            } else {
+                showAlert('範圍格式錯誤，前後綴需相同。例: 1F-10F 或 停1F-停5F', 'error');
             }
         } else {
             const newFloors = value.split(',').map(f => f.trim()).filter(Boolean);
@@ -369,7 +391,6 @@ function initDistributionPage() {
                 if (!floors.includes(f)) floors.push(f);
             });
         }
-        
         floors.sort(sortFloors);
         displayCurrentFloors();
         input.value = '';
@@ -391,7 +412,7 @@ function initDistributionPage() {
         if (!confirm('確定儲存目前的樓層設定嗎？')) return;
         showLoading(true, '儲存設定中...');
         try {
-            const settingData = { tenderId: selectedTender.id, projectId: selectedProject.id, floors, createdBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+            const settingData = { tenderId: selectedTender.id, projectId: selectedProject.id, floors: floors.sort(sortFloors), createdBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
             const query = await db.collection("floorSettings").where("tenderId", "==", selectedTender.id).limit(1).get();
             if (!query.empty) {
                 await db.collection("floorSettings").doc(query.docs[0].id).update(settingData);
@@ -436,12 +457,10 @@ function initDistributionPage() {
                 id: item.dataset.id,
                 sequence: item.querySelector('.sequence-input').value || (index + 1).toString()
             }));
-
             newOrder.forEach(item => {
                 const docRef = db.collection("detailItems").doc(item.id);
                 batch.update(docRef, { sequence: item.sequence });
             });
-
             await batch.commit();
             await loadDetailItems(selectedMajorItem.id);
             buildDistributionTable();
@@ -466,23 +485,12 @@ function initDistributionPage() {
     function hideMainContent() { document.getElementById('mainContent').style.display = 'none'; document.getElementById('emptyState').style.display = 'flex'; }
     function showMainContent() { document.getElementById('mainContent').style.display = 'block'; document.getElementById('emptyState').style.display = 'none'; }
     function showLoading(isLoading, message='載入中...') {
-        // Implement a proper loading overlay if needed
-    }
-    function sortFloors(a, b) {
-        const getFloorParts = (floorStr) => {
-            const match = String(floorStr).match(/([B|R]?)(\d+)/);
-            if (!match) return { prefix: floorStr, num: 0, original: floorStr };
-            const [, prefix, numStr] = match;
-            return { prefix: prefix || '', num: parseInt(numStr, 10), original: floorStr };
-        };
-        const partsA = getFloorParts(a);
-        const partsB = getFloorParts(b);
-        const prefixOrder = { 'B': -1, '': 0, 'R': 1 };
-        const orderA = prefixOrder[partsA.prefix];
-        const orderB = prefixOrder[partsB.prefix];
-        if (orderA !== orderB) return orderA - orderB;
-        if (partsA.num !== partsB.num) return partsA.num - partsB.num;
-        return a.localeCompare(b);
+        const loadingEl = document.querySelector('.loading-overlay'); // A more generic loader
+        if(loadingEl) {
+            loadingEl.style.display = isLoading ? 'flex' : 'none';
+            const textEl = loadingEl.querySelector('p');
+            if (textEl) textEl.textContent = message;
+        }
     }
     function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length-pB.length; }
 
