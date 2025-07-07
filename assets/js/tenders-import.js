@@ -1,5 +1,5 @@
 /**
- * EXCEL 匯入頁面 (tenders/import.js) (SPA 版本) - v2.0 金額與跳轉修正
+ * EXCEL 匯入頁面 (tenders/import.js) (SPA 版本) - v2.1 空白列過濾修正
  * 由 router.js 呼叫 initImportPage() 函數來啟動
  */
 function initImportPage() {
@@ -43,7 +43,6 @@ function initImportPage() {
             if (customPatternGroup) customPatternGroup.style.display = customPatternCheckbox.checked ? 'block' : 'none';
         };
         
-        // 使用事件監聽取代 onclick
         document.querySelector('button[onclick*="parseExcel"]')?.addEventListener('click', parseExcel);
         document.querySelector('button[onclick*="backToUpload"]')?.addEventListener('click', backToUpload);
         document.querySelector('button[onclick*="proceedToImport"]')?.addEventListener('click', proceedToImport);
@@ -53,24 +52,12 @@ function initImportPage() {
         document.querySelector('button[onclick*="clearAllClassifications"]')?.addEventListener('click', clearAllClassifications);
     }
     
-    // --- 【關鍵修正 1】: 新增一個專門處理金額字串的函數 ---
-    /**
-     * 解析可能包含貨幣符號或千分位的字串，回傳一個純數字
-     * @param {string} value - 要解析的金額字串，例如 "NT$ 1,234.50"
-     * @returns {number} - 解析後的數字，例如 1234.5
-     */
     function parseCurrency(value) {
-        if (typeof value === 'number') {
-            return value;
-        }
-        if (typeof value !== 'string' || value.trim() === '') {
-            return 0;
-        }
-        // 移除 "NT$", ",", " " 等所有非數字和非小數點的字元
+        if (typeof value === 'number') return value;
+        if (typeof value !== 'string' || value.trim() === '') return 0;
         const cleanedValue = value.replace(/[^0-9.-]+/g,"");
         return parseFloat(cleanedValue) || 0;
     }
-
 
     // --- 核心邏輯 ---
 
@@ -145,20 +132,23 @@ function initImportPage() {
             let currentMajorItem = null;
 
             jsonData.forEach((row, index) => {
-                if (!row || row.filter(String).length === 0) return; // 忽略空行
+                const itemName = row[1] ? String(row[1]).trim() : '';
+
+                // --- 【關鍵修正】: 只有當「項目名稱」欄位 (B欄) 有內容時，才處理這一行 ---
+                if (!itemName) {
+                    return; // 如果項目名稱是空的，就直接跳過這一行
+                }
                 
-                // --- 【關鍵修正 1】: 在解析時，使用新的 parseCurrency 函數來處理金額欄位 ---
                 const quantity = parseFloat(row[3]) || 0;
                 const unitPrice = parseCurrency(row[4]);
                 let totalPrice = parseCurrency(row[5]);
                 
-                // 如果總價為0，但有數量和單價，則自動計算
                 if (totalPrice === 0 && quantity > 0 && unitPrice > 0) {
                     totalPrice = quantity * unitPrice;
                 }
 
                 const rowData = {
-                    rowNumber: startRow + index, type: 'other', sequence: row[0] || '', name: row[1] || '',
+                    rowNumber: startRow + index, type: 'other', sequence: row[0] || '', name: itemName,
                     unit: row[2] || '', quantity: quantity, unitPrice: unitPrice,
                     totalPrice: totalPrice, parentId: null
                 };
@@ -200,7 +190,6 @@ function initImportPage() {
         const tableBody = document.querySelector('#previewTable tbody');
         tableBody.innerHTML = '';
         let totalAmount = 0, majorCount = 0, detailCount = 0;
-        // 清空並重新渲染表格
         const previewTable = document.getElementById('previewTable');
         previewTable.innerHTML = `
             <thead>
@@ -309,7 +298,6 @@ function initImportPage() {
             showLoading(false);
             showAlert(`成功匯入！創建了 ${majorItems.length} 個大項目和 ${detailItems.length} 個細項`, 'success');
             
-            // --- 【關鍵修正 2】: 使用正確的 SPA 路由，不包含 .html ---
             setTimeout(() => navigateTo('/program/tenders/list'), 2000);
 
         } catch (error) {
@@ -319,7 +307,6 @@ function initImportPage() {
     }
 
     // --- UI 流程控制 ---
-
     function setActiveStep(stepNumber) {
         for (let i = 1; i <= 4; i++) {
             const step = document.getElementById(`step${i}`);
@@ -329,7 +316,6 @@ function initImportPage() {
             else step.className = 'step inactive';
         }
     }
-
     function backToUpload() {
         setActiveStep(1);
         document.getElementById('parseSection').style.display = 'none';
@@ -338,20 +324,17 @@ function initImportPage() {
         parsedData = [];
         document.getElementById('fileInput').value = '';
     }
-
     function proceedToImport() {
         if (parsedData.length === 0) return showAlert('沒有可匯入的資料', 'error');
         setActiveStep(4);
         document.getElementById('previewSection').style.display = 'none';
         document.getElementById('importSection').style.display = 'block';
     }
-
     function backToPreview() {
         setActiveStep(3);
         document.getElementById('importSection').style.display = 'none';
         document.getElementById('previewSection').style.display = 'block';
     }
-
     function showLoading(show, text = '處理中...') {
         const loadingSection = document.getElementById('loadingSection');
         if (loadingSection) {
