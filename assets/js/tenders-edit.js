@@ -220,8 +220,11 @@ function initTenderEditPage() {
             quantityDisplay = originalQuantity;
         }
         
-        const statusBar = document.querySelector(`tr[data-detail-item-id="${item.id}"] .item-status-bar`);
-        const quantityCell = document.querySelector(`tr[data-detail-item-id="${item.id}"] .current-quantity-cell`);
+        const row = document.querySelector(`tr[data-detail-item-id="${item.id}"]`);
+        if(!row) return;
+
+        const statusBar = row.querySelector('.item-status-bar');
+        const quantityCell = row.querySelector('.current-quantity-cell');
         
         if (statusBar) {
             statusBar.className = 'item-status-bar';
@@ -233,7 +236,7 @@ function initTenderEditPage() {
         }
     }
 
-    // --- 事件處理與 Modal 邏輯 (其餘函數與前版相同，為求完整性全部提供) ---
+    // --- 事件處理與 Modal 邏輯 ---
     function setupEventListeners() {
         const content = document.getElementById('editTenderContent');
         if (!content) return;
@@ -375,12 +378,10 @@ function initTenderEditPage() {
         const tenderDoc = await db.collection('tenders').doc(tenderId).get();
         if (!tenderDoc.exists) throw new Error('找不到指定的標單');
         currentTender = { id: tenderDoc.id, ...tenderDoc.data() };
-
         const [majorItemsData, allDetailItemsData] = await Promise.all([
             safeFirestoreQuery('majorItems', [{ field: 'tenderId', operator: '==', value: tenderId }]),
             safeFirestoreQuery('detailItems', [{ field: 'tenderId', operator: '==', value: tenderId }])
         ]);
-
         majorItems = majorItemsData.docs.sort(naturalSequenceSort);
         detailItems = allDetailItemsData.docs.filter(item => !item.isAddition).sort(naturalSequenceSort);
         additionItems = allDetailItemsData.docs.filter(item => item.isAddition).sort((a,b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
