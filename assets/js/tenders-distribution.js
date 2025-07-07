@@ -19,19 +19,12 @@ function initDistributionPage() {
     // --- 【所有函數定義區】---
 
     function showAlert(message, type = 'info', duration = 3000) {
-        const alertContainer = document.querySelector('.alert-container') || document.body;
-        const alertEl = document.createElement('div');
-        alertEl.className = `alert alert-${type}`;
-        alertEl.textContent = message;
-        alertContainer.appendChild(alertEl);
-        setTimeout(() => alertEl.remove(), duration);
+        // 使用瀏覽器內建的 alert，確保提示一定會出現
+        alert(`[${type.toUpperCase()}] ${message}`);
     }
     
     function showLoading(isLoading, message='載入中...') {
-        let loadingEl = document.getElementById('loading');
-        if (!loadingEl) { // Fallback if a specific loading element isn't found
-            loadingEl = document.querySelector('.loading');
-        }
+        const loadingEl = document.querySelector('.loading'); 
         if(loadingEl) {
             loadingEl.style.display = isLoading ? 'flex' : 'none';
             const textEl = loadingEl.querySelector('p');
@@ -74,27 +67,30 @@ function initDistributionPage() {
         });
 
         const maxAllowed = totalQuantity - otherInputsTotal;
-        const currentInputValue = Number(inputElement.value) || 0;
+        let currentInputValue = Number(inputElement.value) || 0;
 
         if (currentInputValue > maxAllowed) {
-            showAlert(`分配數量已達上限，自動修正為最大可分配量: ${maxAllowed}`, 'error');
+            showAlert(`分配數量已達上限，自動修正為最大可分配量: ${maxAllowed}`, 'warning');
             inputElement.value = maxAllowed;
+            currentInputValue = maxAllowed; // 修正後，更新當前值
         }
-
-        const finalDistributed = otherInputsTotal + (Number(inputElement.value) || 0);
+        
+        // 重新計算最終的已分配總量
+        const finalDistributed = otherInputsTotal + currentInputValue;
         
         const strongTag = distributedCell.querySelector('strong');
         if(strongTag) {
             strongTag.textContent = finalDistributed;
         }
 
+        // 根據最終結果更新錯誤狀態
         if (finalDistributed > totalQuantity) {
             distributedCell.classList.add('error');
         } else {
             distributedCell.classList.remove('error');
         }
     }
-
+    
     // --- (以下所有函數的實現都已補全) ---
     function buildDistributionTable() {
         const tableHeader = document.getElementById('tableHeader');
@@ -218,11 +214,9 @@ function initDistributionPage() {
         await loadProjects();
     }
     
-    // 以下為其他函數的完整實現
     async function loadProjects() { showLoading(true, '載入專案中...'); try { const projectDocs = await safeFirestoreQuery("projects", [{ field: "createdBy", operator: "==", value: currentUser.email }], { field: "name", direction: "asc" }); projects = projectDocs.docs; const projectSelect = document.getElementById('projectSelect'); projectSelect.innerHTML = '<option value="">請選擇專案...</option>'; projects.forEach(project => projectSelect.innerHTML += `<option value="${project.id}">${project.name}</option>`); } catch (error) { showAlert('載入專案失敗', 'error'); } finally { showLoading(false); } }
     async function loadTenders(projectId) { const tenderSelect = document.getElementById('tenderSelect'); tenderSelect.innerHTML = '<option value="">載入中...</option>'; tenderSelect.disabled = true; try { const tenderDocs = await safeFirestoreQuery("tenders", [{ field: "projectId", operator: "==", value: projectId }, { field: "createdBy", operator: "==", value: currentUser.email }], { field: "name", direction: "asc" }); tenders = tenderDocs.docs; tenderSelect.innerHTML = '<option value="">請選擇標單...</option>'; tenders.forEach(tender => tenderSelect.innerHTML += `<option value="${tender.id}">${tender.name}</option>`); tenderSelect.disabled = false; } catch (error) { showAlert('載入標單失敗', 'error'); tenderSelect.innerHTML = '<option value="">載入失敗</option>'; } }
     async function loadMajorItems(tenderId) { const majorItemSelect = document.getElementById('majorItemSelect'); majorItemSelect.innerHTML = '<option value="">載入中...</option>'; majorItemSelect.disabled = true; try { const majorItemDocs = await safeFirestoreQuery("majorItems", [{ field: "tenderId", operator: "==", value: tenderId }], { field: "name", direction: "asc" }); majorItems = majorItemDocs.docs; majorItemSelect.innerHTML = '<option value="">請選擇大項目...</option>'; majorItems.forEach(item => majorItemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`); majorItemSelect.disabled = false; } catch (error) { showAlert('載入大項目失敗', 'error'); majorItemSelect.innerHTML = '<option value="">載入失敗</option>'; } }
-    async function loadFloorSettings(tenderId) { try { const snapshot = await db.collection("floorSettings").where("tenderId", "==", tenderId).limit(1).get(); floors = snapshot.empty ? [] : (snapshot.docs[0].data().floors || []).sort(sortFloors); } catch (error) { console.error("載入樓層設定失敗", error); floors = []; } }
     async function loadDetailItems(majorItemId) { const detailItemDocs = await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: majorItemId }]); detailItems = detailItemDocs.docs.sort(naturalSequenceSort); }
     async function loadDistributions(majorItemId) { const distributionDocs = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: majorItemId }]); distributions = distributionDocs.docs; }
     async function saveAllDistributions() { if (!selectedMajorItem) return showAlert('請先選擇大項目', 'warning'); showLoading(true, '儲存中...'); try { const batch = db.batch(); const existingDistributions = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }]); existingDistributions.docs.forEach(doc => { batch.delete(db.collection("distributionTable").doc(doc.id)); }); document.querySelectorAll('.quantity-input').forEach(input => { const quantity = parseInt(input.value) || 0; if (quantity > 0) { const docRef = db.collection("distributionTable").doc(); batch.set(docRef, { tenderId: selectedTender.id, majorItemId: selectedMajorItem.id, detailItemId: input.dataset.itemId, areaType: "樓層", areaName: input.dataset.floor, quantity: quantity, createdBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp(), createdAt: firebase.firestore.FieldValue.serverTimestamp() }); } }); await batch.commit(); await loadDistributions(selectedMajorItem.id); buildDistributionTable(); showAlert('✅ 所有分配已儲存成功！', 'success'); } catch (error) { showAlert('儲存失敗: ' + error.message, 'error'); } finally { showLoading(false); } }
@@ -245,6 +239,5 @@ function initDistributionPage() {
     function showMainContent() { document.getElementById('mainContent').style.display = 'block'; document.getElementById('emptyState').style.display = 'none'; }
     function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length-pB.length; }
     
-    // --- 頁面啟動點 ---
     initializePage();
 }
