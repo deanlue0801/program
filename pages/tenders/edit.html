@@ -1,44 +1,71 @@
 <!DOCTYPE html>
-<div id="loading" class="loading" style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 4rem;">
+<div id="loading" class="loading">
     <div class="spinner"></div>
-    <p style="margin-top: 1rem; font-size: 1rem; color: #666;">載入編輯資料中...</p>
+    <p>載入編輯資料中...</p>
 </div>
 
 <div id="editTenderContent" class="content" style="display: none;">
     <div id="tender-header-container"></div>
 
-    <div id="items-list-container" class="items-list-card"></div>
+    <div id="items-list-container" class="content-card"></div>
 
-    <div id="addition-details-container" class="items-list-card"></div>
-</div>
-    <div class="items-list-card">
-        <h3>數量統計總覽</h3>
+    <div id="addition-details-container" class="content-card"></div>
+    
+    <div class="content-card">
+        <h3>📊 數量統計總覽</h3>
         <div id="summaryGrid" class="summary-grid"></div>
     </div>
+</div>
+
 <div id="additionModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h4 class="modal-title" id="modalTitle">追加項目數量</h4>
-            <button type="button" class="modal-close">&times;</button>
+            <h3 class="modal-title" id="modalTitle">新增追加項目</h3>
+            <button type="button" class="modal-close" data-action="close-modal">&times;</button>
         </div>
         <form id="additionForm" novalidate>
-            <input type="hidden" id="relatedItemId">
             <input type="hidden" id="editAdditionId">
+            
             <div class="form-group">
-                <label for="modalItemName" class="form-label">關聯項目</label>
-                <input type="text" id="modalItemName" class="form-control" disabled>
+                <label class="form-label" for="relatedDetailItem">關聯項目 *</label>
+                <select id="relatedDetailItem" class="form-control" required></select>
             </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="additionDate">追加日期 *</label>
+                    <input type="date" id="additionDate" class="form-control" required>
+                </div>
+                 <div class="form-group">
+                    <label class="form-label" for="approvedBy">核准人員</label>
+                    <input type="text" id="approvedBy" class="form-control" disabled placeholder="未來擴充用">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="additionQuantity">追加數量 *</label>
+                    <input type="number" id="additionQuantity" class="form-control" required min="0" step="any">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="additionUnitPrice">追加單價 *</label>
+                    <input type="number" id="additionUnitPrice" class="form-control" required min="0" step="any">
+                </div>
+            </div>
+            
             <div class="form-group">
-                <label for="additionQuantity" class="form-label">追加數量 *</label>
-                <input type="number" id="additionQuantity" class="form-control" required min="0" step="any">
+                <label class="form-label" for="additionReason">追加原因</label>
+                <textarea id="additionReason" class="form-control" rows="2" placeholder="請說明追加的原因..."></textarea>
             </div>
+
             <div class="form-group">
-                <label for="additionReason" class="form-label">追加原因</label>
-                <textarea id="additionReason" class="form-control" rows="3"></textarea>
+                <label class="form-label" for="additionNotes">備註</label>
+                <textarea id="additionNotes" class="form-control" rows="2" placeholder="其他備註說明..."></textarea>
             </div>
-            <div class="form-actions">
-                <button type="button" id="cancelAdditionBtn" class="btn btn-secondary">取消</button>
-                <button type="submit" class="btn btn-primary">儲存</button>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-action="close-modal">取消</button>
+                <button type="submit" class="btn btn-success">儲存</button>
             </div>
         </form>
     </div>
