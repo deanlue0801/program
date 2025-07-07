@@ -1,13 +1,10 @@
 /* --- 分配管理頁面專屬樣式 --- */
-/* 頁面佈局容器 */
 .distribution-page-wrapper { display: flex; flex-direction: column; height: calc(100vh - 50px - 2rem); }
 .selection-panel { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); flex-shrink: 0; }
 .selection-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
 .distribution-body { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; background: white; border-radius: 15px; padding: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
 .actions-panel { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; flex-shrink: 0; }
 .action-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
-
-/* 表格容器 (處理滾動) */
 .table-container { flex-grow: 1; overflow: auto; border: 1px solid #dee2e6; border-radius: 12px; }
 .distribution-table { border-collapse: collapse; min-width: 1200px; }
 .distribution-table th, .distribution-table td { padding: 12px 10px; text-align: center; border: 1px solid #e9ecef; font-size: 13px; white-space: nowrap; }
@@ -24,18 +21,19 @@
 .item-details { font-size: 12px; color: #6c757d; margin-top: 4px; }
 .quantity-input { width: 50px; text-align: center; padding: 4px; border: 1px solid #ddd; border-radius: 4px; }
 .quantity-input.has-value { background: #e8f5e8; border-color: #28a745; font-weight: bold; }
+/* 【關鍵修正】: 新增錯誤提示樣式 */
 .total-column.error { background-color: #f8d7da !important; color: #721c24; font-weight: bold; }
 .total-column.error strong { color: #721c24 !important; }
 
 /* Modal 相關樣式 */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
 .modal-content { background: #f8f9fa; padding: 30px; border-radius: 15px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
-.modal-content h3 { margin-bottom: 10px; } 
-.modal-content p { color: #666; margin-bottom: 20px; font-size: 14px; }
-.modal-section { margin-bottom: 25px; } 
-.modal-section h4 { margin-bottom: 15px; color: #333; border-left: 4px solid var(--primary-color, #667eea); padding-left: 10px;}
+.modal-content h3 { margin-bottom: 10px; } .modal-content p { color: #666; margin-bottom: 20px; font-size: 14px; }
+.modal-section { margin-bottom: 25px; } .modal-section h4 { margin-bottom: 15px; color: #333; border-left: 4px solid var(--primary-color, #667eea); padding-left: 10px;}
 .modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 30px; }
 .template-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+.custom-add-section { display: flex; gap: 10px; align-items: center; }
+.custom-add-section input { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ddd; }
 #currentFloorsList { display: flex; flex-wrap: wrap; gap: 10px; background: white; border: 1px solid #ddd; padding: 15px; border-radius: 8px; min-height: 50px; }
 .floor-tag { display: inline-flex; align-items: center; background: #e8f5e8; color: #155724; padding: 6px 12px; border-radius: 20px; font-weight: 500;}
 .floor-tag button { background: none; border: none; color: #721c24; cursor: pointer; font-size: 16px; margin-left: 8px; line-height: 1; }
@@ -44,5 +42,3 @@
 .drag-handle { cursor: grab; color: #999; padding: 5px; }
 .sequence-input { width: 60px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; margin-right: 15px; }
 .sequence-name { flex-grow: 1; }
-.custom-add-section { display: flex; gap: 10px; align-items: center; }
-.custom-add-section input { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ddd; }
