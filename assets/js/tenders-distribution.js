@@ -52,110 +52,117 @@ function initDistributionPage() {
     async function loadDetailItems(majorItemId) { /* ... 內容與前版相同 ... */ }
     async function loadDistributions(majorItemId) { /* ... 內容與前版相同 ... */ }
     
-    // --- 【關鍵修正】: onQuantityChange 的邏輯修正 ---
-    function onQuantityChange(inputElement) {
-        const itemId = inputElement.dataset.itemId;
-        const rowInputs = document.querySelectorAll(`input[data-item-id="${itemId}"]`);
-        const distributedCell = document.getElementById(`distributed-${itemId}`);
-        // 如果找不到對應的儲存格，直接返回，避免錯誤
-        if (!distributedCell) return;
-
-        const strongTag = distributedCell.querySelector('strong');
-        // 如果找不到 strong 標籤 (理論上不該發生)，也直接返回
-        if (!strongTag) return;
-
-        const itemRow = distributedCell.closest('tr');
-        const totalQuantity = parseFloat(itemRow.dataset.totalQuantity);
-        
-        const currentDistributed = Array.from(rowInputs).reduce((sum, input) => sum + (Number(input.value) || 0), 0);
-        
-        // 只更新 strong 標籤內的文字，絕不影響到標籤本身
-        strongTag.textContent = currentDistributed;
-        
-        if (currentDistributed > totalQuantity) {
-            distributedCell.classList.add('error');
-        } else {
-            distributedCell.classList.remove('error');
-        }
-    }
+// 修正後的 onQuantityChange 函數
+function onQuantityChange(inputElement) {
+    const itemId = inputElement.dataset.itemId;
+    const rowInputs = document.querySelectorAll(`input[data-item-id="${itemId}"]`);
+    const distributedCell = document.getElementById(`distributed-${itemId}`);
     
-    // ... (此處省略與前版完全相同的函數，以節省篇幅)
-
-    // --- 頁面啟動點 ---
-    async function initializePage() {
-        console.log("🚀 初始化樓層分配頁面...");
-        if (!currentUser) return showAlert("無法獲取用戶資訊", "error");
-        
-        setupEventListeners();
-        await loadProjects();
+    // 如果找不到對應的儲存格，直接返回，避免錯誤
+    if (!distributedCell) {
+        console.warn(`找不到分配儲存格: distributed-${itemId}`);
+        return;
     }
+
+    // 尋找 strong 標籤，如果不存在就創建一個
+    let strongTag = distributedCell.querySelector('strong');
+    if (!strongTag) {
+        console.warn(`找不到 strong 標籤，嘗試創建新的`);
+        // 如果沒有 strong 標籤，創建一個並包裝現有內容
+        strongTag = document.createElement('strong');
+        // 將現有的文字內容移到 strong 標籤中
+        strongTag.textContent = distributedCell.textContent || '0';
+        distributedCell.innerHTML = '';
+        distributedCell.appendChild(strongTag);
+    }
+
+    const itemRow = distributedCell.closest('tr');
+    if (!itemRow) {
+        console.warn(`找不到項目行`);
+        return;
+    }
+
+    const totalQuantity = parseFloat(itemRow.dataset.totalQuantity) || 0;
     
-    // *** 最終執行啟動點 ***
-    initializePage();
-
-    // --- 以下為所有函數的完整實現，確保無省略 ---
-
-    async function loadMajorItemData(majorItemId) {
-        showLoading(true, '載入大項目資料中...');
-        try {
-            await Promise.all([
-                loadFloorSettings(selectedTender.id),
-                loadAllAdditionItems(selectedTender.id),
-                loadDetailItems(majorItemId),
-                loadDistributions(majorItemId)
-            ]);
-            showMainContent();
-            buildDistributionTable();
-        } catch (error) {
-            showAlert('載入大項目資料時發生錯誤', 'error');
-        } finally {
-            showLoading(false);
-        }
-    }
+    // 計算當前已分配的總量
+    const currentDistributed = Array.from(rowInputs).reduce((sum, input) => {
+        const value = Number(input.value) || 0;
+        return sum + value;
+    }, 0);
     
-    async function loadAllAdditionItems(tenderId) {
-        const additionDocs = await safeFirestoreQuery("detailItems", [
-            { field: "tenderId", operator: "==", value: tenderId },
-            { field: "isAddition", operator: "==", value: true }
-        ]);
-        allAdditionItems = additionDocs.docs;
+    // 更新 strong 標籤內的文字
+    strongTag.textContent = currentDistributed;
+    
+    // 根據是否超量來添加或移除錯誤樣式
+    if (currentDistributed > totalQuantity) {
+        distributedCell.classList.add('error');
+    } else {
+        distributedCell.classList.remove('error');
     }
+}
 
-    function buildDistributionTable() {
-        const tableHeader = document.getElementById('tableHeader');
-        const tableBody = document.getElementById('tableBody');
-        let headerHTML = '<tr><th style="width: 300px;">細項名稱</th><th class="total-column">總量</th>';
-        floors.forEach(floor => headerHTML += `<th class="floor-header">${floor}</th>`);
-        headerHTML += '<th class="total-column">已分配</th></tr>';
-        tableHeader.innerHTML = headerHTML;
-        let bodyHTML = '';
-        if (detailItems.length === 0) {
-            bodyHTML = `<tr><td colspan="${floors.length + 3}" style="text-align:center; padding: 2rem;">此大項目沒有細項資料</td></tr>`;
-        } else {
-            detailItems.forEach((item, index) => {
-                const originalQuantity = item.totalQuantity || 0;
-                const relatedAdditions = allAdditionItems.filter(add => add.relatedItemId === item.id);
-                const additionalQuantity = relatedAdditions.reduce((sum, add) => sum + (add.totalQuantity || 0), 0);
-                const currentTotalQuantity = originalQuantity + additionalQuantity;
-                let distributedQuantity = 0;
-                let rowHTML = `<tr class="item-row" data-total-quantity="${currentTotalQuantity}" data-item-id="${item.id}">`;
-                rowHTML += `<td><div class="item-info"><div class="item-name">${item.sequence || `#${index + 1}`}. ${item.name || '未命名'}</div><div class="item-details">單位: ${item.unit || '-'} | 單價: ${formatCurrency(item.unitPrice || 0)}</div></div></td>`;
-                rowHTML += `<td class="total-column" id="total-qty-${item.id}"><strong>${currentTotalQuantity}</strong></td>`;
-                floors.forEach(floor => {
-                    const dist = distributions.find(d => d.detailItemId === item.id && d.areaName === floor);
-                    const quantity = dist ? dist.quantity : 0;
-                    distributedQuantity += quantity;
-                    rowHTML += `<td><input type="number" class="quantity-input ${quantity > 0 ? 'has-value' : ''}" value="${quantity || ''}" min="0" data-item-id="${item.id}" data-floor="${floor}" placeholder="0"></td>`;
-                });
-                const errorClass = distributedQuantity > currentTotalQuantity ? 'error' : '';
-                rowHTML += `<td class="total-column ${errorClass}" id="distributed-${item.id}"><strong>${distributedQuantity}</strong></td>`;
-                rowHTML += '</tr>';
-                bodyHTML += rowHTML;
+// 同時修正 buildDistributionTable 函數中的相關部分
+function buildDistributionTable() {
+    const tableHeader = document.getElementById('tableHeader');
+    const tableBody = document.getElementById('tableBody');
+    
+    // 建立表格標題
+    let headerHTML = '<tr><th style="width: 300px;">細項名稱</th><th class="total-column">總量</th>';
+    floors.forEach(floor => headerHTML += `<th class="floor-header">${floor}</th>`);
+    headerHTML += '<th class="total-column">已分配</th></tr>';
+    tableHeader.innerHTML = headerHTML;
+    
+    let bodyHTML = '';
+    if (detailItems.length === 0) {
+        bodyHTML = `<tr><td colspan="${floors.length + 3}" style="text-align:center; padding: 2rem;">此大項目沒有細項資料</td></tr>`;
+    } else {
+        detailItems.forEach((item, index) => {
+            const originalQuantity = item.totalQuantity || 0;
+            const relatedAdditions = allAdditionItems.filter(add => add.relatedItemId === item.id);
+            const additionalQuantity = relatedAdditions.reduce((sum, add) => sum + (add.totalQuantity || 0), 0);
+            const currentTotalQuantity = originalQuantity + additionalQuantity;
+            
+            let distributedQuantity = 0;
+            let rowHTML = `<tr class="item-row" data-total-quantity="${currentTotalQuantity}" data-item-id="${item.id}">`;
+            
+            // 項目名稱欄
+            rowHTML += `<td><div class="item-info">
+                <div class="item-name">${item.sequence || `#${index + 1}`}. ${item.name || '未命名'}</div>
+                <div class="item-details">單位: ${item.unit || '-'} | 單價: ${formatCurrency(item.unitPrice || 0)}</div>
+            </div></td>`;
+            
+            // 總量欄
+            rowHTML += `<td class="total-column" id="total-qty-${item.id}"><strong>${currentTotalQuantity}</strong></td>`;
+            
+            // 樓層分配欄位
+            floors.forEach(floor => {
+                const dist = distributions.find(d => d.detailItemId === item.id && d.areaName === floor);
+                const quantity = dist ? dist.quantity : 0;
+                distributedQuantity += quantity;
+                rowHTML += `<td><input type="number" class="quantity-input ${quantity > 0 ? 'has-value' : ''}" 
+                    value="${quantity || ''}" min="0" 
+                    data-item-id="${item.id}" 
+                    data-floor="${floor}" 
+                    placeholder="0"></td>`;
             });
-        }
-        tableBody.innerHTML = bodyHTML;
-        tableBody.querySelectorAll('.quantity-input').forEach(input => input.addEventListener('input', () => onQuantityChange(input)));
+            
+            // 已分配總量欄 - 確保 strong 標籤存在
+            const errorClass = distributedQuantity > currentTotalQuantity ? 'error' : '';
+            rowHTML += `<td class="total-column ${errorClass}" id="distributed-${item.id}"><strong>${distributedQuantity}</strong></td>`;
+            
+            rowHTML += '</tr>';
+            bodyHTML += rowHTML;
+        });
     }
+    
+    tableBody.innerHTML = bodyHTML;
+    
+    // 為所有數量輸入框添加事件監聽器
+    tableBody.querySelectorAll('.quantity-input').forEach(input => {
+        input.addEventListener('input', () => onQuantityChange(input));
+        input.addEventListener('change', () => onQuantityChange(input));
+    });
+}
 
     function setupEventListeners() {
         document.getElementById('projectSelect')?.addEventListener('change', onProjectChange);
