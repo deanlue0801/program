@@ -1,4 +1,4 @@
-/* 編輯頁面 (edit.css) - v5.0 最終版 */
+/* 編輯頁面 (edit.css) - v6.0 最終功能版 */
 :root {
     --primary-color: #6a5acd;
     --secondary-color: #6c757d;
@@ -47,13 +47,17 @@
 .detail-items-container { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-in-out; background-color: #fafbff; }
 .detail-items-container.expanded { max-height: 2000px; }
 .detail-items-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-.detail-items-table th, .detail-items-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e9ecef; }
+.detail-items-table th, .detail-items-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e9ecef; vertical-align: middle; }
 .detail-items-table th { background-color: #f1f3f5; font-size: 13px; font-weight: 600; }
 .detail-items-table td { font-size: 14px; }
 .detail-items-table tr:last-child td { border-bottom: none; }
 .detail-items-table .number-cell { text-align: right; }
 .detail-items-table .action-cell { text-align: center; }
-.addition-info-text { color: var(--warning-color); font-size: 12px; }
+
+/* 狀態顏色條 */
+.item-status-bar { width: 4px; height: 100%; min-height: 40px; background-color: var(--success-color); border-radius: 2px; }
+.item-status-bar.has-change { background-color: var(--warning-color); }
+.item-status-bar.is-zero { background-color: var(--danger-color); }
 
 /* 統計總覽 */
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
