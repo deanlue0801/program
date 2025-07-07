@@ -1,5 +1,5 @@
 /**
- * 樓層分配管理系統 (distribution.js) (SPA 版本) - v2.5 完整功能與函數實現
+ * 樓層分配管理系統 (distribution.js) (SPA 版本) - v2.6 融合所有修正最終版
  */
 function initDistributionPage() {
     
@@ -17,10 +17,12 @@ function initDistributionPage() {
     };
 
     // --- 所有函數定義區 ---
+
     function showAlert(message, type = 'info', duration = 3000) {
+        // 使用瀏覽器內建的 alert，確保提示一定會出現
         alert(`[${type.toUpperCase()}] ${message}`);
     }
-    
+
     function showLoading(isLoading, message='載入中...') {
         const loadingEl = document.querySelector('.loading'); 
         if(loadingEl) {
@@ -128,12 +130,14 @@ function initDistributionPage() {
         const itemId = inputElement.dataset.itemId;
         const allInputsForRow = document.querySelectorAll(`input[data-item-id="${itemId}"]`);
         const distributedCell = document.getElementById(`distributed-${itemId}`);
+        
         if (!distributedCell) return;
 
         const itemRow = distributedCell.closest('tr');
         if (!itemRow) return;
         
         const totalQuantity = parseFloat(itemRow.dataset.totalQuantity) || 0;
+        
         let otherInputsTotal = 0;
         allInputsForRow.forEach(input => {
             if (input !== inputElement) {
@@ -145,7 +149,7 @@ function initDistributionPage() {
         let currentInputValue = Number(inputElement.value) || 0;
 
         if (currentInputValue > maxAllowed) {
-            alert(`分配數量已達上限，自動修正為最大可分配量: ${maxAllowed}`);
+            showAlert(`分配數量已達上限 (${totalQuantity})，已自動修正為最大可分配量: ${maxAllowed}`, 'warning');
             inputElement.value = maxAllowed;
             currentInputValue = maxAllowed;
         }
@@ -153,7 +157,9 @@ function initDistributionPage() {
         const finalDistributed = otherInputsTotal + currentInputValue;
         
         const strongTag = distributedCell.querySelector('strong');
-        if(strongTag) strongTag.textContent = finalDistributed;
+        if(strongTag) {
+            strongTag.textContent = finalDistributed;
+        }
 
         if (finalDistributed > totalQuantity) {
             distributedCell.classList.add('error');
@@ -212,7 +218,6 @@ function initDistributionPage() {
             showMainContent();
             buildDistributionTable();
         } catch (error) {
-            console.error('載入大項目資料時發生錯誤', error);
             showAlert('載入大項目資料時發生錯誤', 'error');
         } finally {
             showLoading(false);
@@ -250,26 +255,249 @@ function initDistributionPage() {
         if (modal) modal.style.display = 'none';
     }
 
-    async function saveAllDistributions() { if (!selectedMajorItem) return showAlert('請先選擇大項目', 'warning'); showLoading(true, '儲存中...'); try { const batch = db.batch(); const existingDistributions = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }]); existingDistributions.docs.forEach(doc => { batch.delete(db.collection("distributionTable").doc(doc.id)); }); document.querySelectorAll('.quantity-input').forEach(input => { const quantity = parseInt(input.value) || 0; if (quantity > 0) { const docRef = db.collection("distributionTable").doc(); batch.set(docRef, { tenderId: selectedTender.id, majorItemId: selectedMajorItem.id, detailItemId: input.dataset.itemId, areaType: "樓層", areaName: input.dataset.floor, quantity: quantity, createdBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp(), createdAt: firebase.firestore.FieldValue.serverTimestamp() }); } }); await batch.commit(); await loadDistributions(selectedMajorItem.id); buildDistributionTable(); showAlert('✅ 所有分配已儲存成功！', 'success'); } catch (error) { showAlert('儲存失敗: ' + error.message, 'error'); } finally { showLoading(false); } }
-    function clearAllDistributions() { if (!confirm('確定要清空表格中所有已分配的數量嗎？此操作不會立即儲存，您仍需點擊「儲存分配」。')) return; document.querySelectorAll('.quantity-input').forEach(input => { if (input.value !== '') { input.value = ''; onQuantityChange(input); } }); }
-    function exportToExcel() { if (!selectedMajorItem || detailItems.length === 0) return showAlert('沒有資料可匯出', 'error'); const data = [['項次', '項目名稱', '單位', '總量', ...floors]]; detailItems.forEach(item => { const row = [item.sequence || '', item.name || '', item.unit || '', item.totalQuantity || 0]; const distributedQuantities = {}; distributions.filter(d => d.detailItemId === item.id).forEach(d => { distributedQuantities[d.areaName] = d.quantity; }); floors.forEach(floor => { row.push(distributedQuantities[floor] || 0); }); data.push(row); }); const worksheet = XLSX.utils.aoa_to_sheet(data); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, selectedMajorItem.name); XLSX.writeFile(workbook, `${selectedProject.name}_${selectedTender.name}_${selectedMajorItem.name}_分配表.xlsx`); }
-    function handleFileImport(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const data = new Uint8Array(e.target.result); const workbook = XLSX.read(data, { type: 'array' }); const worksheet = workbook.Sheets[workbook.SheetNames[0]]; const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }); const importedFloors = jsonData[0].slice(4); jsonData.slice(1).forEach(row => { const sequence = row[0]; const targetItem = detailItems.find(item => item.sequence === sequence); if (targetItem) { importedFloors.forEach((floor, index) => { const quantity = parseInt(row[index + 4]) || 0; const input = document.querySelector(`input[data-item-id="${targetItem.id}"][data-floor="${floor}"]`); if (input && quantity > 0) { input.value = quantity; onQuantityChange(input); } }); } }); showAlert('匯入成功！請檢查表格內容並手動儲存。', 'success'); } catch (error) { showAlert('匯入失敗，請檢查檔案格式是否正確。', 'error'); } }; reader.readAsArrayBuffer(file); }
-    function showFloorManager() { if (!selectedTender) return showAlert('請先選擇標單', 'warning'); document.getElementById('currentTenderName').textContent = selectedTender.name; displayCurrentFloors(); document.getElementById('floorModal').style.display = 'flex'; }
-    function displayCurrentFloors() { const container = document.getElementById('currentFloorsList'); container.innerHTML = floors.length === 0 ? '<p>尚未設定樓層</p>' : floors.map((floor, index) => `<div class="floor-tag"><span>${floor}</span><button data-index="${index}" class="remove-floor-btn">&times;</button></div>`).join(''); container.querySelectorAll('.remove-floor-btn').forEach(btn => btn.onclick = () => removeFloor(parseInt(btn.dataset.index))); }
-    function applyFloorTemplate(templateType) { if (defaultFloorTemplates[templateType]) { floors = [...defaultFloorTemplates[templateType]]; displayCurrentFloors(); } }
-    function addCustomFloor() { const input = document.getElementById('newFloorInput'); const value = input.value.trim().toUpperCase(); if (!value) return; if (value.includes('-')) { const [startStr, endStr] = value.split('-'); const startPrefix = (startStr.match(/^([^\d]+)/) || ['',''])[1]; const endPrefix = (endStr.match(/^([^\d]+)/) || ['',''])[1]; const startNum = parseInt(startStr.replace(/^[^\d]+/, '')); const endNum = parseInt(endStr.replace(/^[^\d]+/, '')); if (startPrefix === endPrefix && !isNaN(startNum) && !isNaN(endNum) && startNum <= endNum) { for (let i = startNum; i <= endNum; i++) { const newFloor = `${startPrefix}${i}F`; if (!floors.includes(newFloor)) floors.push(newFloor); } } else { showAlert('範圍格式錯誤，前後綴需相同。例: 1F-10F 或 停1F-停5F', 'error'); } } else { const newFloors = value.split(',').map(f => f.trim()).filter(Boolean); newFloors.forEach(f => { if (!floors.includes(f)) floors.push(f); }); } floors.sort(sortFloors); displayCurrentFloors(); input.value = ''; }
-    function removeFloor(index) { floors.splice(index, 1); displayCurrentFloors(); }
-    function clearAllFloors() { if (confirm('確定清空所有樓層嗎？')) { floors = []; displayCurrentFloors(); } }
-    async function saveFloorSettings() { if (!confirm('確定儲存目前的樓層設定嗎？')) return; showLoading(true, '儲存設定中...'); try { const settingData = { tenderId: selectedTender.id, projectId: selectedProject.id, floors: floors.sort(sortFloors), createdBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }; const query = await db.collection("floorSettings").where("tenderId", "==", selectedTender.id).limit(1).get(); if (!query.empty) { await db.collection("floorSettings").doc(query.docs[0].id).update(settingData); } else { settingData.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("floorSettings").add(settingData); } showAlert('✅ 樓層設定已儲存！', 'success'); if (selectedMajorItem) buildDistributionTable(); closeModal('floorModal'); } catch(error) { showAlert('儲存失敗: ' + error.message, 'error'); } finally { showLoading(false); } }
-    function showSequenceManager() { if (!selectedMajorItem || detailItems.length === 0) return showAlert('沒有細項可調整順序', 'warning'); buildSequenceList(); document.getElementById('sequenceModal').style.display = 'flex'; }
-    function buildSequenceList() { const listContainer = document.getElementById('sequenceList'); listContainer.innerHTML = detailItems.map(item => `<div class="sequence-item" data-id="${item.id}"><input type="text" class="sequence-input" value="${item.sequence || ''}" data-item-id="${item.id}"><span class="sequence-name">${item.name}</span><span class="drag-handle">☰</span></div>`).join(''); if (sortableInstance) sortableInstance.destroy(); sortableInstance = new Sortable(listContainer, { handle: '.drag-handle', animation: 150 }); }
-    async function saveSequenceChanges() { showLoading(true, '儲存順序中...'); try { const batch = db.batch(); const newOrder = Array.from(document.querySelectorAll('.sequence-item')).map((item, index) => ({ id: item.dataset.id, sequence: item.querySelector('.sequence-input').value || (index + 1).toString() })); newOrder.forEach(item => { const docRef = db.collection("detailItems").doc(item.id); batch.update(docRef, { sequence: item.sequence }); }); await batch.commit(); await loadDetailItems(selectedMajorItem.id); buildDistributionTable(); showAlert('✅ 順序已儲存！', 'success'); closeModal('sequenceModal'); } catch (error) { showAlert('儲存順序失敗: ' + error.message, 'error'); } finally { showLoading(false); } }
-    function resetToOriginalOrder() { if (!confirm('這會按照「項目編號」重新排序，確定嗎？')) return; detailItems.sort(naturalSequenceSort); buildSequenceList(); }
-    function hideMainContent() { document.getElementById('mainContent').style.display = 'none'; document.getElementById('emptyState').style.display = 'flex'; }
-    function showMainContent() { document.getElementById('mainContent').style.display = 'block'; document.getElementById('emptyState').style.display = 'none'; }
-    function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length-pB.length; }
+    async function saveAllDistributions() {
+        if (!selectedMajorItem) return showAlert('請先選擇大項目', 'warning');
+        showLoading(true, '儲存中...');
+        try {
+            const batch = db.batch();
+            const existingDistributions = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }]);
+            existingDistributions.docs.forEach(doc => {
+                batch.delete(db.collection("distributionTable").doc(doc.id));
+            });
+            document.querySelectorAll('.quantity-input').forEach(input => {
+                const quantity = parseInt(input.value) || 0;
+                if (quantity > 0) {
+                    const docRef = db.collection("distributionTable").doc();
+                    batch.set(docRef, { tenderId: selectedTender.id, majorItemId: selectedMajorItem.id, detailItemId: input.dataset.itemId, areaType: "樓層", areaName: input.dataset.floor, quantity: quantity, createdBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp(), createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                }
+            });
+            await batch.commit();
+            await loadDistributions(selectedMajorItem.id);
+            buildDistributionTable();
+            showAlert('✅ 所有分配已儲存成功！', 'success');
+        } catch (error) {
+            showAlert('儲存失敗: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function clearAllDistributions() {
+        if (!confirm('確定要清空表格中所有已分配的數量嗎？此操作不會立即儲存，您仍需點擊「儲存分配」。')) return;
+        document.querySelectorAll('.quantity-input').forEach(input => {
+            if (input.value !== '') {
+                input.value = '';
+                onQuantityChange(input);
+            }
+        });
+    }
+
+    function exportToExcel() {
+        if (!selectedMajorItem || detailItems.length === 0) return showAlert('沒有資料可匯出', 'error');
+        const data = [['項次', '項目名稱', '單位', '總量', ...floors]];
+        detailItems.forEach(item => {
+            const originalQuantity = item.totalQuantity || 0;
+            const relatedAdditions = allAdditionItems.filter(add => add.relatedItemId === item.id);
+            const additionalQuantity = relatedAdditions.reduce((sum, add) => sum + (add.totalQuantity || 0), 0);
+            const currentTotalQuantity = originalQuantity + additionalQuantity;
+            const row = [item.sequence || '', item.name || '', item.unit || '', currentTotalQuantity];
+            const distributedQuantities = {};
+            distributions.filter(d => d.detailItemId === item.id).forEach(d => {
+                distributedQuantities[d.areaName] = d.quantity;
+            });
+            floors.forEach(floor => {
+                row.push(distributedQuantities[floor] || 0);
+            });
+            data.push(row);
+        });
+        const worksheet = XLSX.utils.aoa_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, selectedMajorItem.name);
+        XLSX.writeFile(workbook, `${selectedProject.name}_${selectedTender.name}_${selectedMajorItem.name}_分配表.xlsx`);
+    }
+
+    function handleFileImport(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                const importedFloors = jsonData[0].slice(4);
+                jsonData.slice(1).forEach(row => {
+                    const sequence = row[0];
+                    const targetItem = detailItems.find(item => item.sequence === sequence);
+                    if (targetItem) {
+                        importedFloors.forEach((floor, index) => {
+                            const quantity = parseInt(row[index + 4]) || 0;
+                            const input = document.querySelector(`input[data-item-id="${targetItem.id}"][data-floor="${floor}"]`);
+                            if (input && quantity > 0) {
+                                input.value = quantity;
+                                onQuantityChange(input);
+                            }
+                        });
+                    }
+                });
+                showAlert('匯入成功！請檢查表格內容並手動儲存。', 'success');
+            } catch (error) {
+                showAlert('匯入失敗，請檢查檔案格式是否正確。', 'error');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function showFloorManager() {
+        if (!selectedTender) return showAlert('請先選擇標單', 'warning');
+        document.getElementById('currentTenderName').textContent = selectedTender.name;
+        displayCurrentFloors();
+        document.getElementById('floorModal').style.display = 'flex';
+    }
+
+    function displayCurrentFloors() {
+        const container = document.getElementById('currentFloorsList');
+        container.innerHTML = floors.length === 0 ? '<p>尚未設定樓層</p>' : floors.map((floor, index) =>
+            `<div class="floor-tag"><span>${floor}</span><button data-index="${index}" class="remove-floor-btn">&times;</button></div>`
+        ).join('');
+        container.querySelectorAll('.remove-floor-btn').forEach(btn => btn.onclick = () => removeFloor(parseInt(btn.dataset.index)));
+    }
+
+    function applyFloorTemplate(templateType) {
+        if (defaultFloorTemplates[templateType]) {
+            floors = [...defaultFloorTemplates[templateType]];
+            displayCurrentFloors();
+        }
+    }
+
+    function addCustomFloor() {
+        const input = document.getElementById('newFloorInput');
+        const value = input.value.trim().toUpperCase();
+        if (!value) return;
+        if (value.includes('-')) {
+            const [startStr, endStr] = value.split('-');
+            const startPrefix = (startStr.match(/^([^\d]+)/) || ['', ''])[1];
+            const endPrefix = (endStr.match(/^([^\d]+)/) || ['', ''])[1];
+            const startNum = parseInt(startStr.replace(/^[^\d]+/, ''));
+            const endNum = parseInt(endStr.replace(/^[^\d]+/, ''));
+            if (startPrefix === endPrefix && !isNaN(startNum) && !isNaN(endNum) && startNum <= endNum) {
+                for (let i = startNum; i <= endNum; i++) {
+                    const newFloor = `${startPrefix}${i}F`;
+                    if (!floors.includes(newFloor)) floors.push(newFloor);
+                }
+            } else {
+                showAlert('範圍格式錯誤，前後綴需相同。例: 1F-10F 或 停1F-停5F', 'error');
+            }
+        } else {
+            const newFloors = value.split(',').map(f => f.trim()).filter(Boolean);
+            newFloors.forEach(f => {
+                if (!floors.includes(f)) floors.push(f);
+            });
+        }
+        floors.sort(sortFloors);
+        displayCurrentFloors();
+        input.value = '';
+    }
+
+    function removeFloor(index) {
+        floors.splice(index, 1);
+        displayCurrentFloors();
+    }
+
+    function clearAllFloors() {
+        if (confirm('確定清空所有樓層嗎？')) {
+            floors = [];
+            displayCurrentFloors();
+        }
+    }
+
+    async function saveFloorSettings() {
+        if (!confirm('確定儲存目前的樓層設定嗎？')) return;
+        showLoading(true, '儲存設定中...');
+        try {
+            const settingData = { tenderId: selectedTender.id, projectId: selectedProject.id, floors: floors.sort(sortFloors), createdBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+            const query = await db.collection("floorSettings").where("tenderId", "==", selectedTender.id).limit(1).get();
+            if (!query.empty) {
+                await db.collection("floorSettings").doc(query.docs[0].id).update(settingData);
+            } else {
+                settingData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                await db.collection("floorSettings").add(settingData);
+            }
+            showAlert('✅ 樓層設定已儲存！', 'success');
+            if (selectedMajorItem) buildDistributionTable();
+            closeModal('floorModal');
+        } catch(error) {
+            showAlert('儲存失敗: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function showSequenceManager() {
+        if (!selectedMajorItem || detailItems.length === 0) return showAlert('沒有細項可調整順序', 'warning');
+        buildSequenceList();
+        document.getElementById('sequenceModal').style.display = 'flex';
+    }
     
-    // --- 事件綁定 ---
+    function buildSequenceList() {
+        const listContainer = document.getElementById('sequenceList');
+        listContainer.innerHTML = detailItems.map(item =>
+            `<div class="sequence-item" data-id="${item.id}"><input type="text" class="sequence-input" value="${item.sequence || ''}" data-item-id="${item.id}"><span class="sequence-name">${item.name}</span><span class="drag-handle">☰</span></div>`
+        ).join('');
+        if (sortableInstance) sortableInstance.destroy();
+        sortableInstance = new Sortable(listContainer, { handle: '.drag-handle', animation: 150 });
+    }
+
+    async function saveSequenceChanges() {
+        showLoading(true, '儲存順序中...');
+        try {
+            const batch = db.batch();
+            const newOrder = Array.from(document.querySelectorAll('.sequence-item')).map((item, index) => ({ id: item.dataset.id, sequence: item.querySelector('.sequence-input').value || (index + 1).toString() }));
+            newOrder.forEach(item => {
+                const docRef = db.collection("detailItems").doc(item.id);
+                batch.update(docRef, { sequence: item.sequence });
+            });
+            await batch.commit();
+            await loadDetailItems(selectedMajorItem.id);
+            buildDistributionTable();
+            showAlert('✅ 順序已儲存！', 'success');
+            closeModal('sequenceModal');
+        } catch (error) {
+            showAlert('儲存順序失敗: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function resetToOriginalOrder() {
+        if (!confirm('這會按照「項目編號」重新排序，確定嗎？')) return;
+        detailItems.sort(naturalSequenceSort);
+        buildSequenceList();
+    }
+    
+    function hideMainContent() {
+        document.getElementById('mainContent').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'flex';
+    }
+
+    function showMainContent() {
+        document.getElementById('mainContent').style.display = 'block';
+        document.getElementById('emptyState').style.display = 'none';
+    }
+    
+    function naturalSequenceSort(a, b) {
+        const re = /(\d+(\.\d+)?)|(\D+)/g;
+        const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[];
+        for(let i=0; i<Math.min(pA.length, pB.length); i++) {
+            const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]);
+            if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;}
+            else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]);
+        }
+        return pA.length-pB.length;
+    }
+
+    // --- 主流程啟動點 ---
     function setupEventListeners() {
         document.getElementById('projectSelect')?.addEventListener('change', onProjectChange);
         document.getElementById('tenderSelect')?.addEventListener('change', onTenderChange);
@@ -295,7 +523,6 @@ function initDistributionPage() {
         document.getElementById('sequenceModal')?.addEventListener('click', (e) => { if(e.target.id === 'sequenceModal') closeModal('sequenceModal'); });
     }
 
-    // --- 主流程啟動點 ---
     async function initializePage() {
         console.log("🚀 初始化樓層分配頁面...");
         if (!currentUser) return showAlert("無法獲取用戶資訊", "error");
