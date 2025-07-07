@@ -1,9 +1,9 @@
 /**
- * 樓層分配管理系統 (distribution.js) (SPA 版本) - v2.4 修正 onQuantityChange 函數
+ * 樓層分配管理系統 (distribution.js) (SPA 版本) - v2.5 融合修正最終版
  */
 function initDistributionPage() {
     
-    // --- 頁面狀態與設定 ---
+    // --- 頁面級別變數 ---
     let projects = [], tenders = [], majorItems = [], detailItems = [], allAdditionItems = [], distributions = [];
     let selectedProject = null, selectedTender = null, selectedMajorItem = null;
     let floors = [];
@@ -16,7 +16,8 @@ function initDistributionPage() {
         'building': Array.from({ length: 20 }, (_, i) => `${i + 1}F`)
     };
 
-    // --- 【所有函數定義區】---
+    // --- 所有函數定義區 ---
+
     function showLoading(isLoading, message='載入中...') {
         const loadingEl = document.querySelector('.loading'); 
         if(loadingEl) {
@@ -45,156 +46,199 @@ function initDistributionPage() {
         return partsA.num - partsB.num;
     }
 
-    async function loadProjects() { /* ... 內容與前版相同 ... */ }
-    async function loadTenders(projectId) { /* ... 內容與前版相同 ... */ }
-    async function loadMajorItems(tenderId) { /* ... 內容與前版相同 ... */ }
-    async function loadFloorSettings(tenderId) { /* ... 內容與前版相同 ... */ }
-    async function loadDetailItems(majorItemId) { /* ... 內容與前版相同 ... */ }
-    async function loadDistributions(majorItemId) { /* ... 內容與前版相同 ... */ }
-    
-// 修正後的 onQuantityChange 函數
-function onQuantityChange(inputElement) {
-    const itemId = inputElement.dataset.itemId;
-    const rowInputs = document.querySelectorAll(`input[data-item-id="${itemId}"]`);
-    const distributedCell = document.getElementById(`distributed-${itemId}`);
-    
-    // 如果找不到對應的儲存格，直接返回，避免錯誤
-    if (!distributedCell) {
-        console.warn(`找不到分配儲存格: distributed-${itemId}`);
-        return;
+    async function loadProjects() {
+        showLoading(true, '載入專案中...');
+        try {
+            const projectDocs = await safeFirestoreQuery("projects", [{ field: "createdBy", operator: "==", value: currentUser.email }], { field: "name", direction: "asc" });
+            projects = projectDocs.docs;
+            const projectSelect = document.getElementById('projectSelect');
+            projectSelect.innerHTML = '<option value="">請選擇專案...</option>';
+            projects.forEach(project => projectSelect.innerHTML += `<option value="${project.id}">${project.name}</option>`);
+        } catch (error) {
+            showAlert('載入專案失敗', 'error');
+        } finally {
+            showLoading(false);
+        }
     }
 
-    // 尋找 strong 標籤，如果不存在就創建一個
-    let strongTag = distributedCell.querySelector('strong');
-    if (!strongTag) {
-        console.warn(`找不到 strong 標籤，嘗試創建新的`);
-        // 如果沒有 strong 標籤，創建一個並包裝現有內容
-        strongTag = document.createElement('strong');
-        // 將現有的文字內容移到 strong 標籤中
-        strongTag.textContent = distributedCell.textContent || '0';
-        distributedCell.innerHTML = '';
-        distributedCell.appendChild(strongTag);
+    async function loadTenders(projectId) {
+        const tenderSelect = document.getElementById('tenderSelect');
+        tenderSelect.innerHTML = '<option value="">載入中...</option>';
+        tenderSelect.disabled = true;
+        try {
+            const tenderDocs = await safeFirestoreQuery("tenders", [{ field: "projectId", operator: "==", value: projectId }, { field: "createdBy", operator: "==", value: currentUser.email }], { field: "name", direction: "asc" });
+            tenders = tenderDocs.docs;
+            tenderSelect.innerHTML = '<option value="">請選擇標單...</option>';
+            tenders.forEach(tender => tenderSelect.innerHTML += `<option value="${tender.id}">${tender.name}</option>`);
+            tenderSelect.disabled = false;
+        } catch (error) {
+            showAlert('載入標單失敗', 'error');
+            tenderSelect.innerHTML = '<option value="">載入失敗</option>';
+        }
     }
 
-    const itemRow = distributedCell.closest('tr');
-    if (!itemRow) {
-        console.warn(`找不到項目行`);
-        return;
+    async function loadMajorItems(tenderId) {
+        const majorItemSelect = document.getElementById('majorItemSelect');
+        majorItemSelect.innerHTML = '<option value="">載入中...</option>';
+        majorItemSelect.disabled = true;
+        try {
+            const majorItemDocs = await safeFirestoreQuery("majorItems", [{ field: "tenderId", operator: "==", value: tenderId }], { field: "name", direction: "asc" });
+            majorItems = majorItemDocs.docs;
+            majorItemSelect.innerHTML = '<option value="">請選擇大項目...</option>';
+            majorItems.forEach(item => majorItemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`);
+            majorItemSelect.disabled = false;
+        } catch (error) {
+            showAlert('載入大項目失敗', 'error');
+            majorItemSelect.innerHTML = '<option value="">載入失敗</option>';
+        }
     }
 
-    const totalQuantity = parseFloat(itemRow.dataset.totalQuantity) || 0;
-    
-    // 計算當前已分配的總量
-    const currentDistributed = Array.from(rowInputs).reduce((sum, input) => {
-        const value = Number(input.value) || 0;
-        return sum + value;
-    }, 0);
-    
-    // 更新 strong 標籤內的文字
-    strongTag.textContent = currentDistributed;
-    
-    // 根據是否超量來添加或移除錯誤樣式
-    if (currentDistributed > totalQuantity) {
-        distributedCell.classList.add('error');
-    } else {
-        distributedCell.classList.remove('error');
+    async function loadFloorSettings(tenderId) {
+        try {
+            const snapshot = await db.collection("floorSettings").where("tenderId", "==", tenderId).limit(1).get();
+            floors = snapshot.empty ? [] : (snapshot.docs[0].data().floors || []).sort(sortFloors);
+        } catch (error) {
+            console.error("載入樓層設定失敗", error);
+            floors = [];
+        }
     }
-}
 
-// 同時修正 buildDistributionTable 函數中的相關部分
-function buildDistributionTable() {
-    const tableHeader = document.getElementById('tableHeader');
-    const tableBody = document.getElementById('tableBody');
+    async function loadDetailItems(majorItemId) {
+        const detailItemDocs = await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: majorItemId }]);
+        detailItems = detailItemDocs.docs.sort(naturalSequenceSort);
+    }
     
-    // 建立表格標題
-    let headerHTML = '<tr><th style="width: 300px;">細項名稱</th><th class="total-column">總量</th>';
-    floors.forEach(floor => headerHTML += `<th class="floor-header">${floor}</th>`);
-    headerHTML += '<th class="total-column">已分配</th></tr>';
-    tableHeader.innerHTML = headerHTML;
+    async function loadDistributions(majorItemId) {
+        const distributionDocs = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: majorItemId }]);
+        distributions = distributionDocs.docs;
+    }
+
+    async function loadAllAdditionItems(tenderId) {
+        const additionDocs = await safeFirestoreQuery("detailItems", [
+            { field: "tenderId", operator: "==", value: tenderId },
+            { field: "isAddition", operator: "==", value: true }
+        ]);
+        allAdditionItems = additionDocs.docs;
+    }
     
-    let bodyHTML = '';
-    if (detailItems.length === 0) {
-        bodyHTML = `<tr><td colspan="${floors.length + 3}" style="text-align:center; padding: 2rem;">此大項目沒有細項資料</td></tr>`;
-    } else {
-        detailItems.forEach((item, index) => {
-            const originalQuantity = item.totalQuantity || 0;
-            const relatedAdditions = allAdditionItems.filter(add => add.relatedItemId === item.id);
-            const additionalQuantity = relatedAdditions.reduce((sum, add) => sum + (add.totalQuantity || 0), 0);
-            const currentTotalQuantity = originalQuantity + additionalQuantity;
-            
-            let distributedQuantity = 0;
-            let rowHTML = `<tr class="item-row" data-total-quantity="${currentTotalQuantity}" data-item-id="${item.id}">`;
-            
-            // 項目名稱欄
-            rowHTML += `<td><div class="item-info">
-                <div class="item-name">${item.sequence || `#${index + 1}`}. ${item.name || '未命名'}</div>
-                <div class="item-details">單位: ${item.unit || '-'} | 單價: ${formatCurrency(item.unitPrice || 0)}</div>
-            </div></td>`;
-            
-            // 總量欄
-            rowHTML += `<td class="total-column" id="total-qty-${item.id}"><strong>${currentTotalQuantity}</strong></td>`;
-            
-            // 樓層分配欄位
-            floors.forEach(floor => {
-                const dist = distributions.find(d => d.detailItemId === item.id && d.areaName === floor);
-                const quantity = dist ? dist.quantity : 0;
-                distributedQuantity += quantity;
-                rowHTML += `<td><input type="number" class="quantity-input ${quantity > 0 ? 'has-value' : ''}" 
-                    value="${quantity || ''}" min="0" 
-                    data-item-id="${item.id}" 
-                    data-floor="${floor}" 
-                    placeholder="0"></td>`;
+    // --- 【關鍵修正】: 採用 Claude 建議的、更穩健的 onQuantityChange 函數 ---
+    function onQuantityChange(inputElement) {
+        const itemId = inputElement.dataset.itemId;
+        const rowInputs = document.querySelectorAll(`input[data-item-id="${itemId}"]`);
+        const distributedCell = document.getElementById(`distributed-${itemId}`);
+        
+        if (!distributedCell) return;
+
+        let strongTag = distributedCell.querySelector('strong');
+        if (!strongTag) {
+            strongTag = document.createElement('strong');
+            strongTag.textContent = distributedCell.textContent || '0';
+            distributedCell.innerHTML = '';
+            distributedCell.appendChild(strongTag);
+        }
+
+        const itemRow = distributedCell.closest('tr');
+        if (!itemRow) return;
+
+        const totalQuantity = parseFloat(itemRow.dataset.totalQuantity) || 0;
+        
+        const currentDistributed = Array.from(rowInputs).reduce((sum, input) => {
+            return sum + (Number(input.value) || 0);
+        }, 0);
+        
+        strongTag.textContent = currentDistributed;
+        
+        if (currentDistributed > totalQuantity) {
+            distributedCell.classList.add('error');
+        } else {
+            distributedCell.classList.remove('error');
+        }
+    }
+
+    function buildDistributionTable() {
+        const tableHeader = document.getElementById('tableHeader');
+        const tableBody = document.getElementById('tableBody');
+        let headerHTML = '<tr><th style="width: 300px;">細項名稱</th><th class="total-column">總量</th>';
+        floors.forEach(floor => headerHTML += `<th class="floor-header">${floor}</th>`);
+        headerHTML += '<th class="total-column">已分配</th></tr>';
+        tableHeader.innerHTML = headerHTML;
+        let bodyHTML = '';
+        if (detailItems.length === 0) {
+            bodyHTML = `<tr><td colspan="${floors.length + 3}" style="text-align:center; padding: 2rem;">此大項目沒有細項資料</td></tr>`;
+        } else {
+            detailItems.forEach((item, index) => {
+                const originalQuantity = item.totalQuantity || 0;
+                const relatedAdditions = allAdditionItems.filter(add => add.relatedItemId === item.id);
+                const additionalQuantity = relatedAdditions.reduce((sum, add) => sum + (add.totalQuantity || 0), 0);
+                const currentTotalQuantity = originalQuantity + additionalQuantity;
+                let distributedQuantity = 0;
+                let rowHTML = `<tr class="item-row" data-total-quantity="${currentTotalQuantity}" data-item-id="${item.id}">`;
+                rowHTML += `<td><div class="item-info"><div class="item-name">${item.sequence || `#${index + 1}`}. ${item.name || '未命名'}</div><div class="item-details">單位: ${item.unit || '-'} | 單價: ${formatCurrency(item.unitPrice || 0)}</div></div></td>`;
+                rowHTML += `<td class="total-column" id="total-qty-${item.id}"><strong>${currentTotalQuantity}</strong></td>`;
+                floors.forEach(floor => {
+                    const dist = distributions.find(d => d.detailItemId === item.id && d.areaName === floor);
+                    const quantity = dist ? dist.quantity : 0;
+                    distributedQuantity += quantity;
+                    rowHTML += `<td><input type="number" class="quantity-input ${quantity > 0 ? 'has-value' : ''}" value="${quantity || ''}" min="0" data-item-id="${item.id}" data-floor="${floor}" placeholder="0"></td>`;
+                });
+                const errorClass = distributedQuantity > currentTotalQuantity ? 'error' : '';
+                rowHTML += `<td class="total-column ${errorClass}" id="distributed-${item.id}"><strong>${distributedQuantity}</strong></td>`;
+                rowHTML += '</tr>';
+                bodyHTML += rowHTML;
             });
-            
-            // 已分配總量欄 - 確保 strong 標籤存在
-            const errorClass = distributedQuantity > currentTotalQuantity ? 'error' : '';
-            rowHTML += `<td class="total-column ${errorClass}" id="distributed-${item.id}"><strong>${distributedQuantity}</strong></td>`;
-            
-            rowHTML += '</tr>';
-            bodyHTML += rowHTML;
+        }
+        tableBody.innerHTML = bodyHTML;
+        tableBody.querySelectorAll('.quantity-input').forEach(input => {
+            input.addEventListener('input', () => onQuantityChange(input));
+            input.addEventListener('change', () => onQuantityChange(input));
         });
     }
-    
-    tableBody.innerHTML = bodyHTML;
-    
-    // 為所有數量輸入框添加事件監聽器
-    tableBody.querySelectorAll('.quantity-input').forEach(input => {
-        input.addEventListener('input', () => onQuantityChange(input));
-        input.addEventListener('change', () => onQuantityChange(input));
-    });
-}
 
-    function setupEventListeners() {
-        document.getElementById('projectSelect')?.addEventListener('change', onProjectChange);
-        document.getElementById('tenderSelect')?.addEventListener('change', onTenderChange);
-        document.getElementById('majorItemSelect')?.addEventListener('change', onMajorItemChange);
-        document.getElementById('saveDistributionsBtn')?.addEventListener('click', saveAllDistributions);
-        document.getElementById('clearDistributionsBtn')?.addEventListener('click', clearAllDistributions);
-        document.getElementById('importBtn')?.addEventListener('click', () => document.getElementById('importInput').click());
-        document.getElementById('importInput')?.addEventListener('change', handleFileImport);
-        document.getElementById('exportBtn')?.addEventListener('click', exportToExcel);
-        document.getElementById('sequenceManagerBtn')?.addEventListener('click', showSequenceManager);
-        document.getElementById('floorManagerBtn')?.addEventListener('click', showFloorManager);
-        document.getElementById('templateButtons')?.addEventListener('click', (e) => {
-            if (e.target.tagName === 'BUTTON') applyFloorTemplate(e.target.dataset.template);
-        });
-        document.getElementById('addCustomFloorBtn')?.addEventListener('click', addCustomFloor);
-        document.getElementById('clearAllFloorsBtn')?.addEventListener('click', clearAllFloors);
-        document.getElementById('saveFloorSettingsBtn')?.addEventListener('click', saveFloorSettings);
-        document.getElementById('cancelFloorModalBtn')?.addEventListener('click', () => closeModal('floorModal'));
-        document.getElementById('floorModal')?.addEventListener('click', (e) => { if(e.target.id === 'floorModal') closeModal('floorModal'); });
-        document.getElementById('resetOrderBtn')?.addEventListener('click', resetToOriginalOrder);
-        document.getElementById('saveSequenceBtn')?.addEventListener('click', saveSequenceChanges);
-        document.getElementById('cancelSequenceModalBtn')?.addEventListener('click', () => closeModal('sequenceModal'));
-        document.getElementById('sequenceModal')?.addEventListener('click', (e) => { if(e.target.id === 'sequenceModal') closeModal('sequenceModal'); });
+    async function loadMajorItemData(majorItemId) {
+        showLoading(true, '載入大項目資料中...');
+        try {
+            await Promise.all([
+                loadFloorSettings(selectedTender.id),
+                loadAllAdditionItems(selectedTender.id),
+                loadDetailItems(majorItemId),
+                loadDistributions(majorItemId)
+            ]);
+            showMainContent();
+            buildDistributionTable();
+        } catch (error) {
+            showAlert('載入大項目資料時發生錯誤', 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function onProjectChange() {
+        const projectId = document.getElementById('projectSelect').value;
+        document.getElementById('tenderSelect').disabled = true;
+        document.getElementById('majorItemSelect').disabled = true;
+        hideMainContent();
+        if (!projectId) return;
+        selectedProject = projects.find(p => p.id === projectId);
+        loadTenders(projectId);
+    }
+
+    function onTenderChange() {
+        const tenderId = document.getElementById('tenderSelect').value;
+        document.getElementById('majorItemSelect').disabled = true;
+        hideMainContent();
+        if (!tenderId) return;
+        selectedTender = tenders.find(t => t.id === tenderId);
+        loadMajorItems(tenderId);
+    }
+
+    function onMajorItemChange() {
+        const majorItemId = document.getElementById('majorItemSelect').value;
+        if (!majorItemId) { hideMainContent(); return; }
+        selectedMajorItem = majorItems.find(m => m.id === majorItemId);
+        loadMajorItemData(majorItemId);
     }
     
-    // (以下所有函數的實現都已補全)
-    async function loadProjects() { showLoading(true, '載入專案中...'); try { const projectDocs = await safeFirestoreQuery("projects", [{ field: "createdBy", operator: "==", value: currentUser.email }], { field: "name", direction: "asc" }); projects = projectDocs.docs; const projectSelect = document.getElementById('projectSelect'); projectSelect.innerHTML = '<option value="">請選擇專案...</option>'; projects.forEach(project => projectSelect.innerHTML += `<option value="${project.id}">${project.name}</option>`); } catch (error) { showAlert('載入專案失敗', 'error'); } finally { showLoading(false); } }
-    async function loadTenders(projectId) { const tenderSelect = document.getElementById('tenderSelect'); tenderSelect.innerHTML = '<option value="">載入中...</option>'; tenderSelect.disabled = true; try { const tenderDocs = await safeFirestoreQuery("tenders", [{ field: "projectId", operator: "==", value: projectId }, { field: "createdBy", operator: "==", value: currentUser.email }], { field: "name", direction: "asc" }); tenders = tenderDocs.docs; tenderSelect.innerHTML = '<option value="">請選擇標單...</option>'; tenders.forEach(tender => tenderSelect.innerHTML += `<option value="${tender.id}">${tender.name}</option>`); tenderSelect.disabled = false; } catch (error) { showAlert('載入標單失敗', 'error'); tenderSelect.innerHTML = '<option value="">載入失敗</option>'; } }
-    async function loadMajorItems(tenderId) { const majorItemSelect = document.getElementById('majorItemSelect'); majorItemSelect.innerHTML = '<option value="">載入中...</option>'; majorItemSelect.disabled = true; try { const majorItemDocs = await safeFirestoreQuery("majorItems", [{ field: "tenderId", operator: "==", value: tenderId }], { field: "name", direction: "asc" }); majorItems = majorItemDocs.docs; majorItemSelect.innerHTML = '<option value="">請選擇大項目...</option>'; majorItems.forEach(item => majorItemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`); majorItemSelect.disabled = false; } catch (error) { showAlert('載入大項目失敗', 'error'); majorItemSelect.innerHTML = '<option value="">載入失敗</option>'; } }
-    async function loadDetailItems(majorItemId) { const detailItemDocs = await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: majorItemId }]); detailItems = detailItemDocs.docs.sort(naturalSequenceSort); }
-    async function loadDistributions(majorItemId) { const distributionDocs = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: majorItemId }]); distributions = distributionDocs.docs; }
+    // --- 其他所有函數的完整實現 ---
     async function saveAllDistributions() { if (!selectedMajorItem) return showAlert('請先選擇大項目', 'warning'); showLoading(true, '儲存中...'); try { const batch = db.batch(); const existingDistributions = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }]); existingDistributions.docs.forEach(doc => { batch.delete(db.collection("distributionTable").doc(doc.id)); }); document.querySelectorAll('.quantity-input').forEach(input => { const quantity = parseInt(input.value) || 0; if (quantity > 0) { const docRef = db.collection("distributionTable").doc(); batch.set(docRef, { tenderId: selectedTender.id, majorItemId: selectedMajorItem.id, detailItemId: input.dataset.itemId, areaType: "樓層", areaName: input.dataset.floor, quantity: quantity, createdBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp(), createdAt: firebase.firestore.FieldValue.serverTimestamp() }); } }); await batch.commit(); await loadDistributions(selectedMajorItem.id); buildDistributionTable(); showAlert('✅ 所有分配已儲存成功！', 'success'); } catch (error) { showAlert('儲存失敗: ' + error.message, 'error'); } finally { showLoading(false); } }
     function clearAllDistributions() { if (!confirm('確定要清空表格中所有已分配的數量嗎？此操作不會立即儲存，您仍需點擊「儲存分配」。')) return; document.querySelectorAll('.quantity-input').forEach(input => { if (input.value !== '') { input.value = ''; onQuantityChange(input); } }); }
     function exportToExcel() { if (!selectedMajorItem || detailItems.length === 0) return showAlert('沒有資料可匯出', 'error'); const data = [['項次', '項目名稱', '單位', '總量', ...floors]]; detailItems.forEach(item => { const row = [item.sequence || '', item.name || '', item.unit || '', item.totalQuantity || 0]; const distributedQuantities = {}; distributions.filter(d => d.detailItemId === item.id).forEach(d => { distributedQuantities[d.areaName] = d.quantity; }); floors.forEach(floor => { row.push(distributedQuantities[floor] || 0); }); data.push(row); }); const worksheet = XLSX.utils.aoa_to_sheet(data); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, selectedMajorItem.name); XLSX.writeFile(workbook, `${selectedProject.name}_${selectedTender.name}_${selectedMajorItem.name}_分配表.xlsx`); }
@@ -215,4 +259,6 @@ function buildDistributionTable() {
     function showMainContent() { document.getElementById('mainContent').style.display = 'block'; document.getElementById('emptyState').style.display = 'none'; }
     function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length-pB.length; }
 
+    // 主流程啟動點
+    initializePage();
 }
