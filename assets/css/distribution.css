@@ -40,57 +40,69 @@
 
 /* 【修復】按鈕顏色樣式 */
 .btn-success {
-    background: linear-gradient(135deg, #28a745, #20c997);
-    color: white;
+    background-color: #28a745 !important;
+    background: linear-gradient(135deg, #28a745, #20c997) !important;
+    color: white !important;
 }
 
 .btn-success:hover {
-    background: linear-gradient(135deg, #218838, #1ea080);
+    background-color: #218838 !important;
+    background: linear-gradient(135deg, #218838, #1ea080) !important;
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #007bff, #6610f2);
-    color: white;
+    background-color: #007bff !important;
+    background: linear-gradient(135deg, #007bff, #6610f2) !important;
+    color: white !important;
 }
 
 .btn-primary:hover {
-    background: linear-gradient(135deg, #0056b3, #520dc2);
+    background-color: #0056b3 !important;
+    background: linear-gradient(135deg, #0056b3, #520dc2) !important;
 }
 
 .btn-info {
-    background: linear-gradient(135deg, #17a2b8, #6f42c1);
-    color: white;
+    background-color: #17a2b8 !important;
+    background: linear-gradient(135deg, #17a2b8, #6f42c1) !important;
+    color: white !important;
 }
 
 .btn-info:hover {
-    background: linear-gradient(135deg, #138496, #59359a);
+    background-color: #138496 !important;
+    background: linear-gradient(135deg, #138496, #59359a) !important;
 }
 
 .btn-warning {
-    background: linear-gradient(135deg, #ffc107, #fd7e14);
-    color: #212529;
+    background-color: #ffc107 !important;
+    background: linear-gradient(135deg, #ffc107, #fd7e14) !important;
+    color: #212529 !important;
 }
 
 .btn-warning:hover {
-    background: linear-gradient(135deg, #e0a800, #e8590c);
+    background-color: #e0a800 !important;
+    background: linear-gradient(135deg, #e0a800, #e8590c) !important;
 }
 
 .btn-danger {
-    background: linear-gradient(135deg, #dc3545, #e83e8c);
-    color: white;
+    background-color: #dc3545 !important;
+    background: linear-gradient(135deg, #dc3545, #e83e8c) !important;
+    color: white !important;
 }
 
 .btn-danger:hover {
-    background: linear-gradient(135deg, #c82333, #d91a72);
+    background-color: #c82333 !important;
+    background: linear-gradient(135deg, #c82333, #d91a72) !important;
 }
 
 .btn-secondary {
-    background: linear-gradient(135deg, #6c757d, #adb5bd);
-    color: white;
+    background-color: #6c757d !important;
+    background: linear-gradient(135deg, #6c757d, #adb5bd) !important;
+    color: white !important;
 }
 
 .btn-secondary:hover {
-    background: linear-gradient(135deg, #5a6268, #919ca6);
+    background-color: #5a6268 !important;
+    background: linear-gradient(135deg, #5a6268, #919ca6) !important;
 }
 
 /* 【修復】特殊按鈕樣式 */
@@ -103,14 +115,16 @@
 .template-buttons .btn {
     min-width: 130px;
     margin-bottom: 10px;
-    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-    color: #495057;
-    border: 1px solid #dee2e6;
+    background-color: #f8f9fa !important;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef) !important;
+    color: #495057 !important;
+    border: 1px solid #dee2e6 !important;
 }
 
 .template-buttons .btn:hover {
-    background: linear-gradient(135deg, #e9ecef, #dee2e6);
-    border-color: #adb5bd;
+    background-color: #e9ecef !important;
+    background: linear-gradient(135deg, #e9ecef, #dee2e6) !important;
+    border-color: #adb5bd !important;
 }
 
 .table-container { flex-grow: 1; overflow: auto; border: 1px solid #dee2e6; border-radius: 12px; }
