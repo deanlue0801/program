@@ -1,5 +1,5 @@
 /**
- * EXCEL 匯入頁面 (tenders/import.js) (SPA 版本) - v2.1 空白列過濾修正
+ * EXCEL 匯入頁面 (tenders/import.js) (SPA 版本) - v2.2 新增天干地支規則
  * 由 router.js 呼叫 initImportPage() 函數來啟動
  */
 function initImportPage() {
@@ -9,15 +9,11 @@ function initImportPage() {
     let workbook = null;
     let parsedData = [];
     let projects = [];
-    const chineseNumbers = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10 };
-    const romanNumbers = { 'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5, 'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10 };
 
     // --- 初始化與事件綁定 ---
-
     function initializePage() {
         console.log("🚀 初始化 EXCEL 匯入頁面...");
         if (!currentUser) return showAlert("無法獲取用戶資訊", "error");
-
         setupEventListeners();
         loadProjects();
     }
@@ -43,13 +39,13 @@ function initImportPage() {
             if (customPatternGroup) customPatternGroup.style.display = customPatternCheckbox.checked ? 'block' : 'none';
         };
         
-        document.querySelector('button[onclick*="parseExcel"]')?.addEventListener('click', parseExcel);
-        document.querySelector('button[onclick*="backToUpload"]')?.addEventListener('click', backToUpload);
-        document.querySelector('button[onclick*="proceedToImport"]')?.addEventListener('click', proceedToImport);
-        document.querySelector('button[onclick*="backToPreview"]')?.addEventListener('click', backToPreview);
-        document.querySelector('button[onclick*="executeImport"]')?.addEventListener('click', executeImport);
-        document.querySelector('button[onclick*="autoDetectMajorItems"]')?.addEventListener('click', autoDetectMajorItems);
-        document.querySelector('button[onclick*="clearAllClassifications"]')?.addEventListener('click', clearAllClassifications);
+        document.getElementById('parseBtn')?.addEventListener('click', parseExcel);
+        document.getElementById('backToUploadBtn')?.addEventListener('click', backToUpload);
+        document.getElementById('proceedToImportBtn')?.addEventListener('click', proceedToImport);
+        document.getElementById('backToPreviewBtn')?.addEventListener('click', backToPreview);
+        document.getElementById('executeImportBtn')?.addEventListener('click', executeImport);
+        document.getElementById('re-detectBtn')?.addEventListener('click', autoDetectMajorItems);
+        document.getElementById('clear-classBtn')?.addEventListener('click', clearAllClassifications);
     }
     
     function parseCurrency(value) {
@@ -60,7 +56,6 @@ function initImportPage() {
     }
 
     // --- 核心邏輯 ---
-
     async function loadProjects() {
         try {
             showLoading(true, '載入專案列表...');
@@ -133,19 +128,13 @@ function initImportPage() {
 
             jsonData.forEach((row, index) => {
                 const itemName = row[1] ? String(row[1]).trim() : '';
-
-                // --- 【關鍵修正】: 只有當「項目名稱」欄位 (B欄) 有內容時，才處理這一行 ---
-                if (!itemName) {
-                    return; // 如果項目名稱是空的，就直接跳過這一行
-                }
+                if (!itemName) return;
                 
                 const quantity = parseFloat(row[3]) || 0;
                 const unitPrice = parseCurrency(row[4]);
                 let totalPrice = parseCurrency(row[5]);
                 
-                if (totalPrice === 0 && quantity > 0 && unitPrice > 0) {
-                    totalPrice = quantity * unitPrice;
-                }
+                if (totalPrice === 0 && quantity > 0 && unitPrice > 0) totalPrice = quantity * unitPrice;
 
                 const rowData = {
                     rowNumber: startRow + index, type: 'other', sequence: row[0] || '', name: itemName,
@@ -177,7 +166,10 @@ function initImportPage() {
     function isMajorItem(name, sequence) {
         if (!name && !sequence) return false;
         const text = (String(sequence) + ' ' + name).trim();
+        
         if (document.getElementById('ruleChineseNumber').checked && /^[一二三四五六七八九十]/.test(text)) return true;
+        // --- 【關鍵修正】: 新增對天干地支的判斷規則 ---
+        if (document.getElementById('ruleHeavenlyStem').checked && /^[甲乙丙丁戊己庚辛壬癸]/.test(text)) return true;
         if (document.getElementById('ruleRomanNumber').checked && /^[IVX]+\.?\s/.test(text)) return true;
         if (document.getElementById('ruleCustomPattern').checked) {
             const pattern = document.getElementById('customPattern').value;
@@ -187,8 +179,6 @@ function initImportPage() {
     }
 
     function updatePreview() {
-        const tableBody = document.querySelector('#previewTable tbody');
-        tableBody.innerHTML = '';
         let totalAmount = 0, majorCount = 0, detailCount = 0;
         const previewTable = document.getElementById('previewTable');
         previewTable.innerHTML = `
@@ -319,6 +309,7 @@ function initImportPage() {
     function backToUpload() {
         setActiveStep(1);
         document.getElementById('parseSection').style.display = 'none';
+        document.getElementById('previewSection').style.display = 'none';
         document.getElementById('uploadSection').style.display = 'block';
         selectedFile = workbook = null;
         parsedData = [];
