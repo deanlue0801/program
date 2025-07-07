@@ -1,5 +1,5 @@
 /**
- * 編輯標單頁面 (tenders-edit.js) - v6.2 修正 init 啟動錯誤
+ * 編輯標單頁面 (tenders-edit.js) - v6.3 修正函數定義順序
  */
 function initTenderEditPage() {
     // --- 頁面級別變數 ---
@@ -7,6 +7,7 @@ function initTenderEditPage() {
     let allExpanded = true;
 
     // --- 渲染輔助函數 (*** 所有小功能先在這裡定義好 ***) ---
+
     function renderTenderHeader() {
         const container = document.getElementById('tender-header-container');
         if (!container) return;
@@ -281,6 +282,20 @@ function initTenderEditPage() {
 
     function showLoading(isLoading) { document.getElementById('loading').style.display = isLoading ? 'flex' : 'none'; document.getElementById('editTenderContent').style.display = isLoading ? 'none' : 'block'; }
     function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length-pB.length; }
+    
+    // --- 資料載入函數 ---
+    async function loadAllData() {
+        const tenderDoc = await db.collection('tenders').doc(tenderId).get();
+        if (!tenderDoc.exists) throw new Error('找不到指定的標單');
+        currentTender = { id: tenderDoc.id, ...tenderDoc.data() };
+        const [majorItemsData, allDetailItemsData] = await Promise.all([
+            safeFirestoreQuery('majorItems', [{ field: 'tenderId', operator: '==', value: tenderId }]),
+            safeFirestoreQuery('detailItems', [{ field: 'tenderId', operator: '==', value: tenderId }])
+        ]);
+        majorItems = majorItemsData.docs.sort(naturalSequenceSort);
+        detailItems = allDetailItemsData.docs.filter(item => !item.isAddition).sort(naturalSequenceSort);
+        additionItems = allDetailItemsData.docs.filter(item => item.isAddition).sort((a,b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+    }
     
     // --- 頁面啟動點 (*** 將所有啟動邏輯都包在 init 函數中 ***) ---
     async function init() {
