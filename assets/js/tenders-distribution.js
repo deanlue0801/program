@@ -1,5 +1,5 @@
 /**
- * 樓層分配管理系統 (distribution.js) (SPA 版本) - v2.5 融合修正最終版
+ * 樓層分配管理系統 (distribution.js) (SPA 版本) - v2.4 修正函數定義順序
  */
 function initDistributionPage() {
     
@@ -16,7 +16,8 @@ function initDistributionPage() {
         'building': Array.from({ length: 20 }, (_, i) => `${i + 1}F`)
     };
 
-    // --- 所有函數定義區 ---
+    // --- 【所有函數定義區】---
+    // (將所有函數定義都放在主流程之前，確保不會再出現 ReferenceError)
 
     function showLoading(isLoading, message='載入中...') {
         const loadingEl = document.querySelector('.loading'); 
@@ -92,7 +93,7 @@ function initDistributionPage() {
             majorItemSelect.innerHTML = '<option value="">載入失敗</option>';
         }
     }
-
+    
     async function loadFloorSettings(tenderId) {
         try {
             const snapshot = await db.collection("floorSettings").where("tenderId", "==", tenderId).limit(1).get();
@@ -121,12 +122,10 @@ function initDistributionPage() {
         allAdditionItems = additionDocs.docs;
     }
     
-    // --- 【關鍵修正】: 採用 Claude 建議的、更穩健的 onQuantityChange 函數 ---
     function onQuantityChange(inputElement) {
         const itemId = inputElement.dataset.itemId;
         const rowInputs = document.querySelectorAll(`input[data-item-id="${itemId}"]`);
         const distributedCell = document.getElementById(`distributed-${itemId}`);
-        
         if (!distributedCell) return;
 
         let strongTag = distributedCell.querySelector('strong');
@@ -238,7 +237,36 @@ function initDistributionPage() {
         loadMajorItemData(majorItemId);
     }
     
-    // --- 其他所有函數的完整實現 ---
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) modal.style.display = 'none';
+    }
+
+    function setupEventListeners() {
+        document.getElementById('projectSelect')?.addEventListener('change', onProjectChange);
+        document.getElementById('tenderSelect')?.addEventListener('change', onTenderChange);
+        document.getElementById('majorItemSelect')?.addEventListener('change', onMajorItemChange);
+        document.getElementById('saveDistributionsBtn')?.addEventListener('click', saveAllDistributions);
+        document.getElementById('clearDistributionsBtn')?.addEventListener('click', clearAllDistributions);
+        document.getElementById('importBtn')?.addEventListener('click', () => document.getElementById('importInput').click());
+        document.getElementById('importInput')?.addEventListener('change', handleFileImport);
+        document.getElementById('exportBtn')?.addEventListener('click', exportToExcel);
+        document.getElementById('sequenceManagerBtn')?.addEventListener('click', showSequenceManager);
+        document.getElementById('floorManagerBtn')?.addEventListener('click', showFloorManager);
+        document.getElementById('templateButtons')?.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') applyFloorTemplate(e.target.dataset.template);
+        });
+        document.getElementById('addCustomFloorBtn')?.addEventListener('click', addCustomFloor);
+        document.getElementById('clearAllFloorsBtn')?.addEventListener('click', clearAllFloors);
+        document.getElementById('saveFloorSettingsBtn')?.addEventListener('click', saveFloorSettings);
+        document.getElementById('cancelFloorModalBtn')?.addEventListener('click', () => closeModal('floorModal'));
+        document.getElementById('floorModal')?.addEventListener('click', (e) => { if(e.target.id === 'floorModal') closeModal('floorModal'); });
+        document.getElementById('resetOrderBtn')?.addEventListener('click', resetToOriginalOrder);
+        document.getElementById('saveSequenceBtn')?.addEventListener('click', saveSequenceChanges);
+        document.getElementById('cancelSequenceModalBtn')?.addEventListener('click', () => closeModal('sequenceModal'));
+        document.getElementById('sequenceModal')?.addEventListener('click', (e) => { if(e.target.id === 'sequenceModal') closeModal('sequenceModal'); });
+    }
+    
     async function saveAllDistributions() { if (!selectedMajorItem) return showAlert('請先選擇大項目', 'warning'); showLoading(true, '儲存中...'); try { const batch = db.batch(); const existingDistributions = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }]); existingDistributions.docs.forEach(doc => { batch.delete(db.collection("distributionTable").doc(doc.id)); }); document.querySelectorAll('.quantity-input').forEach(input => { const quantity = parseInt(input.value) || 0; if (quantity > 0) { const docRef = db.collection("distributionTable").doc(); batch.set(docRef, { tenderId: selectedTender.id, majorItemId: selectedMajorItem.id, detailItemId: input.dataset.itemId, areaType: "樓層", areaName: input.dataset.floor, quantity: quantity, createdBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp(), createdAt: firebase.firestore.FieldValue.serverTimestamp() }); } }); await batch.commit(); await loadDistributions(selectedMajorItem.id); buildDistributionTable(); showAlert('✅ 所有分配已儲存成功！', 'success'); } catch (error) { showAlert('儲存失敗: ' + error.message, 'error'); } finally { showLoading(false); } }
     function clearAllDistributions() { if (!confirm('確定要清空表格中所有已分配的數量嗎？此操作不會立即儲存，您仍需點擊「儲存分配」。')) return; document.querySelectorAll('.quantity-input').forEach(input => { if (input.value !== '') { input.value = ''; onQuantityChange(input); } }); }
     function exportToExcel() { if (!selectedMajorItem || detailItems.length === 0) return showAlert('沒有資料可匯出', 'error'); const data = [['項次', '項目名稱', '單位', '總量', ...floors]]; detailItems.forEach(item => { const row = [item.sequence || '', item.name || '', item.unit || '', item.totalQuantity || 0]; const distributedQuantities = {}; distributions.filter(d => d.detailItemId === item.id).forEach(d => { distributedQuantities[d.areaName] = d.quantity; }); floors.forEach(floor => { row.push(distributedQuantities[floor] || 0); }); data.push(row); }); const worksheet = XLSX.utils.aoa_to_sheet(data); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, selectedMajorItem.name); XLSX.writeFile(workbook, `${selectedProject.name}_${selectedTender.name}_${selectedMajorItem.name}_分配表.xlsx`); }
@@ -254,11 +282,19 @@ function initDistributionPage() {
     function buildSequenceList() { const listContainer = document.getElementById('sequenceList'); listContainer.innerHTML = detailItems.map(item => `<div class="sequence-item" data-id="${item.id}"><input type="text" class="sequence-input" value="${item.sequence || ''}" data-item-id="${item.id}"><span class="sequence-name">${item.name}</span><span class="drag-handle">☰</span></div>`).join(''); if (sortableInstance) sortableInstance.destroy(); sortableInstance = new Sortable(listContainer, { handle: '.drag-handle', animation: 150 }); }
     async function saveSequenceChanges() { showLoading(true, '儲存順序中...'); try { const batch = db.batch(); const newOrder = Array.from(document.querySelectorAll('.sequence-item')).map((item, index) => ({ id: item.dataset.id, sequence: item.querySelector('.sequence-input').value || (index + 1).toString() })); newOrder.forEach(item => { const docRef = db.collection("detailItems").doc(item.id); batch.update(docRef, { sequence: item.sequence }); }); await batch.commit(); await loadDetailItems(selectedMajorItem.id); buildDistributionTable(); showAlert('✅ 順序已儲存！', 'success'); closeModal('sequenceModal'); } catch (error) { showAlert('儲存順序失敗: ' + error.message, 'error'); } finally { showLoading(false); } }
     function resetToOriginalOrder() { if (!confirm('這會按照「項目編號」重新排序，確定嗎？')) return; detailItems.sort(naturalSequenceSort); buildSequenceList(); }
-    function closeModal(modalId) { document.getElementById(modalId).style.display = 'none'; }
     function hideMainContent() { document.getElementById('mainContent').style.display = 'none'; document.getElementById('emptyState').style.display = 'flex'; }
     function showMainContent() { document.getElementById('mainContent').style.display = 'block'; document.getElementById('emptyState').style.display = 'none'; }
     function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length-pB.length; }
 
-    // 主流程啟動點
+    // --- 主流程啟動點 ---
+    async function initializePage() {
+        console.log("🚀 初始化樓層分配頁面...");
+        if (!currentUser) return showAlert("無法獲取用戶資訊", "error");
+        
+        setupEventListeners();
+        await loadProjects();
+    }
+    
+    // *** 最終執行啟動點 ***
     initializePage();
 }
