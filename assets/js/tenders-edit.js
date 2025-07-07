@@ -1,10 +1,9 @@
 /**
- * 編輯標單頁面 (tenders-edit.js) - v4.4 修正刪除後狀態 & 預設全部展開
+ * 編輯標單頁面 (tenders-edit.js) - v5.0 最終修正版
  */
 function initTenderEditPage() {
     // --- 頁面級別變數 ---
     let tenderId, currentTender, majorItems = [], detailItems = [], additionItems = [];
-    // 【關鍵修正 1】: 將預設狀態改為「全部展開」
     let allExpanded = true; 
 
     // --- 主流程 ---
@@ -57,6 +56,7 @@ function initTenderEditPage() {
         const originalAmount = detailItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
         const additionAmount = additionItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
         const totalAmount = originalAmount + additionAmount;
+        const increasePercentage = originalAmount > 0 ? ((additionAmount / originalAmount) * 100).toFixed(2) : 0;
 
         container.innerHTML = `
             <div class="tender-header-card">
@@ -69,12 +69,16 @@ function initTenderEditPage() {
                     <div class="value">${formatCurrency(originalAmount)}</div>
                 </div>
                 <div class="tender-info-item">
-                    <div class="label">追加金額</div>
+                    <div class="label">追加總金額</div>
                     <div class="value warning">${formatCurrency(additionAmount)}</div>
                 </div>
                 <div class="tender-info-item">
                     <div class="label">目前總金額</div>
                     <div class="value success">${formatCurrency(totalAmount)}</div>
+                </div>
+                 <div class="tender-info-item">
+                    <div class="label">增幅百分比</div>
+                    <div class="value">${increasePercentage}%</div>
                 </div>
             </div>
         `;
@@ -84,17 +88,16 @@ function initTenderEditPage() {
         const container = document.getElementById('items-list-container');
         let html = `
             <div class="list-actions">
-                <h3>原始項目</h3>
-                <button id="expand-all-btn" class="btn btn-secondary">全部收合</button>
+                <h3>原始項目 (不可修改)</h3>
+                <button id="expand-all-btn" class="btn btn-secondary">${allExpanded ? '全部收合' : '全部展開'}</button>
             </div>
         `;
         majorItems.forEach((majorItem) => {
             const detailsInMajor = detailItems.filter(d => d.majorItemId === majorItem.id);
             const itemNumber = majorItem.sequence || 'N/A';
-
             html += `
                 <div class="major-item-wrapper">
-                    <div class="major-item-row expanded" data-major-id="${majorItem.id}">
+                    <div class="major-item-row ${allExpanded ? 'expanded' : ''}" data-major-id="${majorItem.id}">
                         <div class="item-number-circle">${itemNumber}</div>
                         <div class="item-name">${majorItem.name}</div>
                         <div class="item-analysis">
@@ -103,7 +106,7 @@ function initTenderEditPage() {
                         </div>
                         <div class="item-expand-icon">▶</div>
                     </div>
-                    <div class="detail-items-container expanded" id="details-for-${majorItem.id}">
+                    <div class="detail-items-container ${allExpanded ? 'expanded' : ''}" id="details-for-${majorItem.id}">
                         ${renderDetailTable(detailsInMajor)}
                     </div>
                 </div>
@@ -120,7 +123,7 @@ function initTenderEditPage() {
             const additionalQuantity = additions.reduce((s, a) => s + (a.totalQuantity || 0), 0);
             
             const quantityDisplay = additionalQuantity > 0 
-                ? `${originalQuantity + additionalQuantity} (+${additionalQuantity})`
+                ? `${originalQuantity + additionalQuantity} <span class="addition-info-text">(+${additionalQuantity})</span>`
                 : originalQuantity;
 
             return `
@@ -132,7 +135,7 @@ function initTenderEditPage() {
                     <td class="number-cell">${formatCurrency(item.unitPrice)}</td>
                     <td class="number-cell">${formatCurrency(item.totalPrice)}</td>
                     <td class="number-cell">${quantityDisplay}</td>
-                    <td class="action-cell"><button class="btn btn-sm btn-primary" data-action="add-addition" data-item-id="${item.id}" data-item-name="${escape(item.name)}">追加</button></td>
+                    <td class="action-cell"><button class="btn btn-sm btn-primary" data-action="add-addition" data-item-id="${item.id}">追加</button></td>
                 </tr>
             `;
         }).join('');
@@ -157,12 +160,12 @@ function initTenderEditPage() {
             const relatedItem = detailItems.find(d => d.id === add.relatedItemId);
             return `
                 <tr>
-                    <td>${formatDate(add.createdAt)}</td>
+                    <td>${add.additionDate || formatDate(add.createdAt)}</td>
                     <td>${relatedItem ? relatedItem.name : '未知項目'}</td>
                     <td class="number-cell">${add.totalQuantity || 0}</td>
                     <td class="number-cell">${formatCurrency(add.unitPrice)}</td>
                     <td>${add.reason || ''}</td>
-                    <td>${add.status || '待核准'}</td>
+                    <td>${add.notes || ''}</td>
                     <td class="action-cell">
                         <button class="btn btn-sm btn-warning" data-action="edit-addition" data-addition-id="${add.id}">編輯</button>
                         <button class="btn btn-sm btn-danger" data-action="delete-addition" data-addition-id="${add.id}">刪除</button>
@@ -172,7 +175,7 @@ function initTenderEditPage() {
         }).join('');
         html += `
             <table class="detail-items-table">
-                <thead><tr><th>追加日期</th><th>關聯項目</th><th class="number-cell">追加數量</th><th class="number-cell">追加單價</th><th>追加原因</th><th>狀態</th><th class="action-cell">操作</th></tr></thead>
+                <thead><tr><th>追加日期</th><th>關聯項目</th><th class="number-cell">追加數量</th><th class="number-cell">追加單價</th><th>追加原因</th><th>備註</th><th class="action-cell">操作</th></tr></thead>
                 <tbody>${rows}</tbody>
             </table>
         `;
@@ -188,12 +191,7 @@ function initTenderEditPage() {
             if (!summarizedItems[add.relatedItemId]) {
                 const originalItem = detailItems.find(d => d.id === add.relatedItemId);
                 if (originalItem) {
-                    summarizedItems[add.relatedItemId] = {
-                        name: originalItem.name,
-                        unit: originalItem.unit,
-                        originalQty: originalItem.totalQuantity || 0,
-                        additionalQty: 0,
-                    };
+                    summarizedItems[add.relatedItemId] = { name: originalItem.name, unit: originalItem.unit, originalQty: originalItem.totalQuantity || 0, additionalQty: 0 };
                 }
             }
             if (summarizedItems[add.relatedItemId]) {
@@ -202,7 +200,7 @@ function initTenderEditPage() {
         });
 
         if (Object.keys(summarizedItems).length === 0) {
-            summaryContainer.innerHTML = '<div style="color: #888;">無追加項目可供統計。</div>';
+            summaryContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">無追加項目可供統計。</div>';
             return;
         }
 
@@ -228,9 +226,8 @@ function initTenderEditPage() {
             const expandAllBtn = target.closest('#expand-all-btn');
 
             if (majorRow) {
-                const container = majorRow.nextElementSibling;
                 majorRow.classList.toggle('expanded');
-                container.classList.toggle('expanded');
+                majorRow.nextElementSibling.classList.toggle('expanded');
                 return;
             }
 
@@ -243,56 +240,61 @@ function initTenderEditPage() {
             }
 
             if (actionButton) {
-                const { action, itemId, itemName, additionId } = actionButton.dataset;
-                if (action === 'add-addition') showAdditionModal(itemId, itemName);
+                const { action, itemId, additionId } = actionButton.dataset;
+                if (action === 'add-addition') showAdditionModal(itemId);
                 if (action === 'edit-addition') editAddition(additionId);
                 if (action === 'delete-addition') deleteAddition(additionId);
-                return;
             }
         });
         
         const modal = document.getElementById('additionModal');
         if (modal) {
-            modal.querySelector('.modal-close').onclick = () => { modal.style.display = "none"; };
-            document.getElementById('cancelAdditionBtn').onclick = () => { modal.style.display = "none"; };
+            modal.querySelector('[data-action="close-modal"]').onclick = () => { modal.style.display = "none"; };
             document.getElementById('additionForm').onsubmit = handleAdditionSubmit;
-            window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
         }
     }
     
-    // --- 記住與恢復展開狀態的輔助函數 ---
-    function getExpandedState() {
-        const expandedIds = new Set();
-        document.querySelectorAll('.major-item-row.expanded').forEach(row => {
-            if (row.dataset.majorId) {
-                expandedIds.add(row.dataset.majorId);
-            }
-        });
-        return expandedIds;
-    }
-
-    function restoreExpandedState(expandedIds) {
-        if (expandedIds.size > 0) {
-            expandedIds.forEach(id => {
-                const row = document.querySelector(`.major-item-row[data-major-id="${id}"]`);
-                const container = document.getElementById(`details-for-${id}`);
-                if (row && container) {
-                    row.classList.add('expanded');
-                    container.classList.add('expanded');
-                }
-            });
-        }
-    }
-
     // --- Modal 邏輯 ---
-    function showAdditionModal(itemId, itemName) {
+    function populateRelatedItemsDropdown(selectedId = null) {
+        const select = document.getElementById('relatedDetailItem');
+        select.innerHTML = '<option value="">請選擇...</option>';
+        majorItems.forEach(major => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = major.name;
+            const detailsInMajor = detailItems.filter(d => d.majorItemId === major.id);
+            detailsInMajor.forEach(detail => {
+                const option = document.createElement('option');
+                option.value = detail.id;
+                option.textContent = `${detail.sequence}. ${detail.name}`;
+                option.dataset.unitPrice = detail.unitPrice || 0;
+                if (detail.id === selectedId) {
+                    option.selected = true;
+                }
+                optgroup.appendChild(option);
+            });
+            select.appendChild(optgroup);
+        });
+    }
+
+    function showAdditionModal(relatedItemId = null) {
         const modal = document.getElementById('additionModal');
         if(!modal) return;
         document.getElementById('additionForm').reset();
         document.getElementById('editAdditionId').value = '';
-        document.getElementById('relatedItemId').value = itemId;
-        document.getElementById('modalItemName').value = unescape(itemName);
-        document.getElementById('modalTitle').textContent = '追加項目數量';
+        document.getElementById('modalTitle').textContent = '新增追加項目';
+        
+        populateRelatedItemsDropdown(relatedItemId);
+        
+        const select = document.getElementById('relatedDetailItem');
+        select.onchange = () => {
+            const selectedOption = select.options[select.selectedIndex];
+            document.getElementById('additionUnitPrice').value = selectedOption.dataset.unitPrice || 0;
+        };
+        if (relatedItemId) {
+            select.onchange(); // 觸發一次以填入單價
+        }
+        
+        document.getElementById('additionDate').value = new Date().toISOString().slice(0, 10);
         modal.style.display = 'block';
     }
 
@@ -300,82 +302,91 @@ function initTenderEditPage() {
         const item = additionItems.find(a => a.id === additionId);
         if (!item) return showAlert('找不到要編輯的項目', 'error');
         
-        const relatedItem = detailItems.find(d => d.id === item.relatedItemId);
-        if (!relatedItem) return showAlert('找不到關聯的原始項目', 'error');
-        
         const modal = document.getElementById('additionModal');
         if(!modal) return;
         document.getElementById('additionForm').reset();
         document.getElementById('editAdditionId').value = item.id;
-        document.getElementById('relatedItemId').value = item.relatedItemId;
-        document.getElementById('modalItemName').value = relatedItem.name;
-        document.getElementById('additionQuantity').value = item.totalQuantity;
-        document.getElementById('additionReason').value = item.reason;
         document.getElementById('modalTitle').textContent = '編輯追加項目';
+
+        populateRelatedItemsDropdown(item.relatedItemId);
+        document.getElementById('additionDate').value = item.additionDate || '';
+        document.getElementById('additionQuantity').value = item.totalQuantity || '';
+        document.getElementById('additionUnitPrice').value = item.unitPrice || '';
+        document.getElementById('additionReason').value = item.reason || '';
+        document.getElementById('additionNotes').value = item.notes || '';
+        
         modal.style.display = 'block';
+    }
+
+    async function performDbAction(action, data = null) {
+        const expandedIds = getExpandedState();
+        try {
+            await action(data);
+            await init(); // 重新載入所有資料並渲染
+            restoreExpandedState(expandedIds); // 恢復展開狀態
+            showAlert('操作成功！', 'success');
+        } catch (error) {
+            showAlert(`操作失敗: ${error.message}`, 'error');
+        }
     }
 
     async function deleteAddition(additionId) {
         if (!confirm('確定要刪除這筆追加項目嗎？此操作無法復原。')) return;
-        
-        const expandedIds = getExpandedState(); // 記住狀態
-        
-        try {
-            await db.collection('detailItems').doc(additionId).delete();
-            await init(); // 重新載入
-            restoreExpandedState(expandedIds); // 恢復狀態
-            showAlert('刪除成功', 'success');
-        } catch (error) { 
-            showAlert('刪除失敗: ' + error.message, 'error'); 
-        }
+        await performDbAction(() => db.collection('detailItems').doc(additionId).delete());
     }
 
     async function handleAdditionSubmit(event) {
         event.preventDefault();
-        
-        const expandedIds = getExpandedState(); // 記住狀態
-
-        const relatedItemId = document.getElementById('relatedItemId').value;
         const editId = document.getElementById('editAdditionId').value;
-        const relatedItem = detailItems.find(d => d.id === relatedItemId);
-        if (!relatedItem) { showAlert('關聯項目不存在', 'error'); return; }
+        const relatedItemId = document.getElementById('relatedDetailItem').value;
+        if (!relatedItemId) { showAlert('請選擇一個關聯項目', 'error'); return; }
 
         const quantity = parseFloat(document.getElementById('additionQuantity').value);
-        if (isNaN(quantity) || quantity <= 0) { showAlert('請輸入有效的追加數量', 'error'); return; }
+        const unitPrice = parseFloat(document.getElementById('additionUnitPrice').value);
+        if (isNaN(quantity) || isNaN(unitPrice)) { showAlert('請輸入有效的數量和單價', 'error'); return; }
         
         const data = {
             tenderId,
-            majorItemId: relatedItem.majorItemId,
-            relatedItemId: relatedItem.id,
+            relatedItemId,
+            majorItemId: detailItems.find(d => d.id === relatedItemId)?.majorItemId || null,
             isAddition: true,
             totalQuantity: quantity,
+            unitPrice,
+            totalPrice: quantity * unitPrice,
+            additionDate: document.getElementById('additionDate').value,
             reason: document.getElementById('additionReason').value.trim(),
-            unitPrice: relatedItem.unitPrice,
-            totalPrice: (relatedItem.unitPrice || 0) * quantity,
+            notes: document.getElementById('additionNotes').value.trim(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            status: '待核准',
         };
 
-        try {
-            if (editId) {
-                await db.collection('detailItems').doc(editId).update(data);
-            } else {
-                data.createdBy = currentUser.email;
-                data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                await db.collection('detailItems').add(data);
-            }
-            document.getElementById('additionModal').style.display = "none";
-            
-            await init(); // 重新載入
-            restoreExpandedState(expandedIds); // 恢復狀態
+        document.getElementById('additionModal').style.display = "none";
 
-            showAlert('儲存成功！', 'success');
-        } catch (error) { 
-            showAlert('儲存失敗: ' + error.message, 'error'); 
+        if (editId) {
+            await performDbAction(() => db.collection('detailItems').doc(editId).update(data));
+        } else {
+            data.createdBy = currentUser.email;
+            data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await performDbAction(() => db.collection('detailItems').add(data));
         }
     }
     
-    // --- 其他輔助函數 ---
+    // --- 輔助函數 ---
+    function getExpandedState() {
+        const ids = new Set();
+        document.querySelectorAll('.major-item-row.expanded').forEach(r => ids.add(r.dataset.majorId));
+        return ids;
+    }
+
+    function restoreExpandedState(ids) {
+        ids.forEach(id => {
+            const row = document.querySelector(`.major-item-row[data-major-id="${id}"]`);
+            if (row) {
+                row.classList.add('expanded');
+                row.nextElementSibling.classList.add('expanded');
+            }
+        });
+    }
+    
     function showLoading(isLoading) {
         document.getElementById('loading').style.display = isLoading ? 'flex' : 'none';
         document.getElementById('editTenderContent').style.display = isLoading ? 'none' : 'block';
