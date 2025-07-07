@@ -1,5 +1,5 @@
 /**
- * 編輯標單頁面 (tenders-edit.js) - v6.2 修正函數定義順序
+ * 編輯標單頁面 (tenders-edit.js) - v6.2 修正 init 啟動錯誤
  */
 function initTenderEditPage() {
     // --- 頁面級別變數 ---
@@ -7,7 +7,6 @@ function initTenderEditPage() {
     let allExpanded = true;
 
     // --- 渲染輔助函數 (*** 所有小功能先在這裡定義好 ***) ---
-
     function renderTenderHeader() {
         const container = document.getElementById('tender-header-container');
         if (!container) return;
@@ -114,7 +113,6 @@ function initTenderEditPage() {
         summaryContainer.innerHTML = Object.values(summarizedItems).map(summary => `<div class="summary-card"><div class="summary-item-name">${summary.name}</div><div class="summary-detail"><span>原始數量</span><span>${summary.originalQty} ${summary.unit || ''}</span></div><div class="summary-detail"><span>變更數量</span><span class="${summary.additionalQty >= 0 ? 'success' : 'danger'}">${summary.additionalQty > 0 ? '+' : ''}${summary.additionalQty} ${summary.unit || ''}</span></div><div class="summary-detail total"><span>目前總數</span><span>${summary.originalQty + summary.additionalQty} ${summary.unit || ''}</span></div></div>`).join('');
     }
 
-    // --- 主渲染函數 ---
     function renderPage() {
         renderTenderHeader();
         renderMajorItemsList();
@@ -122,7 +120,6 @@ function initTenderEditPage() {
         renderSummaryCards();
     }
 
-    // --- 動態局部更新 ---
     function updatePageAfterAction(relatedItemIdToUpdate = null) {
         renderTenderHeader();
         renderAdditionItemsTable();
@@ -149,37 +146,59 @@ function initTenderEditPage() {
         if (quantityCell) quantityCell.innerHTML = quantityDisplay;
     }
     
-    // --- 事件處理與 Modal 邏輯 ---
-    function setupEventListeners() {
-        const content = document.getElementById('editTenderContent');
-        if (!content) return;
-        content.addEventListener('click', (event) => {
-            const target = event.target;
-            const majorRow = target.closest('.major-item-row');
-            const actionButton = target.closest('button[data-action]');
-            const expandAllBtn = target.closest('#expand-all-btn');
-            if (majorRow) { majorRow.classList.toggle('expanded'); majorRow.nextElementSibling.classList.toggle('expanded'); return; }
-            if (expandAllBtn) {
-                allExpanded = !allExpanded;
-                document.querySelectorAll('.major-item-row').forEach(row => row.classList.toggle('expanded', allExpanded));
-                document.querySelectorAll('.detail-items-container').forEach(cont => cont.classList.toggle('expanded', allExpanded));
-                expandAllBtn.textContent = allExpanded ? '全部收合' : '全部展開';
-                return;
-            }
-            if (actionButton) {
-                const { action, itemId, additionId } = actionButton.dataset;
-                if (action === 'add-addition') showAdditionModal(itemId);
-                if (action === 'edit-addition') editAddition(additionId);
-                if (action === 'delete-addition') deleteAddition(additionId);
-            }
+    function populateRelatedItemsDropdown(selectedId = null) {
+        const select = document.getElementById('relatedDetailItem');
+        select.innerHTML = '<option value="">請選擇...</option>';
+        majorItems.forEach(major => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = `--- ${major.name} ---`;
+            const detailsInMajor = detailItems.filter(d => d.majorItemId === major.id);
+            detailsInMajor.forEach(detail => {
+                const option = document.createElement('option');
+                option.value = detail.id;
+                option.textContent = `${detail.sequence}. ${detail.name}`;
+                option.dataset.unitPrice = detail.unitPrice || 0;
+                if (detail.id === selectedId) option.selected = true;
+                optgroup.appendChild(option);
+            });
+            select.appendChild(optgroup);
         });
+    }
+    
+    function showAdditionModal(relatedItemId = null) {
         const modal = document.getElementById('additionModal');
-        if (modal) {
-            modal.querySelectorAll('[data-action="close-modal"]').forEach(btn => { btn.onclick = () => { modal.style.display = "none"; }; });
-            document.getElementById('additionForm').onsubmit = handleAdditionSubmit;
-        }
+        if(!modal) return;
+        document.getElementById('additionForm').reset();
+        document.getElementById('editAdditionId').value = '';
+        document.getElementById('modalTitle').textContent = '新增項目數量變更';
+        populateRelatedItemsDropdown(relatedItemId);
+        const select = document.getElementById('relatedDetailItem');
+        select.onchange = () => {
+            const selectedOption = select.options[select.selectedIndex];
+            document.getElementById('additionUnitPrice').value = selectedOption.dataset.unitPrice || 0;
+        };
+        if (relatedItemId) { select.value = relatedItemId; select.onchange(); }
+        document.getElementById('additionDate').value = new Date().toISOString().slice(0, 10);
+        modal.style.display = 'block';
     }
 
+    function editAddition(additionId) {
+        const item = additionItems.find(a => a.id === additionId);
+        if (!item) { showAlert('找不到要編輯的項目', 'error'); return; }
+        const modal = document.getElementById('additionModal');
+        if(!modal) return;
+        document.getElementById('additionForm').reset();
+        document.getElementById('editAdditionId').value = item.id;
+        document.getElementById('modalTitle').textContent = '編輯項目數量變更';
+        populateRelatedItemsDropdown(item.relatedItemId);
+        document.getElementById('additionDate').value = item.additionDate || '';
+        document.getElementById('additionQuantity').value = item.totalQuantity || '';
+        document.getElementById('additionUnitPrice').value = item.unitPrice || '';
+        document.getElementById('additionReason').value = item.reason || '';
+        document.getElementById('additionNotes').value = item.notes || '';
+        modal.style.display = 'block';
+    }
+    
     async function handleAdditionSubmit(event) {
         event.preventDefault();
         const editId = document.getElementById('editAdditionId').value;
@@ -230,74 +249,57 @@ function initTenderEditPage() {
         finally { showLoading(false); }
     }
     
-    function showAdditionModal(relatedItemId = null) {
-        const modal = document.getElementById('additionModal');
-        if(!modal) return;
-        document.getElementById('additionForm').reset();
-        document.getElementById('editAdditionId').value = '';
-        document.getElementById('modalTitle').textContent = '新增項目數量變更';
-        populateRelatedItemsDropdown(relatedItemId);
-        const select = document.getElementById('relatedDetailItem');
-        select.onchange = () => {
-            const selectedOption = select.options[select.selectedIndex];
-            document.getElementById('additionUnitPrice').value = selectedOption.dataset.unitPrice || 0;
-        };
-        if (relatedItemId) { select.value = relatedItemId; select.onchange(); }
-        document.getElementById('additionDate').value = new Date().toISOString().slice(0, 10);
-        modal.style.display = 'block';
-    }
-
-    function editAddition(additionId) {
-        const item = additionItems.find(a => a.id === additionId);
-        if (!item) { showAlert('找不到要編輯的項目', 'error'); return; }
-        const modal = document.getElementById('additionModal');
-        if(!modal) return;
-        document.getElementById('additionForm').reset();
-        document.getElementById('editAdditionId').value = item.id;
-        document.getElementById('modalTitle').textContent = '編輯項目數量變更';
-        populateRelatedItemsDropdown(item.relatedItemId);
-        document.getElementById('additionDate').value = item.additionDate || '';
-        document.getElementById('additionQuantity').value = item.totalQuantity || '';
-        document.getElementById('additionUnitPrice').value = item.unitPrice || '';
-        document.getElementById('additionReason').value = item.reason || '';
-        document.getElementById('additionNotes').value = item.notes || '';
-        modal.style.display = 'block';
-    }
-
-    function populateRelatedItemsDropdown(selectedId = null) {
-        const select = document.getElementById('relatedDetailItem');
-        select.innerHTML = '<option value="">請選擇...</option>';
-        majorItems.forEach(major => {
-            const optgroup = document.createElement('optgroup');
-            optgroup.label = `--- ${major.name} ---`;
-            const detailsInMajor = detailItems.filter(d => d.majorItemId === major.id);
-            detailsInMajor.forEach(detail => {
-                const option = document.createElement('option');
-                option.value = detail.id;
-                option.textContent = `${detail.sequence}. ${detail.name}`;
-                option.dataset.unitPrice = detail.unitPrice || 0;
-                if (detail.id === selectedId) option.selected = true;
-                optgroup.appendChild(option);
-            });
-            select.appendChild(optgroup);
+    function setupEventListeners() {
+        const content = document.getElementById('editTenderContent');
+        if (!content) return;
+        content.addEventListener('click', (event) => {
+            const target = event.target;
+            const majorRow = target.closest('.major-item-row');
+            const actionButton = target.closest('button[data-action]');
+            const expandAllBtn = target.closest('#expand-all-btn');
+            if (majorRow) { majorRow.classList.toggle('expanded'); majorRow.nextElementSibling.classList.toggle('expanded'); return; }
+            if (expandAllBtn) {
+                allExpanded = !allExpanded;
+                document.querySelectorAll('.major-item-row').forEach(row => row.classList.toggle('expanded', allExpanded));
+                document.querySelectorAll('.detail-items-container').forEach(cont => cont.classList.toggle('expanded', allExpanded));
+                expandAllBtn.textContent = allExpanded ? '全部收合' : '全部展開';
+                return;
+            }
+            if (actionButton) {
+                const { action, itemId, additionId } = actionButton.dataset;
+                if (action === 'add-addition') showAdditionModal(itemId);
+                if (action === 'edit-addition') editAddition(additionId);
+                if (action === 'delete-addition') deleteAddition(additionId);
+            }
         });
+        const modal = document.getElementById('additionModal');
+        if (modal) {
+            modal.querySelectorAll('[data-action="close-modal"]').forEach(btn => { btn.onclick = () => { modal.style.display = "none"; }; });
+            document.getElementById('additionForm').onsubmit = handleAdditionSubmit;
+        }
     }
 
     function showLoading(isLoading) { document.getElementById('loading').style.display = isLoading ? 'flex' : 'none'; document.getElementById('editTenderContent').style.display = isLoading ? 'none' : 'block'; }
     function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length-pB.length; }
     
     // --- 頁面啟動點 (*** 將所有啟動邏輯都包在 init 函數中 ***) ---
-    async function loadAllData() {
-        const tenderDoc = await db.collection('tenders').doc(tenderId).get();
-        if (!tenderDoc.exists) throw new Error('找不到指定的標單');
-        currentTender = { id: tenderDoc.id, ...tenderDoc.data() };
-        const [majorItemsData, allDetailItemsData] = await Promise.all([
-            safeFirestoreQuery('majorItems', [{ field: 'tenderId', operator: '==', value: tenderId }]),
-            safeFirestoreQuery('detailItems', [{ field: 'tenderId', operator: '==', value: tenderId }])
-        ]);
-        majorItems = majorItemsData.docs.sort(naturalSequenceSort);
-        detailItems = allDetailItemsData.docs.filter(item => !item.isAddition).sort(naturalSequenceSort);
-        additionItems = allDetailItemsData.docs.filter(item => item.isAddition).sort((a,b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+    async function init() {
+        showLoading(true);
+        tenderId = new URLSearchParams(window.location.search).get('id');
+        if (!tenderId) {
+            showAlert('無效的標單ID', 'error');
+            return navigateTo('/program/tenders/list');
+        }
+        try {
+            await loadAllData();
+            renderPage();
+            setupEventListeners();
+        } catch (error) {
+            console.error("載入標單編輯頁面失敗:", error);
+            showAlert("載入資料失敗: " + error.message, "error");
+        } finally {
+            showLoading(false);
+        }
     }
     
     // *** 最終執行啟動點 ***
