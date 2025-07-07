@@ -1,5 +1,5 @@
 /**
- * EXCEL 匯入頁面 (tenders/import.js) (SPA 版本)
+ * EXCEL 匯入頁面 (tenders/import.js) (SPA 版本) - v2.0 金額與跳轉修正
  * 由 router.js 呼叫 initImportPage() 函數來啟動
  */
 function initImportPage() {
@@ -20,19 +20,6 @@ function initImportPage() {
 
         setupEventListeners();
         loadProjects();
-
-        // 將需要在 HTML onclick 中呼叫的函數，暴露到全局
-        window.exposedImportFuncs = {
-            parseExcel,
-            backToUpload,
-            proceedToImport,
-            backToPreview,
-            executeImport,
-            autoDetectMajorItems,
-            clearAllClassifications,
-            toggleItemType,
-            removeItem
-        };
     }
 
     function setupEventListeners() {
@@ -55,7 +42,35 @@ function initImportPage() {
         if (customPatternCheckbox) customPatternCheckbox.onchange = () => {
             if (customPatternGroup) customPatternGroup.style.display = customPatternCheckbox.checked ? 'block' : 'none';
         };
+        
+        // 使用事件監聽取代 onclick
+        document.querySelector('button[onclick*="parseExcel"]')?.addEventListener('click', parseExcel);
+        document.querySelector('button[onclick*="backToUpload"]')?.addEventListener('click', backToUpload);
+        document.querySelector('button[onclick*="proceedToImport"]')?.addEventListener('click', proceedToImport);
+        document.querySelector('button[onclick*="backToPreview"]')?.addEventListener('click', backToPreview);
+        document.querySelector('button[onclick*="executeImport"]')?.addEventListener('click', executeImport);
+        document.querySelector('button[onclick*="autoDetectMajorItems"]')?.addEventListener('click', autoDetectMajorItems);
+        document.querySelector('button[onclick*="clearAllClassifications"]')?.addEventListener('click', clearAllClassifications);
     }
+    
+    // --- 【關鍵修正 1】: 新增一個專門處理金額字串的函數 ---
+    /**
+     * 解析可能包含貨幣符號或千分位的字串，回傳一個純數字
+     * @param {string} value - 要解析的金額字串，例如 "NT$ 1,234.50"
+     * @returns {number} - 解析後的數字，例如 1234.5
+     */
+    function parseCurrency(value) {
+        if (typeof value === 'number') {
+            return value;
+        }
+        if (typeof value !== 'string' || value.trim() === '') {
+            return 0;
+        }
+        // 移除 "NT$", ",", " " 等所有非數字和非小數點的字元
+        const cleanedValue = value.replace(/[^0-9.-]+/g,"");
+        return parseFloat(cleanedValue) || 0;
+    }
+
 
     // --- 核心邏輯 ---
 
@@ -131,14 +146,23 @@ function initImportPage() {
 
             jsonData.forEach((row, index) => {
                 if (!row || row.filter(String).length === 0) return; // 忽略空行
+                
+                // --- 【關鍵修正 1】: 在解析時，使用新的 parseCurrency 函數來處理金額欄位 ---
+                const quantity = parseFloat(row[3]) || 0;
+                const unitPrice = parseCurrency(row[4]);
+                let totalPrice = parseCurrency(row[5]);
+                
+                // 如果總價為0，但有數量和單價，則自動計算
+                if (totalPrice === 0 && quantity > 0 && unitPrice > 0) {
+                    totalPrice = quantity * unitPrice;
+                }
+
                 const rowData = {
                     rowNumber: startRow + index, type: 'other', sequence: row[0] || '', name: row[1] || '',
-                    unit: row[2] || '', quantity: parseFloat(row[3]) || 0, unitPrice: parseFloat(row[4]) || 0,
-                    totalPrice: parseFloat(row[5]) || 0, parentId: null
+                    unit: row[2] || '', quantity: quantity, unitPrice: unitPrice,
+                    totalPrice: totalPrice, parentId: null
                 };
-                if (!rowData.totalPrice && rowData.quantity && rowData.unitPrice) {
-                    rowData.totalPrice = rowData.quantity * rowData.unitPrice;
-                }
+                
                 if (isMajorItem(rowData.name, rowData.sequence)) {
                     rowData.type = 'major';
                     currentMajorItem = rowData;
@@ -176,16 +200,38 @@ function initImportPage() {
         const tableBody = document.querySelector('#previewTable tbody');
         tableBody.innerHTML = '';
         let totalAmount = 0, majorCount = 0, detailCount = 0;
+        // 清空並重新渲染表格
+        const previewTable = document.getElementById('previewTable');
+        previewTable.innerHTML = `
+            <thead>
+                <tr>
+                    <th>行號</th><th>類型</th><th>項次</th><th>項目名稱</th><th>單位</th>
+                    <th>數量</th><th>單價</th><th>總價</th><th>操作</th>
+                </tr>
+            </thead>
+            <tbody></tbody>`;
+
+        const newTableBody = previewTable.querySelector('tbody');
+
         parsedData.forEach((item, index) => {
             if (item.type === 'major') majorCount++; else if (item.type === 'detail') detailCount++;
             totalAmount += item.totalPrice || 0;
-            tableBody.innerHTML += `<tr>
+            const newRow = newTableBody.insertRow();
+            newRow.innerHTML = `
                 <td>${item.rowNumber}</td>
-                <td><span class="item-type ${item.type}" onclick="window.exposedImportFuncs.toggleItemType(${index})">${getTypeLabel(item.type)}</span></td>
-                <td>${item.sequence}</td><td>${item.name}</td><td>${item.unit}</td><td>${item.quantity}</td>
-                <td>${formatCurrency(item.unitPrice)}</td><td>${formatCurrency(item.totalPrice)}</td>
-                <td><button class="btn btn-danger btn-sm" onclick="window.exposedImportFuncs.removeItem(${index})">刪除</button></td></tr>`;
+                <td><span class="item-type ${item.type}" data-index="${index}">${getTypeLabel(item.type)}</span></td>
+                <td>${item.sequence}</td>
+                <td>${item.name}</td>
+                <td>${item.unit}</td>
+                <td>${item.quantity}</td>
+                <td>${formatCurrency(item.unitPrice)}</td>
+                <td>${formatCurrency(item.totalPrice)}</td>
+                <td><button class="btn btn-danger btn-sm" data-index="${index}">刪除</button></td>`;
+            
+            newRow.querySelector('.item-type').onclick = () => toggleItemType(index);
+            newRow.querySelector('.btn-danger').onclick = () => removeItem(index);
         });
+        
         document.getElementById('summaryTotal').textContent = parsedData.length;
         document.getElementById('summaryMajor').textContent = majorCount;
         document.getElementById('summaryDetail').textContent = detailCount;
@@ -262,7 +308,9 @@ function initImportPage() {
 
             showLoading(false);
             showAlert(`成功匯入！創建了 ${majorItems.length} 個大項目和 ${detailItems.length} 個細項`, 'success');
-            setTimeout(() => navigateTo('/tenders/list.html'), 2000);
+            
+            // --- 【關鍵修正 2】: 使用正確的 SPA 路由，不包含 .html ---
+            setTimeout(() => navigateTo('/program/tenders/list'), 2000);
 
         } catch (error) {
             showAlert('匯入失敗: ' + error.message, 'error');
@@ -284,7 +332,7 @@ function initImportPage() {
 
     function backToUpload() {
         setActiveStep(1);
-        document.getElementById('previewSection').style.display = 'none';
+        document.getElementById('parseSection').style.display = 'none';
         document.getElementById('uploadSection').style.display = 'block';
         selectedFile = workbook = null;
         parsedData = [];
