@@ -23,15 +23,16 @@
         <div class="form-group"><label for="worksheetSelect">選擇工作表</label><select id="worksheetSelect" class="form-control"></select></div>
         <div class="form-group"><label for="startRow">資料起始列</label><input type="number" id="startRow" class="form-control" value="1" min="1"></div>
         <div class="form-group">
-            <label>大項目識別規則</label>
-            <div style="display: flex; gap: 15px; margin-top: 8px;">
+            <label>大項目識別規則 (可複選)</label>
+            <div style="display: flex; gap: 15px; margin-top: 8px; flex-wrap: wrap;">
                 <label><input type="checkbox" id="ruleChineseNumber" checked> 中文數字 (一、二...)</label>
+                <label><input type="checkbox" id="ruleHeavenlyStem" checked> 天干地支 (甲、乙...)</label>
                 <label><input type="checkbox" id="ruleRomanNumber"> 羅馬數字 (I、II...)</label>
                 <label><input type="checkbox" id="ruleCustomPattern"> 自定義模式</label>
             </div>
         </div>
         <div class="form-group" id="customPatternGroup" style="display: none;"><label for="customPattern">自定義模式 (正則表達式)</label><input type="text" id="customPattern" class="form-control" placeholder="例：^第.*章$"></div>
-        <button class="btn btn-primary" onclick="window.exposedImportFuncs.parseExcel()">開始解析</button>
+        <button id="parseBtn" class="btn btn-primary">開始解析</button>
     </div>
 
     <div id="previewSection" style="display: none;">
@@ -45,15 +46,15 @@
         <div class="correction-tools">
             <h4>修正工具</h4>
             <div class="correction-row">
-                <button class="btn btn-warning btn-sm" onclick="window.exposedImportFuncs.autoDetectMajorItems()">自動重新識別大項目</button>
-                <button class="btn btn-secondary btn-sm" onclick="window.exposedImportFuncs.clearAllClassifications()">清除所有分類</button>
+                <button id="re-detectBtn" class="btn btn-warning btn-sm">自動重新識別大項目</button>
+                <button id="clear-classBtn" class="btn btn-secondary btn-sm">清除所有分類</button>
             </div>
             <div class="correction-row"><span>手動修正：點擊表格中的項目類型標籤可以切換分類</span></div>
         </div>
-        <div class="preview-table"><table id="previewTable"><thead></thead><tbody></tbody></table></div>
+        <div class="preview-table"><table id="previewTable"></table></div>
         <div style="text-align: center; margin-top: 20px;">
-            <button class="btn btn-secondary" onclick="window.exposedImportFuncs.backToUpload()">重新上傳</button>
-            <button class="btn btn-success" onclick="window.exposedImportFuncs.proceedToImport()">確認無誤，進行匯入</button>
+            <button id="backToUploadBtn" class="btn btn-secondary">重新上傳</button>
+            <button id="proceedToImportBtn" class="btn btn-success">確認無誤，進行匯入</button>
         </div>
     </div>
 
@@ -63,8 +64,8 @@
         <div class="form-group"><label for="tenderName">標單名稱 <span style="color: #dc3545;">*</span></label><input type="text" id="tenderName" class="form-control" required></div>
         <div class="form-group"><label for="contractorName">承包商名稱</label><input type="text" id="contractorName" class="form-control" placeholder="可選填"></div>
         <div style="text-align: center; margin-top: 30px;">
-            <button class="btn btn-secondary" onclick="window.exposedImportFuncs.backToPreview()">返回預覽</button>
-            <button class="btn btn-primary" onclick="window.exposedImportFuncs.executeImport()">執行匯入</button>
+            <button id="backToPreviewBtn" class="btn btn-secondary">返回預覽</button>
+            <button id="executeImportBtn" class="btn btn-primary">執行匯入</button>
         </div>
     </div>
 
