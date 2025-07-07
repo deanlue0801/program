@@ -1,5 +1,5 @@
 /**
- * 樓層分配管理系統 (distribution.js) (SPA 版本) - v2.2 智能樓層排序修正
+ * 樓層分配管理系統 (distribution.js) (SPA 版本) - v2.2 完整功能與事件監聽重構版
  */
 function initDistributionPage() {
     
@@ -49,46 +49,6 @@ function initDistributionPage() {
         document.getElementById('saveSequenceBtn')?.addEventListener('click', saveSequenceChanges);
         document.getElementById('cancelSequenceModalBtn')?.addEventListener('click', () => closeModal('sequenceModal'));
         document.getElementById('sequenceModal')?.addEventListener('click', (e) => { if(e.target.id === 'sequenceModal') closeModal('sequenceModal'); });
-    }
-
-    // --- 【關鍵修正】: 全新、更智能的樓層排序函數 ---
-    function sortFloors(a, b) {
-        const getFloorParts = (floorStr) => {
-            const s = String(floorStr).toUpperCase();
-            // 匹配 "停1F" 或 "A棟B1F" 中的 "停" 或 "A棟"
-            const buildingPrefixMatch = s.match(/^([^\dBRF]+)/);
-            const buildingPrefix = buildingPrefixMatch ? buildingPrefixMatch[1] : '';
-
-            // 匹配 B, R, 和數字
-            const floorMatch = s.match(/([B|R]?)(\d+)/);
-            if (!floorMatch) return { building: buildingPrefix, type: 2, num: 0, original: s };
-            
-            const [, type, numStr] = floorMatch;
-            const floorType = (type === 'B') ? 0 : (type === 'R') ? 2 : 1; // 0:地下, 1:一般, 2:屋頂
-            
-            return {
-                building: buildingPrefix,
-                type: floorType,
-                num: parseInt(numStr, 10)
-            };
-        };
-
-        const partsA = getFloorParts(a);
-        const partsB = getFloorParts(b);
-
-        // 1. 先依大樓前綴排序 (例如 "停" 會跟 "停" 在一起)
-        if (partsA.building > partsB.building) return 1;
-        if (partsA.building < partsB.building) return -1;
-        
-        // 2. 再依樓層類型排序 (B -> 一般樓層 -> R)
-        if (partsA.type > partsB.type) return 1;
-        if (partsA.type < partsB.type) return -1;
-
-        // 3. 最後依數字排序 (地下室由大到小，其他由小到大)
-        if (partsA.type === 0) { // 如果是地下室
-            return partsB.num - partsA.num; // B3, B2, B1
-        }
-        return partsA.num - partsB.num; // 1F, 2F, 3F
     }
 
     // --- 資料載入 ---
@@ -159,7 +119,7 @@ function initDistributionPage() {
     async function loadFloorSettings(tenderId) {
         try {
             const snapshot = await db.collection("floorSettings").where("tenderId", "==", tenderId).limit(1).get();
-            floors = snapshot.empty ? [] : (snapshot.docs[0].data().floors || []).sort(sortFloors);
+            floors = snapshot.empty ? [] : (snapshot.docs[0].data().floors || []);
         } catch (error) {
             console.error("載入樓層設定失敗", error);
             floors = [];
@@ -439,11 +399,7 @@ function initDistributionPage() {
     function buildSequenceList() {
         const listContainer = document.getElementById('sequenceList');
         listContainer.innerHTML = detailItems.map(item =>
-            `<div class="sequence-item" data-id="${item.id}">
-                <input type="text" class="sequence-input" value="${item.sequence || ''}" data-item-id="${item.id}">
-                <span class="sequence-name">${item.name}</span>
-                <span class="drag-handle">☰</span>
-            </div>`
+            `<div class="sequence-item" data-id="${item.id}"><input type="text" class="sequence-input" value="${item.sequence || ''}" data-item-id="${item.id}"><span class="sequence-name">${item.name}</span><span class="drag-handle">☰</span></div>`
         ).join('');
         if (sortableInstance) sortableInstance.destroy();
         sortableInstance = new Sortable(listContainer, { handle: '.drag-handle', animation: 150 });
@@ -453,10 +409,7 @@ function initDistributionPage() {
         showLoading(true, '儲存順序中...');
         try {
             const batch = db.batch();
-            const newOrder = Array.from(document.querySelectorAll('.sequence-item')).map((item, index) => ({
-                id: item.dataset.id,
-                sequence: item.querySelector('.sequence-input').value || (index + 1).toString()
-            }));
+            const newOrder = Array.from(document.querySelectorAll('.sequence-item')).map((item, index) => ({ id: item.dataset.id, sequence: item.querySelector('.sequence-input').value || (index + 1).toString() }));
             newOrder.forEach(item => {
                 const docRef = db.collection("detailItems").doc(item.id);
                 batch.update(docRef, { sequence: item.sequence });
@@ -485,12 +438,32 @@ function initDistributionPage() {
     function hideMainContent() { document.getElementById('mainContent').style.display = 'none'; document.getElementById('emptyState').style.display = 'flex'; }
     function showMainContent() { document.getElementById('mainContent').style.display = 'block'; document.getElementById('emptyState').style.display = 'none'; }
     function showLoading(isLoading, message='載入中...') {
-        const loadingEl = document.querySelector('.loading-overlay'); // A more generic loader
+        const loadingEl = document.querySelector('.loading'); 
         if(loadingEl) {
             loadingEl.style.display = isLoading ? 'flex' : 'none';
             const textEl = loadingEl.querySelector('p');
             if (textEl) textEl.textContent = message;
         }
+    }
+    function sortFloors(a, b) {
+        const getFloorParts = (floorStr) => {
+            const s = String(floorStr).toUpperCase();
+            const buildingPrefixMatch = s.match(/^([^\dBRF]+)/);
+            const buildingPrefix = buildingPrefixMatch ? buildingPrefixMatch[1] : '';
+            const floorMatch = s.match(/([B|R]?)(\d+)/);
+            if (!floorMatch) return { building: buildingPrefix, type: 2, num: 0, original: s };
+            const [, type, numStr] = floorMatch;
+            const floorType = (type === 'B') ? 0 : (type === 'R') ? 2 : 1;
+            return { building: buildingPrefix, type: floorType, num: parseInt(numStr, 10) };
+        };
+        const partsA = getFloorParts(a);
+        const partsB = getFloorParts(b);
+        if (partsA.building > partsB.building) return 1;
+        if (partsA.building < partsB.building) return -1;
+        if (partsA.type > partsB.type) return 1;
+        if (partsA.type < partsB.type) return -1;
+        if (partsA.type === 0) return partsB.num - partsA.num;
+        return partsA.num - partsB.num;
     }
     function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length-pB.length; }
 
