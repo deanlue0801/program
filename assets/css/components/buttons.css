@@ -1,0 +1,295 @@
+/**
+ * 按鈕組件樣式
+ * 路徑: assets/css/components/buttons.css
+ * 依賴: variables.css
+ */
+
+/* 基礎按鈕樣式 */
+.btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
+  transition: all var(--transition-base);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  white-space: nowrap;
+  min-height: 40px;
+}
+
+.btn:focus {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-hover);
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* 按鈕尺寸變化 */
+.btn-sm {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  min-height: 32px;
+}
+
+.btn-lg {
+  padding: var(--spacing-md) var(--spacing-xl);
+  font-size: var(--font-size-lg);
+  min-height: 48px;
+}
+
+/* 按鈕顏色主題 */
+.btn-primary {
+  background: var(--primary-color);
+  color: var(--white);
+  border: 1px solid var(--primary-color);
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.btn-secondary {
+  background: var(--gray-500);
+  color: var(--white);
+  border: 1px solid var(--gray-500);
+}
+
+.btn-secondary:hover {
+  background: var(--gray-600);
+  border-color: var(--gray-600);
+}
+
+.btn-success {
+  background: var(--success-color);
+  color: var(--white);
+  border: 1px solid var(--success-color);
+}
+
+.btn-success:hover {
+  background: var(--success-hover);
+  border-color: var(--success-hover);
+}
+
+.btn-warning {
+  background: var(--warning-color);
+  color: var(--gray-800);
+  border: 1px solid var(--warning-color);
+}
+
+.btn-warning:hover {
+  background: var(--warning-hover);
+  border-color: var(--warning-hover);
+}
+
+.btn-danger {
+  background: var(--danger-color);
+  color: var(--white);
+  border: 1px solid var(--danger-color);
+}
+
+.btn-danger:hover {
+  background: var(--danger-hover);
+  border-color: var(--danger-hover);
+}
+
+.btn-info {
+  background: var(--info-color);
+  color: var(--white);
+  border: 1px solid var(--info-color);
+}
+
+.btn-info:hover {
+  background: var(--info-hover);
+  border-color: var(--info-hover);
+}
+
+/* 特殊按鈕樣式 */
+.btn-logout {
+  background: #ff6b6b;
+  color: var(--white);
+  border: 1px solid #ff6b6b;
+}
+
+.btn-logout:hover {
+  background: #ff5252;
+  border-color: #ff5252;
+}
+
+/* 按鈕變化樣式 */
+.btn-outline {
+  background: transparent;
+  border-width: 2px;
+}
+
+.btn-outline.btn-primary {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.btn-outline.btn-primary:hover {
+  background: var(--primary-color);
+  color: var(--white);
+}
+
+.btn-outline.btn-success {
+  color: var(--success-color);
+  border-color: var(--success-color);
+}
+
+.btn-outline.btn-success:hover {
+  background: var(--success-color);
+  color: var(--white);
+}
+
+/* 圓形按鈕 */
+.btn-circle {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-circle.btn-sm {
+  width: 32px;
+  height: 32px;
+}
+
+.btn-circle.btn-lg {
+  width: 56px;
+  height: 56px;
+  font-size: var(--font-size-xl);
+}
+
+/* 按鈕群組 */
+.btn-group {
+  display: inline-flex;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-group .btn {
+  border-radius: 0;
+  margin: 0;
+  border-right-width: 0;
+}
+
+.btn-group .btn:first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.btn-group .btn:last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  border-right-width: 1px;
+}
+
+.btn-group .btn:only-child {
+  border-radius: var(--radius-md);
+  border-right-width: 1px;
+}
+
+/* 載入狀態 */
+.btn-loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.btn-loading::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: var(--radius-full);
+  animation: btn-spin 1s linear infinite;
+}
+
+@keyframes btn-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 全寬按鈕 */
+.btn-block {
+  width: 100%;
+  display: flex;
+}
+
+/* 浮動動作按鈕 (FAB) */
+.btn-fab {
+  position: fixed;
+  bottom: var(--spacing-xl);
+  right: var(--spacing-xl);
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-fixed);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-xl);
+  transition: all var(--transition-base);
+}
+
+.btn-fab:hover {
+  box-shadow: var(--shadow-xl);
+  transform: translateY(-2px) scale(1.05);
+}
+
+/* 響應式調整 */
+@media (max-width: 768px) {
+  .btn-group {
+    flex-direction: column;
+  }
+  
+  .btn-group .btn {
+    border-radius: 0;
+    border-right-width: 1px;
+    border-bottom-width: 0;
+  }
+  
+  .btn-group .btn:first-child {
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+  }
+  
+  .btn-group .btn:last-child {
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    border-bottom-width: 1px;
+  }
+  
+  .btn-fab {
+    bottom: var(--spacing-lg);
+    right: var(--spacing-lg);
+  }
+}

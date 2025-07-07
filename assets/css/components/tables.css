@@ -1,0 +1,123 @@
+.table-wrapper {
+    overflow-x: auto;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--white);
+    font-size: var(--font-size-sm);
+}
+
+.table th,
+.table td {
+    padding: var(--spacing-sm);
+    text-align: center;
+    border-bottom: 1px solid var(--gray-200);
+    vertical-align: middle;
+}
+
+.table th {
+    background: var(--gradient-primary);
+    color: var(--white);
+    font-weight: var(--font-weight-semibold);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.table th:first-child,
+.table td:first-child {
+    text-align: left;
+    padding-left: var(--spacing-md);
+    min-width: 200px;
+}
+
+.table tbody tr:hover {
+    background: rgba(102, 126, 234, 0.05);
+}
+
+.table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* 表格狀態 */
+.table-striped tbody tr:nth-child(even) {
+    background: var(--gray-50);
+}
+
+.table-bordered {
+    border: 1px solid var(--gray-300);
+}
+
+.table-bordered th,
+.table-bordered td {
+    border: 1px solid var(--gray-300);
+}
+
+/* 表格大小 */
+.table-sm th,
+.table-sm td {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
+}
+
+.table-lg th,
+.table-lg td {
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: var(--font-size-base);
+}
+
+/* 特殊欄位 */
+.total-column {
+    background: rgba(102, 126, 234, 0.1) !important;
+    font-weight: var(--font-weight-bold);
+    color: var(--primary-color);
+}
+
+.summary-row {
+    background: var(--gray-100) !important;
+    font-weight: var(--font-weight-bold);
+    border-top: 2px solid var(--primary-color);
+}
+
+.summary-row td {
+    background: var(--gray-100) !important;
+}
+
+/* 空狀態 */
+.empty-state {
+    text-align: center;
+    padding: var(--spacing-xxxl) var(--spacing-lg);
+    color: var(--gray-600);
+}
+
+.empty-state-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.empty-state-icon {
+    font-size: 48px;
+    opacity: 0.5;
+}
+
+/* 響應式表格 */
+@media (max-width: 768px) {
+    .table th,
+    .table td {
+        padding: var(--spacing-xs) var(--spacing-sm);
+        font-size: var(--font-size-xs);
+    }
+    
+    .table th:first-child,
+    .table td:first-child {
+        min-width: 150px;
+        padding-left: var(--spacing-sm);
+    }
+}
