@@ -1,5 +1,4 @@
 /* --- 分配管理頁面專屬樣式 --- */
-
 /* 頁面佈局容器 */
 .distribution-page-wrapper { display: flex; flex-direction: column; height: calc(100vh - 50px - 2rem); }
 .selection-panel { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); flex-shrink: 0; }
@@ -47,25 +46,3 @@
 .sequence-name { flex-grow: 1; }
 .custom-add-section { display: flex; gap: 10px; align-items: center; }
 .custom-add-section input { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ddd; }
-
-/* --- 【關鍵修正】: 使用更高權重的選擇器來修正按鈕顏色 --- */
-.action-buttons .btn.btn-success,
-#saveDistributionsBtn {
-    background-color: #28a745;
-    color: white;
-}
-.action-buttons .btn.btn-primary,
-#clearDistributionsBtn {
-    background-color: #6a5acd; /* 紫色 */
-    color: white;
-}
-.action-buttons .btn.btn-warning,
-#exportBtn {
-    background-color: #ffc107;
-    color: #212529;
-}
-.action-buttons .btn {
-    background-color: #f8f9fa;
-    color: #343a40;
-    border: 1px solid #dee2e6;
-}
