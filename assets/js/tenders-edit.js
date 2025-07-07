@@ -1,5 +1,5 @@
 /**
- * 編輯標單頁面 (tenders-edit.js) - v6.1 修正函數定義順序
+ * 編輯標單頁面 (tenders-edit.js) - v6.2 修正函數定義順序
  */
 function initTenderEditPage() {
     // --- 頁面級別變數 ---
@@ -15,25 +15,12 @@ function initTenderEditPage() {
         const additionAmount = additionItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
         const totalAmount = originalAmount + additionAmount;
         const increasePercentage = originalAmount > 0 ? ((additionAmount / originalAmount) * 100).toFixed(2) : 0;
-
         container.innerHTML = `
             <div class="tender-header-card">
-                <div class="tender-info-item">
-                    <div class="label">標單名稱</div>
-                    <div class="value large">${currentTender.name}</div>
-                </div>
-                <div class="tender-info-item">
-                    <div class="label">原始合約金額</div>
-                    <div class="value">${formatCurrency(originalAmount)}</div>
-                </div>
-                <div class="tender-info-item">
-                    <div class="label">追加總金額</div>
-                    <div class="value warning">${formatCurrency(additionAmount)}</div>
-                </div>
-                <div class="tender-info-item">
-                    <div class="label">目前總金額</div>
-                    <div class="value success">${formatCurrency(totalAmount)}</div>
-                </div>
+                <div class="tender-info-item"><div class="label">標單名稱</div><div class="value large">${currentTender.name}</div></div>
+                <div class="tender-info-item"><div class="label">原始合約金額</div><div class="value">${formatCurrency(originalAmount)}</div></div>
+                <div class="tender-info-item"><div class="label">追加總金額</div><div class="value warning">${formatCurrency(additionAmount)}</div></div>
+                <div class="tender-info-item"><div class="label">目前總金額</div><div class="value success">${formatCurrency(totalAmount)}</div></div>
                  <div class="tender-info-item">
                     <div class="label">增幅百分比</div>
                     <div class="value">${increasePercentage}%</div>
@@ -89,31 +76,11 @@ function initTenderEditPage() {
     function renderMajorItemsList() {
         const container = document.getElementById('items-list-container');
         if (!container) return;
-        let html = `
-            <div class="list-actions">
-                <h3>原始項目 (不可修改)</h3>
-                <button id="expand-all-btn" class="btn btn-secondary">${allExpanded ? '全部收合' : '全部展開'}</button>
-            </div>
-        `;
+        let html = `<div class="list-actions"><h3>原始項目 (不可修改)</h3><button id="expand-all-btn" class="btn btn-secondary">${allExpanded ? '全部收合' : '全部展開'}</button></div>`;
         majorItems.forEach((majorItem) => {
             const detailsInMajor = detailItems.filter(d => d.majorItemId === majorItem.id);
             const itemNumber = majorItem.sequence || 'N/A';
-            html += `
-                <div class="major-item-wrapper">
-                    <div class="major-item-row ${allExpanded ? 'expanded' : ''}" data-major-id="${majorItem.id}">
-                        <div class="item-number-circle">${itemNumber}</div>
-                        <div class="item-name">${majorItem.name}</div>
-                        <div class="item-analysis">
-                            <span>${detailsInMajor.length} 項</span>
-                            <span class="amount">${formatCurrency(detailsInMajor.reduce((s, i) => s + (i.totalPrice || 0), 0))}</span>
-                        </div>
-                        <div class="item-expand-icon">▶</div>
-                    </div>
-                    <div class="detail-items-container ${allExpanded ? 'expanded' : ''}" id="details-for-${majorItem.id}">
-                        ${renderDetailTable(detailsInMajor)}
-                    </div>
-                </div>
-            `;
+            html += `<div class="major-item-wrapper"><div class="major-item-row ${allExpanded ? 'expanded' : ''}" data-major-id="${majorItem.id}"><div class="item-number-circle">${itemNumber}</div><div class="item-name">${majorItem.name}</div><div class="item-analysis"><span>${detailsInMajor.length} 項</span><span class="amount">${formatCurrency(detailsInMajor.reduce((s, i) => s + (i.totalPrice || 0), 0))}</span></div><div class="item-expand-icon">▶</div></div><div class="detail-items-container ${allExpanded ? 'expanded' : ''}" id="details-for-${majorItem.id}">${renderDetailTable(detailsInMajor)}</div></div>`;
         });
         container.innerHTML = html;
     }
@@ -122,70 +89,32 @@ function initTenderEditPage() {
         const container = document.getElementById('addition-details-container');
         if (!container) return;
         let html = `<h3>追加/追減明細</h3>`;
-        if (additionItems.length === 0) {
-            html += '<div style="padding: 20px; text-align: center; color: #888;">目前尚無變更項目。</div>';
-            container.innerHTML = html; return;
-        }
+        if (additionItems.length === 0) { html += '<div style="padding: 20px; text-align: center; color: #888;">目前尚無變更項目。</div>'; container.innerHTML = html; return; }
         const rows = additionItems.map(add => {
             const relatedItem = detailItems.find(d => d.id === add.relatedItemId);
             const changeTypeClass = (add.totalQuantity || 0) >= 0 ? 'success' : 'danger';
-            return `
-                <tr>
-                    <td>${add.additionDate || formatDate(add.createdAt)}</td>
-                    <td>${relatedItem ? relatedItem.name : '未知項目'}</td>
-                    <td class="number-cell" style="color:var(--${changeTypeClass}-color); font-weight:bold;">${add.totalQuantity || 0}</td>
-                    <td class="number-cell">${formatCurrency(add.unitPrice)}</td>
-                    <td>${add.reason || ''}</td>
-                    <td>${add.notes || ''}</td>
-                    <td class="action-cell">
-                        <button class="btn btn-sm btn-warning" data-action="edit-addition" data-addition-id="${add.id}">編輯</button>
-                        <button class="btn btn-sm btn-danger" data-action="delete-addition" data-addition-id="${add.id}">刪除</button>
-                    </td>
-                </tr>
-            `;
+            return `<tr><td>${add.additionDate || formatDate(add.createdAt)}</td><td>${relatedItem ? relatedItem.name : '未知項目'}</td><td class="number-cell" style="color:var(--${changeTypeClass}-color); font-weight:bold;">${add.totalQuantity || 0}</td><td class="number-cell">${formatCurrency(add.unitPrice)}</td><td>${add.reason || ''}</td><td>${add.notes || ''}</td><td class="action-cell"><button class="btn btn-sm btn-warning" data-action="edit-addition" data-addition-id="${add.id}">編輯</button><button class="btn btn-sm btn-danger" data-action="delete-addition" data-addition-id="${add.id}">刪除</button></td></tr>`;
         }).join('');
-        html += `
-            <table class="detail-items-table">
-                <thead><tr><th>變更日期</th><th>關聯項目</th><th class="number-cell">變更數量</th><th class="number-cell">變更單價</th><th>變更原因</th><th>備註</th><th class="action-cell">操作</th></tr></thead>
-                <tbody>${rows}</tbody>
-            </table>
-        `;
+        html += `<table class="detail-items-table"><thead><tr><th>變更日期</th><th>關聯項目</th><th class="number-cell">變更數量</th><th class="number-cell">變更單價</th><th>變更原因</th><th>備註</th><th class="action-cell">操作</th></tr></thead><tbody>${rows}</tbody></table>`;
         container.innerHTML = html;
     }
 
     function renderSummaryCards() {
         const summaryContainer = document.getElementById('summaryGrid');
         if(!summaryContainer) return;
-        
         const summarizedItems = {};
         additionItems.forEach(add => {
             if (!summarizedItems[add.relatedItemId]) {
                 const originalItem = detailItems.find(d => d.id === add.relatedItemId);
-                if (originalItem) {
-                    summarizedItems[add.relatedItemId] = { name: originalItem.name, unit: originalItem.unit, originalQty: originalItem.totalQuantity || 0, additionalQty: 0 };
-                }
+                if (originalItem) summarizedItems[add.relatedItemId] = { name: originalItem.name, unit: originalItem.unit, originalQty: originalItem.totalQuantity || 0, additionalQty: 0 };
             }
-            if (summarizedItems[add.relatedItemId]) {
-                summarizedItems[add.relatedItemId].additionalQty += (add.totalQuantity || 0);
-            }
+            if (summarizedItems[add.relatedItemId]) summarizedItems[add.relatedItemId].additionalQty += (add.totalQuantity || 0);
         });
-
-        if (Object.keys(summarizedItems).length === 0) {
-            summaryContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">無變更項目可供統計。</div>';
-            return;
-        }
-
-        summaryContainer.innerHTML = Object.values(summarizedItems).map(summary => `
-            <div class="summary-card">
-                <div class="summary-item-name">${summary.name}</div>
-                <div class="summary-detail"><span>原始數量</span><span>${summary.originalQty} ${summary.unit || ''}</span></div>
-                <div class="summary-detail"><span>變更數量</span><span class="${summary.additionalQty >= 0 ? 'success' : 'danger'}">${summary.additionalQty > 0 ? '+' : ''}${summary.additionalQty} ${summary.unit || ''}</span></div>
-                <div class="summary-detail total"><span>目前總數</span><span>${summary.originalQty + summary.additionalQty} ${summary.unit || ''}</span></div>
-            </div>
-        `).join('');
+        if (Object.keys(summarizedItems).length === 0) { summaryContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">無變更項目可供統計。</div>'; return; }
+        summaryContainer.innerHTML = Object.values(summarizedItems).map(summary => `<div class="summary-card"><div class="summary-item-name">${summary.name}</div><div class="summary-detail"><span>原始數量</span><span>${summary.originalQty} ${summary.unit || ''}</span></div><div class="summary-detail"><span>變更數量</span><span class="${summary.additionalQty >= 0 ? 'success' : 'danger'}">${summary.additionalQty > 0 ? '+' : ''}${summary.additionalQty} ${summary.unit || ''}</span></div><div class="summary-detail total"><span>目前總數</span><span>${summary.originalQty + summary.additionalQty} ${summary.unit || ''}</span></div></div>`).join('');
     }
 
-    // --- 主渲染函數 (*** 現在可以安全地呼叫上面的輔助函數 ***) ---
+    // --- 主渲染函數 ---
     function renderPage() {
         renderTenderHeader();
         renderMajorItemsList();
@@ -198,44 +127,28 @@ function initTenderEditPage() {
         renderTenderHeader();
         renderAdditionItemsTable();
         renderSummaryCards();
-        if (relatedItemIdToUpdate) {
-            updateSingleDetailItemRow(relatedItemIdToUpdate);
-        }
+        if (relatedItemIdToUpdate) updateSingleDetailItemRow(relatedItemIdToUpdate);
     }
 
     function updateSingleDetailItemRow(detailItemId) {
         const item = detailItems.find(d => d.id === detailItemId);
         if (!item) return;
-
         const originalQuantity = item.totalQuantity || 0;
         const additions = additionItems.filter(add => add.relatedItemId === item.id);
         const additionalQuantity = additions.reduce((s, a) => s + (a.totalQuantity || 0), 0);
-        
-        let quantityDisplay;
-        if (additionalQuantity > 0) {
-            quantityDisplay = `${originalQuantity + additionalQuantity} <span style="color:var(--success-color); font-size:12px;">(+${additionalQuantity})</span>`;
-        } else if (additionalQuantity < 0) {
-            quantityDisplay = `${originalQuantity + additionalQuantity} <span style="color:var(--danger-color); font-size:12px;">(${additionalQuantity})</span>`;
-        } else {
-            quantityDisplay = originalQuantity;
-        }
-        
+        let quantityDisplay = (additionalQuantity > 0) ? `${originalQuantity + additionalQuantity} <span style="color:var(--success-color); font-size:12px;">(+${additionalQuantity})</span>` : (additionalQuantity < 0) ? `${originalQuantity + additionalQuantity} <span style="color:var(--danger-color); font-size:12px;">(${additionalQuantity})</span>` : originalQuantity;
         const row = document.querySelector(`tr[data-detail-item-id="${item.id}"]`);
         if(!row) return;
-
         const statusBar = row.querySelector('.item-status-bar');
         const quantityCell = row.querySelector('.current-quantity-cell');
-        
         if (statusBar) {
             statusBar.className = 'item-status-bar';
             if(additions.length > 0) statusBar.classList.add('has-change');
             else if(originalQuantity === 0) statusBar.classList.add('is-zero');
         }
-        if (quantityCell) {
-            quantityCell.innerHTML = quantityDisplay;
-        }
+        if (quantityCell) quantityCell.innerHTML = quantityDisplay;
     }
-
+    
     // --- 事件處理與 Modal 邏輯 ---
     function setupEventListeners() {
         const content = document.getElementById('editTenderContent');
@@ -372,8 +285,8 @@ function initTenderEditPage() {
 
     function showLoading(isLoading) { document.getElementById('loading').style.display = isLoading ? 'flex' : 'none'; document.getElementById('editTenderContent').style.display = isLoading ? 'none' : 'block'; }
     function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length-pB.length; }
-
-    // --- 頁面啟動點 ---
+    
+    // --- 頁面啟動點 (*** 將所有啟動邏輯都包在 init 函數中 ***) ---
     async function loadAllData() {
         const tenderDoc = await db.collection('tenders').doc(tenderId).get();
         if (!tenderDoc.exists) throw new Error('找不到指定的標單');
@@ -387,5 +300,6 @@ function initTenderEditPage() {
         additionItems = allDetailItemsData.docs.filter(item => item.isAddition).sort((a,b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
     }
     
+    // *** 最終執行啟動點 ***
     init();
 }
