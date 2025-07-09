@@ -1,5 +1,5 @@
 /**
- * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.6 - 最終修正Modal關閉BUG)
+ * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.7 - 最終修正Modal關閉BUG)
  */
 function initSpaceDistributionPage() {
     
@@ -54,7 +54,7 @@ function initSpaceDistributionPage() {
             tenders.forEach(tender => tenderSelect.innerHTML += `<option value="${tender.id}">${tender.name}</option>`);
             tenderSelect.disabled = false;
         } catch (error) {
-            showAlert('載入標單失败', 'error');
+            showAlert('載入標單失敗', 'error');
             tenderSelect.innerHTML = '<option value="">載入失敗</option>';
         }
     }
