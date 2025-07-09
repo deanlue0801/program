@@ -17,7 +17,7 @@
             <select class="form-select" id="floorSelect" disabled></select>
         </div>
         <div>
-            <label class="selection-label" for="spaceSelect">🚪 空間</label>
+            <label class="selection-label" for="spaceSelect">🚪 空間 (可選，以檢視單一空間)</label>
             <select class="form-select" id="spaceSelect" disabled></select>
         </div>
     </div>
@@ -33,9 +33,19 @@
         <div class="actions-panel">
             <h2 id="currentLocation" style="color: #333; font-size: 20px;"></h2>
             <div class="action-buttons">
+                 <button id="importBtn" class="btn btn-primary">📥 匯入 Excel</button>
+                 <input type="file" id="importInput" accept=".xlsx, .xls" style="display: none;">
+                 <button id="exportBtn" class="btn btn-warning">📤 匯出 Excel</button>
                  <button id="workItemsManagerBtn" class="btn btn-info">⚙️ 管理工項</button>
             </div>
         </div>
+        
+        <div id="spaceFilterContainer" class="space-filter-container" style="display: none;">
+            <h4>空間篩選</h4>
+            <div id="spaceFilterCheckboxes" class="checkbox-group">
+                </div>
+        </div>
+        
         <div class="table-container">
             <table class="distribution-table" id="progressTable">
                 <thead id="tableHeader"></thead>
@@ -46,7 +56,7 @@
     
     <div id="initialEmptyState" class="empty-state" style="display: flex;">
         <div class="empty-state-icon">↖️</div>
-        <p>請從上方的下拉選單選擇完整的目標，以載入施工進度表</p>
+        <p>請從上方的下拉選單選擇「專案」、「標單」、「大項」及「樓層」以開始作業</p>
     </div>
 </div>
 
