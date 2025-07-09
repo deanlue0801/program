@@ -1,5 +1,5 @@
 /**
- * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.7 - 最終修正Modal關閉BUG)
+ * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.8 - 最終修正Modal關閉BUG)
  */
 function initSpaceDistributionPage() {
     
@@ -303,7 +303,7 @@ function initSpaceDistributionPage() {
                         const confirmed = confirm(`偵測到新的空間欄位：\n\n[${newSpaces.join(', ')}]\n\n是否要將這些新空間自動新增至 '${selectedFloor}' 的設定中？`);
                         if (confirmed) {
                             spaces = [...spaces, ...newSpaces];
-                            await saveSpaceSettings(true); 
+                            await _performSaveSpaceSettings(); 
                         } else {
                             showAlert('匯入已取消。', 'info');
                             return;
@@ -437,29 +437,9 @@ function initSpaceDistributionPage() {
     }
 
     // --- 【第 545 行：開始，這是本次修正的核心函數】 ---
-    async function saveSpaceSettings(isSilent = false) {
-        // isSilent = true 是給Excel匯入功能在背景呼叫用的
-        if (isSilent) {
-            try {
-                const settingData = { tenderId: selectedTender.id, floorName: selectedFloor, spaces: spaces, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-                const query = await db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get();
-                if (!query.empty) {
-                    await db.collection("spaceSettings").doc(query.docs[0].id).update(settingData);
-                } else {
-                    settingData.createdBy = currentUser.email;
-                    settingData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                    await db.collection("spaceSettings").add(settingData);
-                }
-            } catch (error) {
-                throw error;
-            }
-            return;
-        }
 
-        // 修正後的正常流程
-        closeModal('spaceModal');
-        showLoading(true, '設定儲存中...');
-
+    // 這是給 Excel 匯入功能在背景呼叫的「純資料」儲存函式
+    async function _performSaveSpaceSettings() {
         try {
             const settingData = { tenderId: selectedTender.id, floorName: selectedFloor, spaces: spaces, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
             const query = await db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get();
@@ -470,17 +450,42 @@ function initSpaceDistributionPage() {
                 settingData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 await db.collection("spaceSettings").add(settingData);
             }
-            
-            await onFloorChange(selectedFloor);
-            showAlert('✅ 空間設定已儲存！', 'success');
-
         } catch (error) {
-            showAlert('儲存失敗: ' + error.message, 'error');
-        } finally {
-            showLoading(false);
+            // 在背景模式下，向上拋出錯誤讓呼叫者處理
+            throw error;
         }
     }
-    // --- 【第 603 行：結束，以上是本次修正的核心函數】 ---
+    
+    // 這是給使用者點擊「儲存設定」按鈕呼叫的「UI」儲存函式
+    function saveSpaceSettings() {
+        // 1. 立即關閉彈出視窗，這是最重要的第一步
+        closeModal('spaceModal');
+
+        // 2. 使用 setTimeout 將後續的耗時操作推入非同步佇列
+        //    這能確保瀏覽器有足夠的時間完成關閉視窗的渲染
+        setTimeout(async () => {
+            showLoading(true, '設定儲存中...');
+            try {
+                // 3. 呼叫純資料儲存函式
+                await _performSaveSpaceSettings();
+                
+                // 4. 成功後，重新整理主頁面內容以顯示新的空間欄位
+                await onFloorChange(selectedFloor);
+                
+                // 5. 最後才顯示成功訊息
+                showAlert('✅ 空間設定已儲存！', 'success');
+
+            } catch (error) {
+                // 如果出錯，也要顯示錯誤訊息
+                showAlert('儲存失敗: ' + error.message, 'error');
+            } finally {
+                // 6. 無論成功或失敗，最後都要隱藏讀取動畫
+                showLoading(false);
+            }
+        }, 10); // 給予 10 毫秒的延遲，確保 UI 渲染完成
+    }
+    
+    // --- 【第 601 行：結束，以上是本次修正的核心函數】 ---
     
     function resetSelect(selectId, defaultText) {
         const select = document.getElementById(selectId);
