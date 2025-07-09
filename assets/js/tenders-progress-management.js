@@ -1,5 +1,5 @@
 /**
- * 施工進度管理 (progress-management.js) (SPA 版本 v1.0)
+ * 施工進度管理 (progress-management.js) (SPA 版本 v1.1 - 修正下拉選單BUG)
  */
 function initProgressManagementPage() {
 
@@ -16,27 +16,27 @@ function initProgressManagementPage() {
     }
 
     async function loadProjects() {
-        // ... (這部分的程式碼與 space-distribution.js 的 loadProjects 相同)
         showLoading(true, '載入專案中...');
         try {
             const projectDocs = await safeFirestoreQuery("projects", [{ field: "createdBy", operator: "==", value: currentUser.email }], { field: "name", direction: "asc" });
             projects = projectDocs.docs;
-            const projectSelect = document.getElementById('projectSelect');
-            projectSelect.innerHTML = '<option value="">請選擇專案...</option>';
-            projects.forEach(project => projectSelect.innerHTML += `<option value="${project.id}">${project.name}</option>`);
+            populateSelect(document.getElementById('projectSelect'), projects, '請選擇專案...');
         } catch (error) {
             showAlert('載入專案失敗', 'error');
         } finally {
             showLoading(false);
         }
     }
+    
+    // --- 【第 41 行：開始，這是本次修正的核心邏輯】 ---
 
     async function onProjectChange(projectId) {
-        // ... (這部分的程式碼與 space-distribution.js 的 onProjectChange 相似)
-        resetAllSelects();
+        resetSelects('tender'); // 重設標單及之後的選單
         if (!projectId) return;
+
         const tenderSelect = document.getElementById('tenderSelect');
         tenderSelect.disabled = true;
+        tenderSelect.innerHTML = `<option value="">載入中...</option>`;
         try {
             const tenderDocs = await safeFirestoreQuery("tenders", [{ field: "projectId", operator: "==", value: projectId }], { field: "name", direction: "asc" });
             tenders = tenderDocs.docs;
@@ -45,12 +45,14 @@ function initProgressManagementPage() {
     }
     
     async function onTenderChange(tenderId) {
-        // ... (這部分的程式碼與 space-distribution.js 的 onTenderChange 相似)
-        resetAllSelects(true);
+        resetSelects('majorItem'); // 重設大項及之後的選單
         if(!tenderId) return;
         selectedTender = tenders.find(t => t.id === tenderId);
         
-        // 同時載入大項、樓層、工項設定
+        const majorItemSelect = document.getElementById('majorItemSelect');
+        majorItemSelect.disabled = true;
+        majorItemSelect.innerHTML = `<option value="">載入中...</option>`;
+        
         try {
             const [majorItemDocs, floorSettingsDoc, workItemSettingsDoc] = await Promise.all([
                  safeFirestoreQuery("majorItems", [{ field: "tenderId", operator: "==", value: tenderId }], { field: "name", direction: "asc" }),
@@ -58,9 +60,8 @@ function initProgressManagementPage() {
                  db.collection("workItemSettings").where("tenderId", "==", tenderId).limit(1).get()
             ]);
             majorItems = majorItemDocs.docs;
-            populateSelect(document.getElementById('majorItemSelect'), majorItems, '請選擇大項目...');
+            populateSelect(majorItemSelect, majorItems, '請選擇大項目...');
             floors = floorSettingsDoc.empty ? [] : (floorSettingsDoc.docs[0].data().floors || []);
-            populateSelect(document.getElementById('floorSelect'), floors.map(f => ({id:f, name:f})), '請選擇樓層...');
             if (!workItemSettingsDoc.empty) {
                 workItems = workItemSettingsDoc.docs[0].data().workItems || workItems;
             }
@@ -68,26 +69,35 @@ function initProgressManagementPage() {
         } catch (error) { showAlert('載入標單資料失敗', 'error'); }
     }
 
+    async function onMajorItemChange(majorItemId) {
+        resetSelects('floor'); // 重設樓層及之後的選單
+        if(!majorItemId) return;
+        selectedMajorItem = majorItems.find(m => m.id === majorItemId);
+        populateSelect(document.getElementById('floorSelect'), floors.map(f => ({id:f, name:f})), '請選擇樓層...');
+    }
+
     async function onFloorChange(floorName) {
-        // 載入該樓層的所有空間
-        resetAllSelects(true, true);
+        resetSelects('space'); // 重設空間選單
         if(!floorName) return;
         selectedFloor = floorName;
+        
+        const spaceSelect = document.getElementById('spaceSelect');
+        spaceSelect.disabled = true;
+        spaceSelect.innerHTML = `<option value="">載入中...</option>`;
         try {
             const spaceSettingsDoc = await db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", floorName).limit(1).get();
             spaces = spaceSettingsDoc.empty ? [] : (spaceSettingsDoc.docs[0].data().spaces || []);
-            populateSelect(document.getElementById('spaceSelect'), spaces.map(s => ({id:s, name:s})), '請選擇空間...');
+            populateSelect(spaceSelect, spaces.map(s => ({id:s, name:s})), '請選擇空間...');
         } catch(error) { showAlert('載入空間資料失敗', 'error'); }
     }
     
     async function onSpaceChange(spaceName) {
-        if(!spaceName) { hideContent(); return; }
+        hideContent(true); // 隱藏表格內容，但保留主區塊
+        if(!spaceName) return; 
         selectedSpace = spaceName;
-        selectedMajorItem = majorItems.find(m => m.id === document.getElementById('majorItemSelect').value);
         
         showLoading(true, "載入進度資料...");
         try {
-            // 取得這個空間分配了哪些項目和數量
             const spaceDistDocs = await safeFirestoreQuery("spaceDistribution", [
                 { field: "tenderId", operator: "==", value: selectedTender.id },
                 { field: "floorName", operator: "==", value: selectedFloor },
@@ -95,7 +105,6 @@ function initProgressManagementPage() {
                 { field: "majorItemId", operator: "==", value: selectedMajorItem.id }
             ]);
 
-            // 取得已經存在的進度項目
             const progressItemDocs = await safeFirestoreQuery("progressItems", [
                 { field: "tenderId", operator: "==", value: selectedTender.id },
                 { field: "floorName", operator: "==", value: selectedFloor },
@@ -103,7 +112,6 @@ function initProgressManagementPage() {
                 { field: "majorItemId", operator: "==", value: selectedMajorItem.id }
             ]);
 
-            // 取得大項下的所有細項定義
             const detailItemDocs = await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }]);
 
             buildProgressTable(spaceDistDocs.docs, progressItemDocs.docs, detailItemDocs.docs);
@@ -116,17 +124,17 @@ function initProgressManagementPage() {
         }
     }
 
+    // --- 【第 142 行：結束，這是本次修正的核心邏輯】 ---
+
     function buildProgressTable(spaceDists, progressItems, detailItems) {
         const tableHeader = document.getElementById('tableHeader');
         const tableBody = document.getElementById('tableBody');
         
-        // 建立表頭
         let headerHTML = '<tr><th>項目名稱</th>';
         workItems.forEach(w => headerHTML += `<th>${w}</th>`);
         headerHTML += '</tr>';
         tableHeader.innerHTML = headerHTML;
         
-        // 建立表格內容
         let bodyHTML = '';
         spaceDists.forEach(dist => {
             const detailItem = detailItems.find(d => d.id === dist.detailItemId);
@@ -154,7 +162,6 @@ function initProgressManagementPage() {
         });
         tableBody.innerHTML = bodyHTML;
 
-        // 綁定狀態變更事件
         tableBody.querySelectorAll('.progress-status-select').forEach(select => {
             select.addEventListener('change', (e) => onStatusChange(e.target));
         });
@@ -170,7 +177,6 @@ function initProgressManagementPage() {
             const querySnapshot = await db.collection("progressItems").where("uniqueId", "==", uniqueId).limit(1).get();
             
             if (querySnapshot.empty) {
-                // 如果不存在，則新建一筆
                 const docRef = db.collection("progressItems").doc();
                 await docRef.set({
                     tenderId: selectedTender.id,
@@ -185,7 +191,6 @@ function initProgressManagementPage() {
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
             } else {
-                // 如果存在，則更新
                 const docId = querySnapshot.docs[0].id;
                 const updateData = {};
                 updateData[`workStatuses.${workItem}`] = newStatus;
@@ -195,17 +200,15 @@ function initProgressManagementPage() {
             console.log(`Status for ${uniqueId} - ${workItem} updated to ${newStatus}`);
         } catch (error) {
             showAlert('儲存狀態失敗: ' + error.message, 'error');
-            // 還原下拉選單的值
             selectElement.value = selectElement.querySelector('option[selected]').value;
         }
     }
 
-    // --- 事件綁定 ---
     function setupEventListeners() {
         document.getElementById('projectSelect')?.addEventListener('change', (e) => onProjectChange(e.target.value));
         document.getElementById('tenderSelect')?.addEventListener('change', (e) => onTenderChange(e.target.value));
+        document.getElementById('majorItemSelect')?.addEventListener('change', (e) => onMajorItemChange(e.target.value));
         document.getElementById('floorSelect')?.addEventListener('change', (e) => onFloorChange(e.target.value));
-        document.getElementById('majorItemSelect')?.addEventListener('change', hideContent); // 選擇大項時先清空內容
         document.getElementById('spaceSelect')?.addEventListener('change', (e) => onSpaceChange(e.target.value));
         
         document.getElementById('workItemsManagerBtn')?.addEventListener('click', () => {
@@ -238,14 +241,12 @@ function initProgressManagementPage() {
             }
             showAlert('工項設定已儲存', 'success');
             closeModal('workItemsModal');
-            // 如果當前有顯示表格，重新渲染
             if (selectedSpace) {
                 onSpaceChange(selectedSpace);
             }
         } catch(error) { showAlert('儲存工項設定失敗: ' + error.message, 'error'); }
     }
 
-    // --- 輔助函數 ---
     function populateSelect(selectEl, options, defaultText) {
         selectEl.innerHTML = `<option value="">${defaultText}</option>`;
         options.forEach(opt => {
@@ -253,19 +254,28 @@ function initProgressManagementPage() {
         });
         selectEl.disabled = false;
     }
-
-    function resetAllSelects(keepProject = false) {
-        if (!keepProject) populateSelect(document.getElementById('projectSelect'), [], '請選擇專案...');
-        populateSelect(document.getElementById('tenderSelect'), [], '請先選擇專案');
-        populateSelect(document.getElementById('majorItemSelect'), [], '請先選擇標單');
-        populateSelect(document.getElementById('floorSelect'), [], '請先選擇標單');
-        populateSelect(document.getElementById('spaceSelect'), [], '請先選擇樓層');
+    
+    // --- 【第 279 行：新的、更精確的重設函數】 ---
+    function resetSelects(from = 'project') {
+        const selects = ['project', 'tender', 'space', 'floor', 'majorItem'];
+        const startIndex = selects.indexOf(from);
+        
+        for (let i = startIndex; i < selects.length; i++) {
+            const selectId = selects[i] + 'Select';
+            const el = document.getElementById(selectId);
+            if(el) {
+                el.innerHTML = `<option value="">請先選擇${el.previousElementSibling.textContent}</option>`;
+                el.disabled = true;
+            }
+        }
         hideContent();
     }
 
-    function hideContent() {
+    function hideContent(keepMainWrapper = false) {
         document.getElementById('mainContent').style.display = 'none';
-        document.getElementById('initialEmptyState').style.display = 'flex';
+        if (!keepMainWrapper) {
+            document.getElementById('initialEmptyState').style.display = 'flex';
+        }
     }
 
     function showContent() {
@@ -274,9 +284,13 @@ function initProgressManagementPage() {
         document.getElementById('currentLocation').textContent = `${selectedFloor} / ${selectedSpace}`;
     }
 
-    function showLoading(isLoading, message = '載入中...') { /* ... */ }
+    function showLoading(isLoading, message = '載入中...') {
+        const loadingEl = document.getElementById('loading');
+        if(loadingEl) {
+             loadingEl.style.display = isLoading ? 'flex' : 'none';
+        }
+    }
     function closeModal(modalId) { document.getElementById(modalId).style.display = 'none'; }
     
-    // --- 頁面啟動點 ---
     initializePage();
 }
