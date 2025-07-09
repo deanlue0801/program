@@ -1,5 +1,5 @@
 /**
- * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.5 - 修正Modal關閉BUG)
+ * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.6 - 最終修正Modal關閉BUG)
  */
 function initSpaceDistributionPage() {
     
@@ -438,6 +438,7 @@ function initSpaceDistributionPage() {
 
     // --- 【第 545 行：開始，這是本次修正的核心函數】 ---
     async function saveSpaceSettings(isSilent = false) {
+        // isSilent = true 是給Excel匯入功能在背景呼叫用的
         if (isSilent) {
             try {
                 const settingData = { tenderId: selectedTender.id, floorName: selectedFloor, spaces: spaces, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
@@ -450,16 +451,23 @@ function initSpaceDistributionPage() {
                     await db.collection("spaceSettings").add(settingData);
                 }
             } catch (error) {
+                // 在靜默模式下，向上拋出錯誤讓呼叫者處理
                 throw error;
             }
-            return;
+            return; // 結束靜默模式的執行
         }
 
-        // 修正後的正常流程
+        // 以下是使用者點擊「儲存設定」按鈕的正常流程
+        // **修正後的穩定流程**
+        
+        // 1. 先關閉視窗，這是最優先的UI回饋
         closeModal('spaceModal');
+
+        // 2. 顯示全螢幕的讀取動畫，避免使用者重複操作
         showLoading(true, '設定儲存中...');
 
         try {
+            // 3. 執行非同步的資料庫儲存
             const settingData = { tenderId: selectedTender.id, floorName: selectedFloor, spaces: spaces, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
             const query = await db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get();
             if (!query.empty) {
@@ -470,19 +478,25 @@ function initSpaceDistributionPage() {
                 await db.collection("spaceSettings").add(settingData);
             }
             
+            // 4. 成功後，重新整理主頁面內容以顯示新的空間欄位
             await onFloorChange(selectedFloor);
+            
+            // 5. 最後才顯示成功訊息
             showAlert('✅ 空間設定已儲存！', 'success');
 
         } catch (error) {
+            // 如果出錯，也要顯示錯誤訊息
             showAlert('儲存失敗: ' + error.message, 'error');
         } finally {
+            // 6. 無論成功或失敗，最後都要隱藏讀取動畫
             showLoading(false);
         }
     }
-    // --- 【第 591 行：結束，以上是本次修正的核心函數】 ---
+    // --- 【第 603 行：結束，以上是本次修正的核心函數】 ---
     
     function resetSelect(selectId, defaultText) {
         const select = document.getElementById(selectId);
+        if(!select) return;
         select.innerHTML = `<option value="">${defaultText}</option>`;
         select.disabled = true;
     }
