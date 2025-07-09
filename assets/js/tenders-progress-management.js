@@ -1,5 +1,5 @@
 /**
- * 施工進度管理 (progress-management.js) (SPA 版本 v2.1 - 修正無空間時的BUG)
+ * 施工進度管理 (progress-management.js) (SPA 版本 v2.2 - 完成Excel匯入功能)
  */
 function initProgressManagementPage() {
 
@@ -8,6 +8,7 @@ function initProgressManagementPage() {
     let selectedTender = null, selectedMajorItem = null, selectedFloor = null, selectedSpace = null;
     let workItems = ['配管', '配線', '設備安裝', '測試']; 
     let currentViewMode = 'floor'; // 'floor' or 'space'
+    let allDetailItems = []; // 儲存當前大項的所有細項
 
     // --- 初始化與資料載入 ---
     async function initializePage() {
@@ -58,6 +59,8 @@ function initProgressManagementPage() {
             floors = floorSettingsDoc.empty ? [] : (floorSettingsDoc.docs[0].data().floors || []);
              if (!workItemSettingsDoc.empty) {
                 workItems = workItemSettingsDoc.docs[0].data().workItems || workItems;
+            } else {
+                workItems = ['配管', '配線', '設備安裝', '測試']; // 如果沒有設定，則恢復預設值
             }
             document.getElementById('newWorkItemInput').value = workItems.join(',');
         } catch (error) { showAlert('載入標單資料失敗', 'error'); }
@@ -67,6 +70,8 @@ function initProgressManagementPage() {
         resetSelects('floor');
         if(!majorItemId) return;
         selectedMajorItem = majorItems.find(m => m.id === majorItemId);
+        // 預先載入細項，供匯入功能使用
+        allDetailItems = (await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }])).docs;
         populateSelect(document.getElementById('floorSelect'), floors.map(f => ({id:f, name:f})), '請選擇樓層...');
     }
 
@@ -74,7 +79,6 @@ function initProgressManagementPage() {
         resetSelects('space');
         if(!floorName) return;
         selectedFloor = floorName;
-        
         currentViewMode = 'floor';
         loadProgressData(); 
     }
@@ -90,7 +94,6 @@ function initProgressManagementPage() {
         loadProgressData();
     }
 
-    // --- 【第 119 行：開始，這是本次修正的核心函數】 ---
     async function loadProgressData() {
         if (!selectedFloor) {
             hideContent();
@@ -99,32 +102,27 @@ function initProgressManagementPage() {
         
         showLoading(true, "載入進度資料...");
         try {
-            // 基礎查詢條件
             const baseQuery = [
                 { field: "tenderId", operator: "==", value: selectedTender.id },
                 { field: "majorItemId", operator: "==", value: selectedMajorItem.id },
                 { field: "floorName", operator: "==", value: selectedFloor }
             ];
 
-            // 1. **主要資料來源**：從「樓層分配表」取得總數
             const floorDistQuery = [
                 { field: "tenderId", operator: "==", value: selectedTender.id },
                 { field: "majorItemId", operator: "==", value: selectedMajorItem.id },
-                { field: "areaName", operator: "==", value: selectedFloor } // 注意這裡的欄位是 areaName
+                { field: "areaName", operator: "==", value: selectedFloor }
             ];
-            const floorDistDocs = await safeFirestoreQuery("distributionTable", floorDistQuery);
-
-            // 2. **輔助資料來源**：取得所有相關的空間分配、進度項目、細項定義和空間設定
-            const [spaceDistDocs, progressItemDocs, detailItemDocs, spaceSettingsDoc] = await Promise.all([
+            
+            const [floorDistDocs, spaceDistDocs, progressItemDocs, spaceSettingsDoc] = await Promise.all([
+                safeFirestoreQuery("distributionTable", floorDistQuery),
                 safeFirestoreQuery("spaceDistribution", baseQuery),
                 safeFirestoreQuery("progressItems", baseQuery),
-                safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }]),
                 db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get()
             ]);
 
-            // 如果是單一空間檢視，需要過濾樓層總數資料
             const finalFloorDistDocs = (currentViewMode === 'space' && selectedSpace)
-                ? floorDistDocs.docs.filter(doc => spaceDistDocs.docs.some(sDoc => sDoc.detailItemId === doc.detailItemId))
+                ? floorDistDocs.docs.filter(doc => spaceDistDocs.docs.some(sDoc => sDoc.detailItemId === doc.detailItemId && sDoc.spaceName === selectedSpace))
                 : floorDistDocs.docs;
 
             spaces = spaceSettingsDoc.empty ? [] : (spaceSettingsDoc.docs[0].data().spaces || []);
@@ -133,7 +131,7 @@ function initProgressManagementPage() {
                 buildSpaceFilter();
             }
             
-            buildProgressTable(finalFloorDistDocs, spaceDistDocs.docs, progressItemDocs.docs, detailItemDocs.docs);
+            buildProgressTable(finalFloorDistDocs, spaceDistDocs.docs, progressItemDocs.docs, allDetailItems);
             showContent();
 
         } catch (error) {
@@ -188,13 +186,14 @@ function initProgressManagementPage() {
         tableHeader.innerHTML = headerHTML;
         
         let bodyHTML = '';
+        
+        const spaceDistsForFloor = spaceDists.filter(sd => sd.floorName === selectedFloor);
 
         floorDists.forEach(floorDist => {
             const detailItem = detailItems.find(d => d.id === floorDist.detailItemId);
             if (!detailItem) return;
 
-            // 建立一個查找表，來決定每個編號的設備在哪個空間
-            const itemSpaceDists = spaceDists.filter(sd => sd.detailItemId === floorDist.detailItemId);
+            const itemSpaceDists = spaceDistsForFloor.filter(sd => sd.detailItemId === floorDist.detailItemId);
             const spaceLookup = [];
             let cumulativeQty = 0;
             itemSpaceDists.forEach(sd => {
@@ -203,16 +202,20 @@ function initProgressManagementPage() {
                 spaceLookup.push({ space: sd.spaceName, start, end });
                 cumulativeQty += sd.quantity;
             });
-
-            const totalQuantity = (currentViewMode === 'space' && selectedSpace)
-                ? itemSpaceDists.find(sd => sd.spaceName === selectedSpace)?.quantity || 0
-                : floorDist.quantity;
+            
+            let totalQuantity = floorDist.quantity;
+            if (currentViewMode === 'space' && selectedSpace) {
+                totalQuantity = itemSpaceDists.find(sd => sd.spaceName === selectedSpace)?.quantity || 0;
+                if (totalQuantity === 0) return;
+            }
 
             for (let i = 1; i <= totalQuantity; i++) {
                 const uniqueId = `${floorDist.detailItemId}-${i}`;
                 const progressItem = progressItems.find(p => p.uniqueId === uniqueId);
                 const spaceInfo = spaceLookup.find(sl => i >= sl.start && i <= sl.end);
                 const spaceName = spaceInfo ? spaceInfo.space : "尚未分配";
+
+                if (currentViewMode === 'space' && selectedSpace && spaceName !== selectedSpace) continue;
 
                 bodyHTML += `<tr data-unique-id="${uniqueId}" data-detail-item-id="${floorDist.detailItemId}" data-space-name="${spaceName}">`;
                 bodyHTML += `<td>${detailItem.name} #${i}</td>`;
@@ -239,8 +242,6 @@ function initProgressManagementPage() {
             select.addEventListener('change', (e) => onStatusChange(e.target));
         });
     }
-
-    // --- 【第 274 行：結束，以上是本次修正的核心函數】 ---
 
     async function onStatusChange(selectElement) {
         const tr = selectElement.closest('tr');
@@ -270,7 +271,6 @@ function initProgressManagementPage() {
             console.log(`Status for ${uniqueId} updated.`);
         } catch (error) {
             showAlert('儲存狀態失敗: ' + error.message, 'error');
-            // Revert dropdown value on error
         }
     }
     
@@ -288,9 +288,9 @@ function initProgressManagementPage() {
             if (row.style.display === 'none') return;
             
             const rowData = [];
-            const itemName = row.cells[0].textContent;
-            const sequence = itemName.split('#')[1] || '';
-            const name = itemName.split('#')[0].trim();
+            const itemNameCell = row.cells[0].textContent;
+            const sequence = itemNameCell.split('#')[1]?.trim() || '';
+            const name = itemNameCell.split('#')[0].trim();
             rowData.push(sequence, name);
 
             let cellIndex = 1;
@@ -300,7 +300,7 @@ function initProgressManagementPage() {
             }
             
             workItems.forEach(() => {
-                const select = row.cells[cellIndex].querySelector('select');
+                const select = row.cells[cellIndex]?.querySelector('select');
                 rowData.push(select ? select.value : '');
                 cellIndex++;
             });
@@ -315,7 +315,8 @@ function initProgressManagementPage() {
         XLSX.writeFile(workbook, fileName);
     }
     
-    function handleFileImport(event) {
+    // --- 【第 375 行：開始，這是本次修改的核心函數】 ---
+    async function handleFileImport(event) {
         const file = event.target.files[0];
         if (!file || !selectedFloor) return;
 
@@ -328,8 +329,86 @@ function initProgressManagementPage() {
                 const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-                // 在這裡實現完整的匯入邏輯
-                showAlert('匯入功能正在開發中...', 'info');
+                const importedHeader = jsonData[0];
+                const hasSpaceColumn = importedHeader.includes('所在空間');
+                
+                // 模式驗證
+                if (hasSpaceColumn && currentViewMode !== 'floor') {
+                    throw new Error("匯入檔案格式為「樓層總覽」，但目前為「單一空間」檢視模式，請先切換模式。");
+                }
+                if (!hasSpaceColumn && currentViewMode === 'floor') {
+                     throw new Error("匯入檔案格式為「單一空間」，但目前為「樓層總覽」檢視模式，請選擇一個特定空間後再匯入。");
+                }
+
+                // 工項驗證
+                const excelWorkItems = hasSpaceColumn ? importedHeader.slice(3) : importedHeader.slice(2);
+                if (JSON.stringify(excelWorkItems) !== JSON.stringify(workItems)) {
+                    throw new Error(`工項不匹配！\n頁面工項: ${workItems.join(', ')}\nExcel工項: ${excelWorkItems.join(', ')}`);
+                }
+                
+                showLoading(true, "準備更新資料...");
+                // 建立批次處理
+                const batch = db.batch();
+                // 建立一個查詢Map，減少資料庫讀取次數
+                const progressQuery = await safeFirestoreQuery("progressItems", [
+                    { field: "tenderId", operator: "==", value: selectedTender.id },
+                    { field: "majorItemId", operator: "==", value: selectedMajorItem.id },
+                    { field: "floorName", operator: "==", value: selectedFloor }
+                ]);
+                const progressMap = new Map(progressQuery.docs.map(doc => [doc.data().uniqueId, doc.id]));
+
+                let updatedCount = 0;
+                let createdCount = 0;
+
+                for (const row of jsonData.slice(1)) {
+                    const sequence = row[0];
+                    const itemName = row[1];
+                    const detailItem = allDetailItems.find(item => item.name === itemName);
+
+                    if (!detailItem) {
+                        console.warn(`在細項列表中找不到項目: ${itemName}，跳過此行。`);
+                        continue;
+                    }
+
+                    const uniqueId = `${detailItem.id}-${sequence}`;
+                    const spaceName = hasSpaceColumn ? row[2] : selectedSpace;
+                    const workStatuses = {};
+                    excelWorkItems.forEach((wItem, index) => {
+                        const statusIndex = hasSpaceColumn ? index + 3 : index + 2;
+                        workStatuses[wItem] = row[statusIndex] || "未施工";
+                    });
+
+                    const existingDocId = progressMap.get(uniqueId);
+                    const docData = {
+                        tenderId: selectedTender.id, majorItemId: selectedMajorItem.id, detailItemId: detailItem.id,
+                        floorName: selectedFloor, spaceName: spaceName, uniqueId: uniqueId,
+                        workStatuses: workStatuses,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+
+                    if (existingDocId) {
+                        // 更新現有文件
+                        const docRef = db.collection("progressItems").doc(existingDocId);
+                        batch.update(docRef, docData);
+                        updatedCount++;
+                    } else {
+                        // 建立新文件
+                        docData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                        const docRef = db.collection("progressItems").doc();
+                        batch.set(docRef, docData);
+                        createdCount++;
+                    }
+                }
+
+                if (updatedCount + createdCount > 0) {
+                    showLoading(true, "正在批次寫入資料庫...");
+                    await batch.commit();
+                    showAlert(`匯入成功！\n更新了 ${updatedCount} 筆，新增了 ${createdCount} 筆紀錄。`, 'success');
+                } else {
+                    showAlert('沒有需要更新或新增的紀錄。', 'info');
+                }
+                
+                await loadProgressData();
 
             } catch (error) {
                 showAlert('匯入失敗: ' + error.message, 'error');
@@ -340,6 +419,7 @@ function initProgressManagementPage() {
         };
         reader.readAsArrayBuffer(file);
     }
+    // --- 【第 488 行：結束，以上是本次修改的核心函數】 ---
 
     function setupEventListeners() {
         document.getElementById('projectSelect')?.addEventListener('change', (e) => onProjectChange(e.target.value));
@@ -348,7 +428,10 @@ function initProgressManagementPage() {
         document.getElementById('floorSelect')?.addEventListener('change', (e) => onFloorChange(e.target.value));
         document.getElementById('spaceSelect')?.addEventListener('change', (e) => onSpaceChange(e.target.value));
         
-        document.getElementById('importBtn')?.addEventListener('click', () => document.getElementById('importInput').click());
+        document.getElementById('importBtn')?.addEventListener('click', () => {
+            if (!selectedFloor) return showAlert('請先選擇一個樓層後才能匯入', 'warning');
+            document.getElementById('importInput').click()
+        });
         document.getElementById('importInput')?.addEventListener('change', handleFileImport);
         document.getElementById('exportBtn')?.addEventListener('click', exportToExcel);
 
