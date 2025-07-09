@@ -1,5 +1,5 @@
 /**
- * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.1 - 修正資料載入邏輯)
+ * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.2 - 優化無空間時的體驗)
  */
 function initSpaceDistributionPage() {
     
@@ -7,9 +7,9 @@ function initSpaceDistributionPage() {
     let projects = [], tenders = [], majorItems = [], tenderFloors = [];
     let selectedProject = null, selectedTender = null, selectedMajorItem = null, selectedFloor = null;
 
-    let detailItems = []; // <--- 【修正點】將 detailItems 提升為更高層級的變數
+    let detailItems = []; 
     let floorDistributions = [], spaceDistributions = [];
-    let spaces = []; // 這個樓層定義了哪些空間
+    let spaces = []; 
 
     // --- 初始化與資料載入 ---
     async function initializePage() {
@@ -70,7 +70,6 @@ function initSpaceDistributionPage() {
         majorItemSelect.innerHTML = '<option value="">載入中...</option>';
         majorItemSelect.disabled = true;
 
-        // 同時載入大項與樓層設定
         try {
             const [majorItemDocs, floorSettingsDoc] = await Promise.all([
                  safeFirestoreQuery("majorItems", [{ field: "tenderId", operator: "==", value: tenderId }], { field: "name", direction: "asc" }),
@@ -93,12 +92,11 @@ function initSpaceDistributionPage() {
     async function onMajorItemChange(majorItemId) {
         resetSelect('floorSelect', '請先選擇大項');
         hideContent();
-        detailItems = []; // 清空舊的細項
+        detailItems = [];
         if(!majorItemId) return;
         
         selectedMajorItem = majorItems.find(m => m.id === majorItemId);
         
-        // --- 【修正點】選擇大項後，立刻載入細項 ---
         showLoading(true, '載入細項資料...');
         try {
             const detailItemsResult = await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }]);
@@ -126,7 +124,6 @@ function initSpaceDistributionPage() {
         
         showLoading(true, '載入分配資料...');
         try {
-            // --- 【修正點】這裡不再需要載入 detailItems ---
             const [
                 floorDistributionsResult,
                 spaceSettingsResult,
@@ -143,14 +140,10 @@ function initSpaceDistributionPage() {
 
             document.getElementById('currentLocation').textContent = `樓層: ${selectedFloor}`;
             
-            // 現在直接建立表格，無論空間是否存在
+            // 【關鍵修改】直接建立表格並顯示主要內容
             buildSpaceDistributionTable();
             showContent();
             
-            if (spaces.length === 0) {
-                showNoSpacesState(); // 如果沒有空間，另外顯示提示
-            }
-
         } catch (error) {
              showAlert('載入樓層資料失敗: ' + error.message, 'error');
         } finally {
@@ -164,48 +157,59 @@ function initSpaceDistributionPage() {
         const tableContainer = document.querySelector('.table-container');
 
         if (!tableHeader || !tableBody) return;
-        tableContainer.style.display = 'table'; // 確保表格容器可見
+        tableContainer.style.display = 'table';
+        document.getElementById('noSpacesState').style.display = 'none'; // 隱藏提示
 
         let headerHTML = '<tr><th style="width: 300px;">細項名稱</th><th class="total-column">樓層總量</th>';
-        spaces.forEach(space => headerHTML += `<th class="floor-header">${space}</th>`);
-        headerHTML += '<th class="total-column">已分配(空間)</th></tr>';
+        
+        // --- 【第 185 行：新增此條件判斷】 ---
+        if (spaces.length > 0) {
+            spaces.forEach(space => headerHTML += `<th class="floor-header">${space}</th>`);
+            headerHTML += '<th class="total-column">已分配(空間)</th></tr>';
+        } else {
+            headerHTML += '<th>空間分配</th></tr>';
+        }
         tableHeader.innerHTML = headerHTML;
 
         let bodyHTML = '';
         
-        // --- 【修正點】這裡的邏輯變更 ---
         detailItems.forEach((item, index) => {
             const floorDist = floorDistributions.find(d => d.detailItemId === item.id);
-            // 即使 floorDist 是 undefined (表示此樓層該項目分配量為0)，我們依然要顯示它
             const floorTotalQuantity = floorDist ? floorDist.quantity : 0;
-            
-            let distributedInSpaces = 0;
             
             let rowHTML = `<tr class="item-row" data-total-quantity="${floorTotalQuantity}" data-item-id="${item.id}">`;
             rowHTML += `<td><div class="item-info"><div class="item-name">${item.sequence || `#${index + 1}`}. ${item.name || '未命名'}</div><div class="item-details">單位: ${item.unit || '-'}</div></div></td>`;
             rowHTML += `<td class="total-column" id="total-qty-${item.id}"><strong>${floorTotalQuantity}</strong></td>`;
             
-            spaces.forEach(space => {
-                const spaceDist = spaceDistributions.find(d => d.detailItemId === item.id && d.spaceName === space);
-                const quantity = spaceDist ? spaceDist.quantity : 0;
-                distributedInSpaces += quantity;
-                rowHTML += `<td><input type="number" class="quantity-input ${quantity > 0 ? 'has-value' : ''}" value="${quantity || ''}" min="0" data-item-id="${item.id}" data-space="${space}" placeholder="0"></td>`;
-            });
+            // --- 【第 204 行：新增此條件判斷】 ---
+            if (spaces.length > 0) {
+                let distributedInSpaces = 0;
+                spaces.forEach(space => {
+                    const spaceDist = spaceDistributions.find(d => d.detailItemId === item.id && d.spaceName === space);
+                    const quantity = spaceDist ? spaceDist.quantity : 0;
+                    distributedInSpaces += quantity;
+                    rowHTML += `<td><input type="number" class="quantity-input ${quantity > 0 ? 'has-value' : ''}" value="${quantity || ''}" min="0" data-item-id="${item.id}" data-space="${space}" placeholder="0"></td>`;
+                });
+                
+                const errorClass = distributedInSpaces > floorTotalQuantity ? 'error' : '';
+                rowHTML += `<td class="total-column ${errorClass}" id="distributed-${item.id}"><strong>${distributedInSpaces}</strong></td>`;
+            } else {
+                rowHTML += `<td style="text-align: center; color: #6c757d; background-color: #f8f9fa;">請先點擊「管理空間」按鈕新增空間</td>`;
+            }
             
-            const errorClass = distributedInSpaces > floorTotalQuantity ? 'error' : '';
-            rowHTML += `<td class="total-column ${errorClass}" id="distributed-${item.id}"><strong>${distributedInSpaces}</strong></td>`;
             rowHTML += '</tr>';
             bodyHTML += rowHTML;
         });
 
         tableBody.innerHTML = bodyHTML;
-        tableBody.querySelectorAll('.quantity-input').forEach(input => {
-            input.addEventListener('input', () => onQuantityChange(input));
-        });
+        
+        if (spaces.length > 0) {
+             tableBody.querySelectorAll('.quantity-input').forEach(input => {
+                input.addEventListener('input', () => onQuantityChange(input));
+            });
+        }
     }
-
-    // ... (從這裡開始到檔案結尾的程式碼維持不變) ...
-
+    
     function onQuantityChange(inputElement) {
         const itemId = inputElement.dataset.itemId;
         const allInputsForRow = document.querySelectorAll(`input[data-item-id="${itemId}"]`);
@@ -245,6 +249,10 @@ function initSpaceDistributionPage() {
     }
 
     async function saveAllSpaceDistributions() {
+        // --- 【第 278 行：新增此條件判斷】 ---
+        if (spaces.length === 0) {
+            return showAlert('尚未建立任何空間，無法儲存分配。', 'warning');
+        }
         showLoading(true, '儲存空間分配中...');
         try {
             const batch = db.batch();
@@ -385,12 +393,8 @@ function initSpaceDistributionPage() {
         document.getElementById('noSpacesState').style.display = 'none';
     }
     
-    function showNoSpacesState() {
-        document.getElementById('mainContent').style.display = 'block';
-        document.getElementById('initialEmptyState').style.display = 'none';
-        document.getElementById('noSpacesState').style.display = 'block';
-        document.querySelector('.table-container').style.display = 'none';
-    }
+    // 【修改】這個函數現在不再需要了，因為表格總是會顯示
+    // function showNoSpacesState() { ... }
 
     function closeModal(modalId) {
         const modal = document.getElementById(modalId);
@@ -399,10 +403,9 @@ function initSpaceDistributionPage() {
 
     function showLoading(isLoading, message='載入中...') {
         const loadingEl = document.getElementById('loading');
-        if (loadingEl) {
-            loadingEl.style.display = isLoading ? 'flex' : 'none';
-            if (loadingEl.querySelector('p')) loadingEl.querySelector('p').textContent = message;
-        }
+        const contentEl = document.getElementById('contentCard'); // 我們控制整個卡片的顯隱
+        if (loadingEl) loadingEl.style.display = isLoading ? 'flex' : 'none';
+        if (contentEl) contentEl.style.display = isLoading ? 'none' : 'block';
     }
     
     function naturalSequenceSort(a, b) {
