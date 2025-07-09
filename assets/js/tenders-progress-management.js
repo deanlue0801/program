@@ -1,5 +1,5 @@
 /**
- * 施工進度管理 (progress-management.js) (SPA 版本 v2.0 - 雙模式檢視)
+ * 施工進度管理 (progress-management.js) (SPA 版本 v2.1 - 修正無空間時的BUG)
  */
 function initProgressManagementPage() {
 
@@ -90,6 +90,7 @@ function initProgressManagementPage() {
         loadProgressData();
     }
 
+    // --- 【第 119 行：開始，這是本次修正的核心函數】 ---
     async function loadProgressData() {
         if (!selectedFloor) {
             hideContent();
@@ -98,16 +99,22 @@ function initProgressManagementPage() {
         
         showLoading(true, "載入進度資料...");
         try {
+            // 基礎查詢條件
             const baseQuery = [
                 { field: "tenderId", operator: "==", value: selectedTender.id },
                 { field: "majorItemId", operator: "==", value: selectedMajorItem.id },
                 { field: "floorName", operator: "==", value: selectedFloor }
             ];
 
-            if (currentViewMode === 'space' && selectedSpace) {
-                baseQuery.push({ field: "spaceName", operator: "==", value: selectedSpace });
-            }
+            // 1. **主要資料來源**：從「樓層分配表」取得總數
+            const floorDistQuery = [
+                { field: "tenderId", operator: "==", value: selectedTender.id },
+                { field: "majorItemId", operator: "==", value: selectedMajorItem.id },
+                { field: "areaName", operator: "==", value: selectedFloor } // 注意這裡的欄位是 areaName
+            ];
+            const floorDistDocs = await safeFirestoreQuery("distributionTable", floorDistQuery);
 
+            // 2. **輔助資料來源**：取得所有相關的空間分配、進度項目、細項定義和空間設定
             const [spaceDistDocs, progressItemDocs, detailItemDocs, spaceSettingsDoc] = await Promise.all([
                 safeFirestoreQuery("spaceDistribution", baseQuery),
                 safeFirestoreQuery("progressItems", baseQuery),
@@ -115,13 +122,18 @@ function initProgressManagementPage() {
                 db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get()
             ]);
 
+            // 如果是單一空間檢視，需要過濾樓層總數資料
+            const finalFloorDistDocs = (currentViewMode === 'space' && selectedSpace)
+                ? floorDistDocs.docs.filter(doc => spaceDistDocs.docs.some(sDoc => sDoc.detailItemId === doc.detailItemId))
+                : floorDistDocs.docs;
+
             spaces = spaceSettingsDoc.empty ? [] : (spaceSettingsDoc.docs[0].data().spaces || []);
             if (currentViewMode === 'floor') {
                 populateSelect(document.getElementById('spaceSelect'), spaces.map(s => ({id:s, name:s})), '可選，以檢視單一空間...');
                 buildSpaceFilter();
             }
             
-            buildProgressTable(spaceDistDocs.docs, progressItemDocs.docs, detailItemDocs.docs);
+            buildProgressTable(finalFloorDistDocs, spaceDistDocs.docs, progressItemDocs.docs, detailItemDocs.docs);
             showContent();
 
         } catch (error) {
@@ -163,7 +175,7 @@ function initProgressManagementPage() {
         });
     }
 
-    function buildProgressTable(spaceDists, progressItems, detailItems) {
+    function buildProgressTable(floorDists, spaceDists, progressItems, detailItems) {
         const tableHeader = document.getElementById('tableHeader');
         const tableBody = document.getElementById('tableBody');
         
@@ -176,26 +188,36 @@ function initProgressManagementPage() {
         tableHeader.innerHTML = headerHTML;
         
         let bodyHTML = '';
-        const itemCounters = {};
 
-        spaceDists.sort((a,b) => a.spaceName.localeCompare(b.spaceName)).forEach(dist => {
-            const detailItem = detailItems.find(d => d.id === dist.detailItemId);
+        floorDists.forEach(floorDist => {
+            const detailItem = detailItems.find(d => d.id === floorDist.detailItemId);
             if (!detailItem) return;
-            
-            if(!itemCounters[dist.detailItemId]) {
-                 itemCounters[dist.detailItemId] = 0;
-            }
 
-            for (let i = 0; i < dist.quantity; i++) {
-                itemCounters[dist.detailItemId]++;
-                const itemNumber = itemCounters[dist.detailItemId];
-                const uniqueId = `${dist.detailItemId}-${itemNumber}`;
+            // 建立一個查找表，來決定每個編號的設備在哪個空間
+            const itemSpaceDists = spaceDists.filter(sd => sd.detailItemId === floorDist.detailItemId);
+            const spaceLookup = [];
+            let cumulativeQty = 0;
+            itemSpaceDists.forEach(sd => {
+                const start = cumulativeQty + 1;
+                const end = cumulativeQty + sd.quantity;
+                spaceLookup.push({ space: sd.spaceName, start, end });
+                cumulativeQty += sd.quantity;
+            });
+
+            const totalQuantity = (currentViewMode === 'space' && selectedSpace)
+                ? itemSpaceDists.find(sd => sd.spaceName === selectedSpace)?.quantity || 0
+                : floorDist.quantity;
+
+            for (let i = 1; i <= totalQuantity; i++) {
+                const uniqueId = `${floorDist.detailItemId}-${i}`;
                 const progressItem = progressItems.find(p => p.uniqueId === uniqueId);
-                
-                bodyHTML += `<tr data-unique-id="${uniqueId}" data-detail-item-id="${dist.detailItemId}" data-space-name="${dist.spaceName}">`;
-                bodyHTML += `<td>${detailItem.name} #${itemNumber}</td>`;
+                const spaceInfo = spaceLookup.find(sl => i >= sl.start && i <= sl.end);
+                const spaceName = spaceInfo ? spaceInfo.space : "尚未分配";
+
+                bodyHTML += `<tr data-unique-id="${uniqueId}" data-detail-item-id="${floorDist.detailItemId}" data-space-name="${spaceName}">`;
+                bodyHTML += `<td>${detailItem.name} #${i}</td>`;
                 if (currentViewMode === 'floor') {
-                    bodyHTML += `<td>${dist.spaceName}</td>`;
+                    bodyHTML += `<td>${spaceName}</td>`;
                 }
                 
                 workItems.forEach(workItem => {
@@ -218,6 +240,8 @@ function initProgressManagementPage() {
         });
     }
 
+    // --- 【第 274 行：結束，以上是本次修正的核心函數】 ---
+
     async function onStatusChange(selectElement) {
         const tr = selectElement.closest('tr');
         const uniqueId = tr.dataset.uniqueId;
@@ -235,6 +259,7 @@ function initProgressManagementPage() {
                     tenderId: selectedTender.id, majorItemId: selectedMajorItem.id, detailItemId: detailItemId,
                     floorName: selectedFloor, spaceName: spaceName, uniqueId: uniqueId,
                     workStatuses: { [workItem]: newStatus },
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
             } else {
@@ -316,8 +341,6 @@ function initProgressManagementPage() {
         reader.readAsArrayBuffer(file);
     }
 
-    // --- 【第 374 行：開始，以下是完整的輔助函數】 ---
-
     function setupEventListeners() {
         document.getElementById('projectSelect')?.addEventListener('change', (e) => onProjectChange(e.target.value));
         document.getElementById('tenderSelect')?.addEventListener('change', (e) => onTenderChange(e.target.value));
@@ -378,7 +401,7 @@ function initProgressManagementPage() {
         const selects = ['tender', 'majorItem', 'floor', 'space'];
         const labels = {
             'tender': '標單', 'majorItem': '大項', 'floor': '樓層', 'space': '空間'
-        }
+        };
         const startIndex = selects.indexOf(from);
         
         if (startIndex === -1) return;
@@ -387,7 +410,12 @@ function initProgressManagementPage() {
             const selectId = selects[i] + 'Select';
             const el = document.getElementById(selectId);
             if(el) {
-                el.innerHTML = `<option value="">請先選擇${labels[selects[i-1]] || '上一個項目'}</option>`;
+                let label = labels[selects[i-1]] || '上一個項目';
+                if (selects[i] === 'space') {
+                    el.innerHTML = `<option value="">可選，以檢視單一空間...</option>`;
+                } else {
+                    el.innerHTML = `<option value="">請先選擇${label}</option>`;
+                }
                 el.disabled = true;
             }
         }
