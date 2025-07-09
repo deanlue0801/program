@@ -1,5 +1,5 @@
 /**
- * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.4 - 智慧匯入空間)
+ * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.5 - 修正Modal關閉BUG)
  */
 function initSpaceDistributionPage() {
     
@@ -281,13 +281,12 @@ function initSpaceDistributionPage() {
         XLSX.writeFile(workbook, fileName);
     }
 
-    // --- 【第 341 行：修改此函數】 ---
     async function handleFileImport(event) {
         const file = event.target.files[0];
         if (!file || !selectedFloor) return;
 
         const reader = new FileReader();
-        reader.onload = async (e) => { // <-- 設為 async
+        reader.onload = async (e) => {
             try {
                 showLoading(true, "正在讀取 Excel...");
                 const data = new Uint8Array(e.target.result);
@@ -296,25 +295,22 @@ function initSpaceDistributionPage() {
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
                 const importedHeader = jsonData[0];
-                const importedSpaces = importedHeader.slice(4); // 提取所有空間名稱
+                const importedSpaces = importedHeader.slice(4);
 
-                // 比較匯入的空間與當前空間是否匹配
                 if (JSON.stringify(importedSpaces) !== JSON.stringify(spaces)) {
                     const newSpaces = importedSpaces.filter(s => !spaces.includes(s));
                     if (newSpaces.length > 0) {
                         const confirmed = confirm(`偵測到新的空間欄位：\n\n[${newSpaces.join(', ')}]\n\n是否要將這些新空間自動新增至 '${selectedFloor}' 的設定中？`);
                         if (confirmed) {
-                            // 更新當前頁面的 spaces 變數並儲存
                             spaces = [...spaces, ...newSpaces];
-                            await saveSpaceSettings(true); // 傳入 true 表示是靜默儲存
+                            await saveSpaceSettings(true); 
                         } else {
                             showAlert('匯入已取消。', 'info');
-                            return; // 使用者取消，中止匯入
+                            return;
                         }
                     }
                 }
                 
-                // 繼續填入資料
                 showLoading(true, "正在填入資料...");
                 jsonData.slice(1).forEach(row => {
                     const sequence = row[0];
@@ -343,7 +339,6 @@ function initSpaceDistributionPage() {
         };
         reader.readAsArrayBuffer(file);
     }
-
 
     async function saveAllSpaceDistributions() {
         if (spaces.length === 0) {
@@ -441,18 +436,33 @@ function initSpaceDistributionPage() {
         }
     }
 
-    // --- 【第 506 行：修改此函數，增加 isSilent 參數】 ---
+    // --- 【第 545 行：開始，這是本次修正的核心函數】 ---
     async function saveSpaceSettings(isSilent = false) {
-        if (!isSilent) {
-            showLoading(true, '儲存空間設定中...');
+        // isSilent = true 是給Excel匯入功能在背景呼叫用的
+        if (isSilent) {
+            try {
+                const settingData = { tenderId: selectedTender.id, floorName: selectedFloor, spaces: spaces, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+                const query = await db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get();
+                if (!query.empty) {
+                    await db.collection("spaceSettings").doc(query.docs[0].id).update(settingData);
+                } else {
+                    settingData.createdBy = currentUser.email;
+                    settingData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    await db.collection("spaceSettings").add(settingData);
+                }
+            } catch (error) {
+                // 在靜默模式下，向上拋出錯誤讓呼叫者處理
+                throw error;
+            }
+            return; // 結束靜默模式的執行
         }
+
+        // 以下是使用者點擊「儲存設定」按鈕的正常流程
         try {
-            const settingData = {
-                tenderId: selectedTender.id,
-                floorName: selectedFloor,
-                spaces: spaces,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
+            // 為了最好的使用者體驗，先關閉視窗，再執行儲存和重載
+            closeModal('spaceModal');
+            
+            const settingData = { tenderId: selectedTender.id, floorName: selectedFloor, spaces: spaces, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
             const query = await db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get();
             if (!query.empty) {
                 await db.collection("spaceSettings").doc(query.docs[0].id).update(settingData);
@@ -462,18 +472,18 @@ function initSpaceDistributionPage() {
                 await db.collection("spaceSettings").add(settingData);
             }
             
-            if (!isSilent) {
-                showAlert('✅ 空間設定已儲存！', 'success');
-                closeModal('spaceModal');
-                await onFloorChange(selectedFloor);
-            }
+            showAlert('✅ 空間設定已儲存！', 'success');
+            
+            // 重新整理主頁面內容以顯示新的空間欄位
+            await onFloorChange(selectedFloor);
+
         } catch (error) {
-            if (!isSilent) showAlert('儲存失敗: ' + error.message, 'error');
-            throw error; // 向上拋出錯誤，讓匯入函數可以捕獲
-        } finally {
-            if (!isSilent) showLoading(false);
+            showAlert('儲存失敗: ' + error.message, 'error');
+            // 如果出錯，也確保視窗是關閉的
+            closeModal('spaceModal');
         }
     }
+    // --- 【第 593 行：結束，以上是本次修正的核心函數】 ---
     
     function resetSelect(selectId, defaultText) {
         const select = document.getElementById(selectId);
@@ -484,11 +494,13 @@ function initSpaceDistributionPage() {
     function hideContent() {
         document.getElementById('mainContent').style.display = 'none';
         document.getElementById('initialEmptyState').style.display = 'flex';
+        document.getElementById('noSpacesState').style.display = 'none';
     }
 
     function showContent() {
         document.getElementById('mainContent').style.display = 'block';
         document.getElementById('initialEmptyState').style.display = 'none';
+        document.getElementById('noSpacesState').style.display = 'none';
     }
 
     function closeModal(modalId) {
@@ -498,9 +510,20 @@ function initSpaceDistributionPage() {
 
     function showLoading(isLoading, message='載入中...') {
         const loadingEl = document.getElementById('loading');
-        const contentEl = document.getElementById('contentCard');
-        if (loadingEl) loadingEl.style.display = isLoading ? 'flex' : 'none';
-        if (contentEl) contentEl.style.display = isLoading ? 'none' : 'block';
+        if (loadingEl) {
+            loadingEl.style.display = isLoading ? 'flex' : 'none';
+            const p = loadingEl.querySelector('p');
+            if (p) p.textContent = message;
+        }
+        
+        // 這邊的邏輯只控制 mainContent，避免影響到 Modal
+        const mainContentEl = document.getElementById('mainContent');
+        if(mainContentEl) {
+            mainContentEl.style.display = isLoading ? 'none' : 'block';
+        }
+        if(isLoading) {
+             document.getElementById('initialEmptyState').style.display = 'none';
+        }
     }
     
     function naturalSequenceSort(a, b) {
