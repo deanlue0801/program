@@ -1,5 +1,5 @@
 /**
- * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.2 - 優化無空間時的體驗)
+ * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.4 - 智慧匯入空間)
  */
 function initSpaceDistributionPage() {
     
@@ -140,7 +140,6 @@ function initSpaceDistributionPage() {
 
             document.getElementById('currentLocation').textContent = `樓層: ${selectedFloor}`;
             
-            // 【關鍵修改】直接建立表格並顯示主要內容
             buildSpaceDistributionTable();
             showContent();
             
@@ -158,11 +157,10 @@ function initSpaceDistributionPage() {
 
         if (!tableHeader || !tableBody) return;
         tableContainer.style.display = 'table';
-        document.getElementById('noSpacesState').style.display = 'none'; // 隱藏提示
+        document.getElementById('noSpacesState').style.display = 'none';
 
         let headerHTML = '<tr><th style="width: 300px;">細項名稱</th><th class="total-column">樓層總量</th>';
         
-        // --- 【第 185 行：新增此條件判斷】 ---
         if (spaces.length > 0) {
             spaces.forEach(space => headerHTML += `<th class="floor-header">${space}</th>`);
             headerHTML += '<th class="total-column">已分配(空間)</th></tr>';
@@ -181,7 +179,6 @@ function initSpaceDistributionPage() {
             rowHTML += `<td><div class="item-info"><div class="item-name">${item.sequence || `#${index + 1}`}. ${item.name || '未命名'}</div><div class="item-details">單位: ${item.unit || '-'}</div></div></td>`;
             rowHTML += `<td class="total-column" id="total-qty-${item.id}"><strong>${floorTotalQuantity}</strong></td>`;
             
-            // --- 【第 204 行：新增此條件判斷】 ---
             if (spaces.length > 0) {
                 let distributedInSpaces = 0;
                 spaces.forEach(space => {
@@ -246,10 +243,109 @@ function initSpaceDistributionPage() {
         document.getElementById('clearAllSpacesBtn')?.addEventListener('click', clearAllSpaces);
         document.getElementById('saveSpaceSettingsBtn')?.addEventListener('click', saveSpaceSettings);
         document.getElementById('cancelSpaceModalBtn')?.addEventListener('click', () => closeModal('spaceModal'));
+        
+        document.getElementById('importBtn')?.addEventListener('click', () => document.getElementById('importInput').click());
+        document.getElementById('importInput')?.addEventListener('change', handleFileImport);
+        document.getElementById('exportBtn')?.addEventListener('click', exportToExcel);
+    }
+    
+    function exportToExcel() {
+        if (!selectedFloor || detailItems.length === 0) {
+            return showAlert('沒有資料可匯出', 'error');
+        }
+
+        const header = ['項次', '項目名稱', '單位', '樓層總量', ...spaces];
+        const data = [header];
+
+        detailItems.forEach(item => {
+            const row = document.querySelector(`tr[data-item-id="${item.id}"]`);
+            if (!row) return;
+
+            const floorTotal = row.querySelector(`#total-qty-${item.id} strong`)?.textContent || '0';
+            const rowData = [item.sequence || '', item.name || '', item.unit || '', floorTotal];
+            
+            if (spaces.length > 0) {
+                 spaces.forEach(space => {
+                    const input = row.querySelector(`input[data-space="${space}"]`);
+                    rowData.push(input ? input.value : '0');
+                });
+            }
+            data.push(rowData);
+        });
+
+        const worksheet = XLSX.utils.aoa_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, `${selectedFloor}空間分配`);
+        
+        const fileName = `${selectedProject.name}_${selectedTender.name}_${selectedFloor}_空間分配表.xlsx`;
+        XLSX.writeFile(workbook, fileName);
     }
 
+    // --- 【第 341 行：修改此函數】 ---
+    async function handleFileImport(event) {
+        const file = event.target.files[0];
+        if (!file || !selectedFloor) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => { // <-- 設為 async
+            try {
+                showLoading(true, "正在讀取 Excel...");
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                const importedHeader = jsonData[0];
+                const importedSpaces = importedHeader.slice(4); // 提取所有空間名稱
+
+                // 比較匯入的空間與當前空間是否匹配
+                if (JSON.stringify(importedSpaces) !== JSON.stringify(spaces)) {
+                    const newSpaces = importedSpaces.filter(s => !spaces.includes(s));
+                    if (newSpaces.length > 0) {
+                        const confirmed = confirm(`偵測到新的空間欄位：\n\n[${newSpaces.join(', ')}]\n\n是否要將這些新空間自動新增至 '${selectedFloor}' 的設定中？`);
+                        if (confirmed) {
+                            // 更新當前頁面的 spaces 變數並儲存
+                            spaces = [...spaces, ...newSpaces];
+                            await saveSpaceSettings(true); // 傳入 true 表示是靜默儲存
+                        } else {
+                            showAlert('匯入已取消。', 'info');
+                            return; // 使用者取消，中止匯入
+                        }
+                    }
+                }
+                
+                // 繼續填入資料
+                showLoading(true, "正在填入資料...");
+                jsonData.slice(1).forEach(row => {
+                    const sequence = row[0];
+                    const targetItem = detailItems.find(item => String(item.sequence) === String(sequence));
+                    
+                    if (targetItem) {
+                        spaces.forEach((space, index) => {
+                            const quantity = parseInt(row[index + 4]) || 0;
+                            const input = document.querySelector(`input[data-item-id="${targetItem.id}"][data-space="${space}"]`);
+                            if (input && quantity > 0) {
+                                input.value = quantity;
+                            }
+                        });
+                        const firstInput = document.querySelector(`input[data-item-id="${targetItem.id}"]`);
+                        if(firstInput) onQuantityChange(firstInput);
+                    }
+                });
+
+                showAlert('匯入成功！請檢查表格內容並記得點擊「儲存空間分配」。', 'success');
+            } catch (error) {
+                showAlert('匯入失敗，請檢查檔案格式是否正確。 ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+                event.target.value = '';
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+
     async function saveAllSpaceDistributions() {
-        // --- 【第 278 行：新增此條件判斷】 ---
         if (spaces.length === 0) {
             return showAlert('尚未建立任何空間，無法儲存分配。', 'warning');
         }
@@ -345,8 +441,11 @@ function initSpaceDistributionPage() {
         }
     }
 
-    async function saveSpaceSettings() {
-        showLoading(true, '儲存空間設定中...');
+    // --- 【第 506 行：修改此函數，增加 isSilent 參數】 ---
+    async function saveSpaceSettings(isSilent = false) {
+        if (!isSilent) {
+            showLoading(true, '儲存空間設定中...');
+        }
         try {
             const settingData = {
                 tenderId: selectedTender.id,
@@ -363,15 +462,16 @@ function initSpaceDistributionPage() {
                 await db.collection("spaceSettings").add(settingData);
             }
             
-            showAlert('✅ 空間設定已儲存！', 'success');
-            closeModal('spaceModal');
-            
-            await onFloorChange(selectedFloor);
-
+            if (!isSilent) {
+                showAlert('✅ 空間設定已儲存！', 'success');
+                closeModal('spaceModal');
+                await onFloorChange(selectedFloor);
+            }
         } catch (error) {
-            showAlert('儲存失敗: ' + error.message, 'error');
+            if (!isSilent) showAlert('儲存失敗: ' + error.message, 'error');
+            throw error; // 向上拋出錯誤，讓匯入函數可以捕獲
         } finally {
-            showLoading(false);
+            if (!isSilent) showLoading(false);
         }
     }
     
@@ -384,17 +484,12 @@ function initSpaceDistributionPage() {
     function hideContent() {
         document.getElementById('mainContent').style.display = 'none';
         document.getElementById('initialEmptyState').style.display = 'flex';
-        document.getElementById('noSpacesState').style.display = 'none';
     }
 
     function showContent() {
         document.getElementById('mainContent').style.display = 'block';
         document.getElementById('initialEmptyState').style.display = 'none';
-        document.getElementById('noSpacesState').style.display = 'none';
     }
-    
-    // 【修改】這個函數現在不再需要了，因為表格總是會顯示
-    // function showNoSpacesState() { ... }
 
     function closeModal(modalId) {
         const modal = document.getElementById(modalId);
@@ -403,7 +498,7 @@ function initSpaceDistributionPage() {
 
     function showLoading(isLoading, message='載入中...') {
         const loadingEl = document.getElementById('loading');
-        const contentEl = document.getElementById('contentCard'); // 我們控制整個卡片的顯隱
+        const contentEl = document.getElementById('contentCard');
         if (loadingEl) loadingEl.style.display = isLoading ? 'flex' : 'none';
         if (contentEl) contentEl.style.display = isLoading ? 'none' : 'block';
     }
