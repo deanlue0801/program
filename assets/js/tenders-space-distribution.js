@@ -1,5 +1,5 @@
 /**
- * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.0 - 獨立頁面)
+ * 空間分配管理系統 (space-distribution.js) (SPA 版本 v2.1 - 修正資料載入邏輯)
  */
 function initSpaceDistributionPage() {
     
@@ -7,7 +7,8 @@ function initSpaceDistributionPage() {
     let projects = [], tenders = [], majorItems = [], tenderFloors = [];
     let selectedProject = null, selectedTender = null, selectedMajorItem = null, selectedFloor = null;
 
-    let detailItems = [], floorDistributions = [], spaceDistributions = [];
+    let detailItems = []; // <--- 【修正點】將 detailItems 提升為更高層級的變數
+    let floorDistributions = [], spaceDistributions = [];
     let spaces = []; // 這個樓層定義了哪些空間
 
     // --- 初始化與資料載入 ---
@@ -92,17 +93,29 @@ function initSpaceDistributionPage() {
     async function onMajorItemChange(majorItemId) {
         resetSelect('floorSelect', '請先選擇大項');
         hideContent();
+        detailItems = []; // 清空舊的細項
         if(!majorItemId) return;
         
         selectedMajorItem = majorItems.find(m => m.id === majorItemId);
-        const floorSelect = document.getElementById('floorSelect');
-        floorSelect.innerHTML = '<option value="">請選擇樓層...</option>';
         
-        if(tenderFloors.length > 0) {
-            tenderFloors.forEach(floor => floorSelect.innerHTML += `<option value="${floor}">${floor}</option>`);
-            floorSelect.disabled = false;
-        } else {
-            floorSelect.innerHTML = '<option value="">此標單無樓層設定</option>';
+        // --- 【修正點】選擇大項後，立刻載入細項 ---
+        showLoading(true, '載入細項資料...');
+        try {
+            const detailItemsResult = await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }]);
+            detailItems = detailItemsResult.docs.sort(naturalSequenceSort);
+            
+            const floorSelect = document.getElementById('floorSelect');
+            floorSelect.innerHTML = '<option value="">請選擇樓層...</option>';
+            if(tenderFloors.length > 0) {
+                tenderFloors.forEach(floor => floorSelect.innerHTML += `<option value="${floor}">${floor}</option>`);
+                floorSelect.disabled = false;
+            } else {
+                floorSelect.innerHTML = '<option value="">此標單無樓層設定</option>';
+            }
+        } catch (error) {
+            showAlert('載入細項資料失敗: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
         }
     }
 
@@ -113,30 +126,29 @@ function initSpaceDistributionPage() {
         
         showLoading(true, '載入分配資料...');
         try {
+            // --- 【修正點】這裡不再需要載入 detailItems ---
             const [
-                detailItemsResult,
                 floorDistributionsResult,
                 spaceSettingsResult,
                 spaceDistributionsResult
             ] = await Promise.all([
-                safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }]),
                 safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }, { field: "areaName", operator: "==", value: selectedFloor }]),
                 db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get(),
                 safeFirestoreQuery("spaceDistribution", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }, { field: "floorName", operator: "==", value: selectedFloor }])
             ]);
 
-            detailItems = detailItemsResult.docs.sort(naturalSequenceSort);
             floorDistributions = floorDistributionsResult.docs;
             spaces = spaceSettingsResult.empty ? [] : (spaceSettingsResult.docs[0].data().spaces || []);
             spaceDistributions = spaceDistributionsResult.docs;
 
             document.getElementById('currentLocation').textContent = `樓層: ${selectedFloor}`;
             
-            if (spaces.length > 0) {
-                buildSpaceDistributionTable();
-                showContent();
-            } else {
-                showNoSpacesState();
+            // 現在直接建立表格，無論空間是否存在
+            buildSpaceDistributionTable();
+            showContent();
+            
+            if (spaces.length === 0) {
+                showNoSpacesState(); // 如果沒有空間，另外顯示提示
             }
 
         } catch (error) {
@@ -146,11 +158,13 @@ function initSpaceDistributionPage() {
         }
     }
     
-    // --- 渲染與UI更新 (與前一版相同，直接複製) ---
     function buildSpaceDistributionTable() {
         const tableHeader = document.getElementById('tableHeader');
         const tableBody = document.getElementById('tableBody');
+        const tableContainer = document.querySelector('.table-container');
+
         if (!tableHeader || !tableBody) return;
+        tableContainer.style.display = 'table'; // 確保表格容器可見
 
         let headerHTML = '<tr><th style="width: 300px;">細項名稱</th><th class="total-column">樓層總量</th>';
         spaces.forEach(space => headerHTML += `<th class="floor-header">${space}</th>`);
@@ -158,12 +172,13 @@ function initSpaceDistributionPage() {
         tableHeader.innerHTML = headerHTML;
 
         let bodyHTML = '';
+        
+        // --- 【修正點】這裡的邏輯變更 ---
         detailItems.forEach((item, index) => {
             const floorDist = floorDistributions.find(d => d.detailItemId === item.id);
+            // 即使 floorDist 是 undefined (表示此樓層該項目分配量為0)，我們依然要顯示它
             const floorTotalQuantity = floorDist ? floorDist.quantity : 0;
             
-            if (floorTotalQuantity === 0) return; // 如果該樓層此項目數量為0，則不顯示
-
             let distributedInSpaces = 0;
             
             let rowHTML = `<tr class="item-row" data-total-quantity="${floorTotalQuantity}" data-item-id="${item.id}">`;
@@ -188,7 +203,9 @@ function initSpaceDistributionPage() {
             input.addEventListener('input', () => onQuantityChange(input));
         });
     }
-    
+
+    // ... (從這裡開始到檔案結尾的程式碼維持不變) ...
+
     function onQuantityChange(inputElement) {
         const itemId = inputElement.dataset.itemId;
         const allInputsForRow = document.querySelectorAll(`input[data-item-id="${itemId}"]`);
@@ -213,7 +230,6 @@ function initSpaceDistributionPage() {
         distributedCell.classList.toggle('error', currentDistributed > totalQuantity);
     }
 
-    // --- 事件綁定與處理 (與前一版相同，直接複製) ---
     function setupEventListeners() {
         document.getElementById('projectSelect')?.addEventListener('change', (e) => onProjectChange(e.target.value));
         document.getElementById('tenderSelect')?.addEventListener('change', (e) => onTenderChange(e.target.value));
@@ -233,13 +249,11 @@ function initSpaceDistributionPage() {
         try {
             const batch = db.batch();
             
-            // 先刪除舊的
             const existingDocs = await safeFirestoreQuery("spaceDistribution", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }, { field: "floorName", operator: "==", value: selectedFloor }]);
             existingDocs.docs.forEach(doc => {
                 batch.delete(db.collection("spaceDistribution").doc(doc.id));
             });
 
-            // 再寫入新的
             document.querySelectorAll('.quantity-input').forEach(input => {
                 const quantity = parseInt(input.value) || 0;
                 if (quantity > 0) {
@@ -258,7 +272,6 @@ function initSpaceDistributionPage() {
                 }
             });
             await batch.commit();
-            // 重新載入當前樓層的最新資料
             await onFloorChange(selectedFloor);
             showAlert('✅ 空間分配已儲存成功！', 'success');
 
@@ -269,7 +282,6 @@ function initSpaceDistributionPage() {
         }
     }
     
-    // --- 空間管理 Modal 相關 (與前一版相同，直接複製) ---
     function showSpaceManager() {
         if (!selectedFloor) return showAlert('請先選擇一個樓層', 'warning');
         document.getElementById('currentFloorName').textContent = selectedFloor;
@@ -346,13 +358,7 @@ function initSpaceDistributionPage() {
             showAlert('✅ 空間設定已儲存！', 'success');
             closeModal('spaceModal');
             
-            // 重新渲染表格
-            if (spaces.length > 0) {
-                buildSpaceDistributionTable();
-                showContent();
-            } else {
-                showNoSpacesState();
-            }
+            await onFloorChange(selectedFloor);
 
         } catch (error) {
             showAlert('儲存失敗: ' + error.message, 'error');
@@ -361,7 +367,6 @@ function initSpaceDistributionPage() {
         }
     }
     
-    // --- 輔助函數 (更新) ---
     function resetSelect(selectId, defaultText) {
         const select = document.getElementById(selectId);
         select.innerHTML = `<option value="">${defaultText}</option>`;
@@ -411,6 +416,5 @@ function initSpaceDistributionPage() {
         return pA.length-pB.length;
     }
     
-    // --- 頁面啟動點 ---
     initializePage();
 }
