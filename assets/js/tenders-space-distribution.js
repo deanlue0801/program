@@ -438,7 +438,6 @@ function initSpaceDistributionPage() {
 
     // --- 【第 545 行：開始，這是本次修正的核心函數】 ---
     async function saveSpaceSettings(isSilent = false) {
-        // isSilent = true 是給Excel匯入功能在背景呼叫用的
         if (isSilent) {
             try {
                 const settingData = { tenderId: selectedTender.id, floorName: selectedFloor, spaces: spaces, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
@@ -451,17 +450,16 @@ function initSpaceDistributionPage() {
                     await db.collection("spaceSettings").add(settingData);
                 }
             } catch (error) {
-                // 在靜默模式下，向上拋出錯誤讓呼叫者處理
                 throw error;
             }
-            return; // 結束靜默模式的執行
+            return;
         }
 
-        // 以下是使用者點擊「儲存設定」按鈕的正常流程
+        // 修正後的正常流程
+        closeModal('spaceModal');
+        showLoading(true, '設定儲存中...');
+
         try {
-            // 為了最好的使用者體驗，先關閉視窗，再執行儲存和重載
-            closeModal('spaceModal');
-            
             const settingData = { tenderId: selectedTender.id, floorName: selectedFloor, spaces: spaces, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
             const query = await db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get();
             if (!query.empty) {
@@ -472,18 +470,16 @@ function initSpaceDistributionPage() {
                 await db.collection("spaceSettings").add(settingData);
             }
             
-            showAlert('✅ 空間設定已儲存！', 'success');
-            
-            // 重新整理主頁面內容以顯示新的空間欄位
             await onFloorChange(selectedFloor);
+            showAlert('✅ 空間設定已儲存！', 'success');
 
         } catch (error) {
             showAlert('儲存失敗: ' + error.message, 'error');
-            // 如果出錯，也確保視窗是關閉的
-            closeModal('spaceModal');
+        } finally {
+            showLoading(false);
         }
     }
-    // --- 【第 593 行：結束，以上是本次修正的核心函數】 ---
+    // --- 【第 591 行：結束，以上是本次修正的核心函數】 ---
     
     function resetSelect(selectId, defaultText) {
         const select = document.getElementById(selectId);
@@ -514,15 +510,6 @@ function initSpaceDistributionPage() {
             loadingEl.style.display = isLoading ? 'flex' : 'none';
             const p = loadingEl.querySelector('p');
             if (p) p.textContent = message;
-        }
-        
-        // 這邊的邏輯只控制 mainContent，避免影響到 Modal
-        const mainContentEl = document.getElementById('mainContent');
-        if(mainContentEl) {
-            mainContentEl.style.display = isLoading ? 'none' : 'block';
-        }
-        if(isLoading) {
-             document.getElementById('initialEmptyState').style.display = 'none';
         }
     }
     
