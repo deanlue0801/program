@@ -1,5 +1,5 @@
 /**
- * 施工進度管理 (progress-management.js) (SPA 版本 v2.2 - 完成Excel匯入功能)
+ * 施工進度管理 (progress-management.js) (SPA 版本 v2.3 - 修正Excel匯入BUG)
  */
 function initProgressManagementPage() {
 
@@ -315,7 +315,6 @@ function initProgressManagementPage() {
         XLSX.writeFile(workbook, fileName);
     }
     
-    // --- 【第 375 行：開始，這是本次修改的核心函數】 ---
     async function handleFileImport(event) {
         const file = event.target.files[0];
         if (!file || !selectedFloor) return;
@@ -332,30 +331,31 @@ function initProgressManagementPage() {
                 const importedHeader = jsonData[0];
                 const hasSpaceColumn = importedHeader.includes('所在空間');
                 
-                // 模式驗證
                 if (hasSpaceColumn && currentViewMode !== 'floor') {
                     throw new Error("匯入檔案格式為「樓層總覽」，但目前為「單一空間」檢視模式，請先切換模式。");
                 }
-                if (!hasSpaceColumn && currentViewMode === 'floor') {
-                     throw new Error("匯入檔案格式為「單一空間」，但目前為「樓層總覽」檢視模式，請選擇一個特定空間後再匯入。");
+                if (!hasSpaceColumn && currentViewMode === 'floor' && selectedSpace) {
+                     throw new Error("匯入檔案格式為「單一空間」，但目前為「樓層總覽」檢視模式，請清除空間選擇後再匯入。");
                 }
 
-                // 工項驗證
                 const excelWorkItems = hasSpaceColumn ? importedHeader.slice(3) : importedHeader.slice(2);
                 if (JSON.stringify(excelWorkItems) !== JSON.stringify(workItems)) {
                     throw new Error(`工項不匹配！\n頁面工項: ${workItems.join(', ')}\nExcel工項: ${excelWorkItems.join(', ')}`);
                 }
                 
                 showLoading(true, "準備更新資料...");
-                // 建立批次處理
                 const batch = db.batch();
-                // 建立一個查詢Map，減少資料庫讀取次數
+                
                 const progressQuery = await safeFirestoreQuery("progressItems", [
                     { field: "tenderId", operator: "==", value: selectedTender.id },
                     { field: "majorItemId", operator: "==", value: selectedMajorItem.id },
                     { field: "floorName", operator: "==", value: selectedFloor }
                 ]);
-                const progressMap = new Map(progressQuery.docs.map(doc => [doc.data().uniqueId, doc.id]));
+
+                // --- 【第 432 行：開始，這是本次修正的核心】 ---
+                // 修正：我們的 safeFirestoreQuery 已經回傳了物件陣列，所以不需要再呼叫 .data()
+                const progressMap = new Map(progressQuery.docs.map(doc => [doc.uniqueId, doc.id]));
+                // --- 【第 434 行：結束，以上是本次修正的核心】 ---
 
                 let updatedCount = 0;
                 let createdCount = 0;
@@ -387,12 +387,10 @@ function initProgressManagementPage() {
                     };
 
                     if (existingDocId) {
-                        // 更新現有文件
                         const docRef = db.collection("progressItems").doc(existingDocId);
                         batch.update(docRef, docData);
                         updatedCount++;
                     } else {
-                        // 建立新文件
                         docData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                         const docRef = db.collection("progressItems").doc();
                         batch.set(docRef, docData);
@@ -419,7 +417,6 @@ function initProgressManagementPage() {
         };
         reader.readAsArrayBuffer(file);
     }
-    // --- 【第 488 行：結束，以上是本次修改的核心函數】 ---
 
     function setupEventListeners() {
         document.getElementById('projectSelect')?.addEventListener('change', (e) => onProjectChange(e.target.value));
