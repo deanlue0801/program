@@ -1,0 +1,71 @@
+<section class="selection-panel">
+    <div class="selection-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+        <div>
+            <label class="selection-label" for="projectSelect">📁 專案</label>
+            <select class="form-select" id="projectSelect"></select>
+        </div>
+        <div>
+            <label class="selection-label" for="tenderSelect">📋 標單</label>
+            <select class="form-select" id="tenderSelect" disabled></select>
+        </div>
+        <div>
+            <label class="selection-label" for="majorItemSelect">🔧 大項</label>
+            <select class="form-select" id="majorItemSelect" disabled></select>
+        </div>
+        <div>
+            <label class="selection-label" for="floorSelect">🏢 樓層</label>
+            <select class="form-select" id="floorSelect" disabled></select>
+        </div>
+        <div>
+            <label class="selection-label" for="spaceSelect">🚪 空間</label>
+            <select class="form-select" id="spaceSelect" disabled></select>
+        </div>
+    </div>
+</section>
+
+<div class="content-card" id="contentCard">
+    <div id="loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>載入進度資料中...</p>
+    </div>
+
+    <div id="mainContent" style="display: none;">
+        <div class="actions-panel">
+            <h2 id="currentLocation" style="color: #333; font-size: 20px;"></h2>
+            <div class="action-buttons">
+                 <button id="workItemsManagerBtn" class="btn btn-info">⚙️ 管理工項</button>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="distribution-table" id="progressTable">
+                <thead id="tableHeader"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div id="initialEmptyState" class="empty-state" style="display: flex;">
+        <div class="empty-state-icon">↖️</div>
+        <p>請從上方的下拉選單選擇完整的目標，以載入施工進度表</p>
+    </div>
+</div>
+
+<div id="workItemsModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <h3>⚙️ 工項設定管理</h3>
+        <p>為此標單設定全域的施工工項，設定將套用於所有項目。</p>
+        <div class="modal-section">
+            <h4>✏️ 自訂工項 (以逗號分隔)</h4>
+            <div class="custom-add-section">
+                <input type="text" id="newWorkItemInput" class="form-control" placeholder="例如：配管,配線,設備安裝,測試">
+            </div>
+        </div>
+        <div class="modal-actions">
+            <div></div>
+            <div>
+                <button id="saveWorkItemsBtn" class="btn btn-success">💾 儲存設定</button>
+                <button id="cancelWorkItemsModalBtn" class="btn btn-secondary">❌ 取消</button>
+            </div>
+        </div>
+    </div>
+</div>
