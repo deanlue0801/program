@@ -10,6 +10,7 @@ const routes = {
     '/tenders/list': { html: `pages/tenders/list.html`, init: 'initTendersListPage' },
     '/tenders/detail': { html: `pages/tenders/detail.html`, init: 'initTenderDetailPage' },
     '/tenders/distribution': { html: `pages/tenders/distribution.html`, init: 'initDistributionPage' },
+    '/tenders/space-distribution': { html: `pages/tenders/space-distribution.html`, init: 'initSpaceDistributionPage' },
     '/tenders/import': { html: `pages/tenders/import.html`, init: 'initImportPage' },
     '/projects/create': { html: 'pages/projects/create.html' },
     '/projects/edit': { html: 'pages/projects/edit.html' },
