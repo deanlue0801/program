@@ -1,5 +1,5 @@
 /**
- * 標單詳情頁面 (tenders-detail.js) - 修正數量計算 BUG 並新增追蹤開關
+ * 標單詳情頁面 (tenders-detail.js) - 修正排序、數量BUG，並新增追蹤開關
  */
 function initTenderDetailPage() {
 
@@ -65,11 +65,12 @@ function initTenderDetailPage() {
     }
     
     async function loadMajorAndDetailItems() {
+        // 修正排序：先讀取，再用 naturalSequenceSort 排序
         const majorItemsResult = await safeFirestoreQuery('majorItems',
             [{ field: 'tenderId', operator: '==', value: tenderId }]
         );
         majorItems = majorItemsResult.docs;
-        majorItems.sort(naturalSequenceSort);
+        majorItems.sort(naturalSequenceSort); // 使用正確的自然排序
 
         if (majorItems.length === 0) { detailItems = []; return; }
         const majorItemIds = majorItems.map(item => item.id);
@@ -80,7 +81,7 @@ function initTenderDetailPage() {
         }
         const detailChunks = await Promise.all(detailPromises);
         detailItems = detailChunks.flatMap(chunk => chunk.docs);
-        detailItems.sort(naturalSequenceSort);
+        detailItems.sort(naturalSequenceSort); // 細項也使用自然排序
     }
 
     async function loadDistributionData() {
@@ -436,7 +437,6 @@ function initTenderDetailPage() {
     loadAllData();
 }
 
-// 這個自然排序函式很重要，確保它在檔案中
 function naturalSequenceSort(a, b) {
     const seqA = String(a.sequence || '');
     const seqB = String(b.sequence || '');
