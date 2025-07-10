@@ -542,3 +542,15 @@ input:checked + .slider:before {
     padding-top: 1rem;
     border-top: 1px solid #eee;
 }
+/* --- 新增規則 (v2.5)：修正詳情頁中展開表格的樣式 --- */
+.detail-view-table {
+    table-layout: fixed; /* 這是讓寬度百分比生效的關鍵 */
+    width: 100%;
+    min-width: 0; /* 覆蓋 distribution.css 的 min-width: 1200px */
+}
+
+.detail-view-table th,
+.detail-view-table td {
+    white-space: normal; /* 允許文字自動換行 */
+    word-break: break-word; /* 如果有很長的英文或數字，強制斷詞 */
+}
