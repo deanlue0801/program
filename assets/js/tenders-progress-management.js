@@ -1,5 +1,5 @@
 /**
- * 施工進度管理 (progress-management.js) (SPA 版本 v2.3 - 修正Excel匯入BUG)
+ * 施工進度管理 (progress-management.js) (SPA 版本 v2.4 - 遵守進度追蹤開關)
  */
 function initProgressManagementPage() {
 
@@ -7,8 +7,8 @@ function initProgressManagementPage() {
     let projects = [], tenders = [], majorItems = [], floors = [], spaces = [];
     let selectedTender = null, selectedMajorItem = null, selectedFloor = null, selectedSpace = null;
     let workItems = ['配管', '配線', '設備安裝', '測試']; 
-    let currentViewMode = 'floor'; // 'floor' or 'space'
-    let allDetailItems = []; // 儲存當前大項的所有細項
+    let currentViewMode = 'floor';
+    let allDetailItems = [];
 
     // --- 初始化與資料載入 ---
     async function initializePage() {
@@ -60,20 +60,26 @@ function initProgressManagementPage() {
              if (!workItemSettingsDoc.empty) {
                 workItems = workItemSettingsDoc.docs[0].data().workItems || workItems;
             } else {
-                workItems = ['配管', '配線', '設備安裝', '測試']; // 如果沒有設定，則恢復預設值
+                workItems = ['配管', '配線', '設備安裝', '測試']; 
             }
             document.getElementById('newWorkItemInput').value = workItems.join(',');
         } catch (error) { showAlert('載入標單資料失敗', 'error'); }
     }
 
+    // --- 【第 259 行：開始，這是本次修改的核心函數】 ---
     async function onMajorItemChange(majorItemId) {
         resetSelects('floor');
         if(!majorItemId) return;
         selectedMajorItem = majorItems.find(m => m.id === majorItemId);
-        // 預先載入細項，供匯入功能使用
-        allDetailItems = (await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }])).docs;
+        
+        // 預先載入「需要被追蹤」的細項
+        const allItems = (await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }])).docs;
+        // 在這裡就進行過濾！
+        allDetailItems = allItems.filter(item => !item.excludeFromProgress);
+
         populateSelect(document.getElementById('floorSelect'), floors.map(f => ({id:f, name:f})), '請選擇樓層...');
     }
+    // --- 【第 270 行：結束，以上是本次修改的核心函數】 ---
 
     async function onFloorChange(floorName) {
         resetSelects('space');
@@ -114,16 +120,22 @@ function initProgressManagementPage() {
                 { field: "areaName", operator: "==", value: selectedFloor }
             ];
             
+            // 這裡不再需要載入 detailItems，因為 onMajorItemChange 已經載入並過濾完畢
             const [floorDistDocs, spaceDistDocs, progressItemDocs, spaceSettingsDoc] = await Promise.all([
                 safeFirestoreQuery("distributionTable", floorDistQuery),
                 safeFirestoreQuery("spaceDistribution", baseQuery),
                 safeFirestoreQuery("progressItems", baseQuery),
                 db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get()
             ]);
+            
+            // 過濾掉不需追蹤的項目的分配資料
+            const trackedItemIds = allDetailItems.map(item => item.id);
+            const trackedFloorDists = floorDistDocs.docs.filter(doc => trackedItemIds.includes(doc.detailItemId));
+            const trackedSpaceDists = spaceDistDocs.docs.filter(doc => trackedItemIds.includes(doc.detailItemId));
 
             const finalFloorDistDocs = (currentViewMode === 'space' && selectedSpace)
-                ? floorDistDocs.docs.filter(doc => spaceDistDocs.docs.some(sDoc => sDoc.detailItemId === doc.detailItemId && sDoc.spaceName === selectedSpace))
-                : floorDistDocs.docs;
+                ? trackedFloorDists.filter(doc => trackedSpaceDists.some(sDoc => sDoc.detailItemId === doc.detailItemId && sDoc.spaceName === selectedSpace))
+                : trackedFloorDists;
 
             spaces = spaceSettingsDoc.empty ? [] : (spaceSettingsDoc.docs[0].data().spaces || []);
             if (currentViewMode === 'floor') {
@@ -131,7 +143,7 @@ function initProgressManagementPage() {
                 buildSpaceFilter();
             }
             
-            buildProgressTable(finalFloorDistDocs, spaceDistDocs.docs, progressItemDocs.docs, allDetailItems);
+            buildProgressTable(finalFloorDistDocs, trackedSpaceDists, progressItemDocs.docs, allDetailItems);
             showContent();
 
         } catch (error) {
@@ -141,6 +153,7 @@ function initProgressManagementPage() {
         }
     }
 
+    // ... (檔案剩餘的其他函數，維持不變) ...
     function buildSpaceFilter() {
         const container = document.getElementById('spaceFilterCheckboxes');
         const filterContainer = document.getElementById('spaceFilterContainer');
@@ -351,11 +364,8 @@ function initProgressManagementPage() {
                     { field: "majorItemId", operator: "==", value: selectedMajorItem.id },
                     { field: "floorName", operator: "==", value: selectedFloor }
                 ]);
-
-                // --- 【第 432 行：開始，這是本次修正的核心】 ---
-                // 修正：我們的 safeFirestoreQuery 已經回傳了物件陣列，所以不需要再呼叫 .data()
+                
                 const progressMap = new Map(progressQuery.docs.map(doc => [doc.uniqueId, doc.id]));
-                // --- 【第 434 行：結束，以上是本次修正的核心】 ---
 
                 let updatedCount = 0;
                 let createdCount = 0;
