@@ -1,5 +1,5 @@
 /**
- * 標單詳情頁面 (tenders-detail.js) - v2.1 修正排序邏輯
+ * 標單詳情頁面 (tenders-detail.js) - v2.2 修正資料讀取邏輯
  */
 function initTenderDetailPage() {
 
@@ -64,36 +64,50 @@ function initTenderDetailPage() {
         }
     }
     
+    /**
+     * 【核心修正】
+     * 修正 majorItems 和 detailItems 的資料處理，
+     * 從 Firestore 的 DocumentSnapshot 中正確提取資料。
+     */
     async function loadMajorAndDetailItems() {
         const majorItemsResult = await safeFirestoreQuery('majorItems',
             [{ field: 'tenderId', operator: '==', value: tenderId }]
         );
-        majorItems = majorItemsResult.docs;
+        // 【修正】使用 .map(doc => ({...})) 來解包資料
+        majorItems = majorItemsResult.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         majorItems.sort(naturalSequenceSort);
 
         if (majorItems.length === 0) { detailItems = []; return; }
         const majorItemIds = majorItems.map(item => item.id);
         const detailPromises = [];
+        // Firestore 'in' 查詢每次最多10個
         for (let i = 0; i < majorItemIds.length; i += 10) {
             const chunk = majorItemIds.slice(i, i + 10);
             detailPromises.push(safeFirestoreQuery('detailItems', [{ field: 'majorItemId', operator: 'in', value: chunk }]));
         }
         const detailChunks = await Promise.all(detailPromises);
-        detailItems = detailChunks.flatMap(chunk => chunk.docs);
+        // 【修正】使用 .flatMap(chunk => chunk.docs.map(...)) 來解包所有細項資料
+        detailItems = detailChunks.flatMap(chunk => chunk.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         detailItems.sort(naturalSequenceSort);
     }
 
+    /**
+     * 【核心修正】
+     * 修正 distributionData 的資料處理，確保能正確讀取分配數量。
+     */
     async function loadDistributionData() {
         if (detailItems.length === 0) { distributionData = []; return; }
         const detailItemIds = detailItems.map(item => item.id);
         const distPromises = [];
+        // Firestore 'in' 查詢每次最多10個
         for (let i = 0; i < detailItemIds.length; i += 10) {
             const chunk = detailItemIds.slice(i, i + 10);
             distPromises.push(safeFirestoreQuery('distributionTable', [{ field: 'detailItemId', operator: 'in', value: chunk }]));
         }
         const distChunks = await Promise.all(distPromises);
-        distributionData = distChunks.flatMap(chunk => chunk.docs);
+         // 【修正】使用 .flatMap(chunk => chunk.docs.map(...)) 來解包所有分配資料
+        distributionData = distChunks.flatMap(chunk => chunk.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }
 
     // --- 畫面渲染與計算 ---
@@ -133,9 +147,9 @@ function initTenderDetailPage() {
         document.getElementById('totalAmount').textContent = formatCurrency(totalAmount);
         document.getElementById('majorItemsCount').textContent = majorItemsCount;
         document.getElementById('detailItemsCount').textContent = detailItemsCount;
-        document.getElementById('overallProgress').textContent = `0%`;
+        document.getElementById('overallProgress').textContent = `0%`; // 暫不計算
         document.getElementById('distributionProgress').textContent = `${Math.round(distributionProgress)}%`;
-        document.getElementById('billingAmount').textContent = formatCurrency(0);
+        document.getElementById('billingAmount').textContent = formatCurrency(0); // 暫不計算
     }
 
     function renderOverviewTab() {
@@ -435,8 +449,7 @@ function initTenderDetailPage() {
 }
 
 /**
- * 【核心修正】
- * 新的自然排序函式，能夠正確處理中文數字與天干地支。
+ * 自然排序函式，能夠正確處理中文數字與天干地支。
  */
 function naturalSequenceSort(a, b) {
     const CHINESE_NUM_MAP = {
