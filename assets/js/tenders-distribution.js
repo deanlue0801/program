@@ -1,5 +1,5 @@
 /**
- * 樓層分配管理系統 (distribution.js) (SPA 版本) - v2.6 融合所有修正最終版
+ * 樓層分配管理系統 (distribution.js) (SPA 版本) - v2.7 修正排序邏輯
  */
 function initDistributionPage() {
     
@@ -19,7 +19,6 @@ function initDistributionPage() {
     // --- 所有函數定義區 ---
 
     function showAlert(message, type = 'info', duration = 3000) {
-        // 使用瀏覽器內建的 alert，確保提示一定會出現
         alert(`[${type.toUpperCase()}] ${message}`);
     }
 
@@ -485,17 +484,6 @@ function initDistributionPage() {
         document.getElementById('mainContent').style.display = 'block';
         document.getElementById('emptyState').style.display = 'none';
     }
-    
-    function naturalSequenceSort(a, b) {
-        const re = /(\d+(\.\d+)?)|(\D+)/g;
-        const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[];
-        for(let i=0; i<Math.min(pA.length, pB.length); i++) {
-            const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]);
-            if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;}
-            else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]);
-        }
-        return pA.length-pB.length;
-    }
 
     // --- 主流程啟動點 ---
     function setupEventListeners() {
@@ -533,4 +521,45 @@ function initDistributionPage() {
     
     // *** 最終執行啟動點 ***
     initializePage();
+}
+
+/**
+ * 【核心修正】
+ * 新的自然排序函式，能夠正確處理中文數字與天干地支。
+ */
+function naturalSequenceSort(a, b) {
+    const CHINESE_NUM_MAP = {
+        '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+        '甲': 1, '乙': 2, '丙': 3, '丁': 4, '戊': 5, '己': 6, '庚': 7, '辛': 8, '壬': 9, '癸': 10
+    };
+
+    const re = /(\d+(\.\d+)?)|([一二三四五六七八九十甲乙丙丁戊己庚辛壬癸])|(\D+)/g;
+    const seqA = String(a.sequence || '');
+    const seqB = String(b.sequence || '');
+    const partsA = seqA.match(re) || [];
+    const partsB = seqB.match(re) || [];
+    const len = Math.min(partsA.length, partsB.length);
+
+    for (let i = 0; i < len; i++) {
+        const partA = partsA[i];
+        const partB = partsB[i];
+
+        // 嘗試解析為阿拉伯數字
+        let numA = parseFloat(partA);
+        let numB = parseFloat(partB);
+
+        // 如果不是阿拉伯數字，嘗試解析為中文數字
+        if (isNaN(numA)) numA = CHINESE_NUM_MAP[partA];
+        if (isNaN(numB)) numB = CHINESE_NUM_MAP[partB];
+
+        // 如果兩者都是數字 (無論是阿拉伯還是中文轉換的)
+        if (numA !== undefined && numB !== undefined) {
+            if (numA !== numB) return numA - numB;
+        } else {
+            // 如果其中一個不是數字，或兩者都不是，則進行文字比較
+            const comparison = partA.localeCompare(partB);
+            if (comparison !== 0) return comparison;
+        }
+    }
+    return partsA.length - partsB.length;
 }
