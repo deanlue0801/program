@@ -536,21 +536,27 @@ input:checked + .slider:before {
     transform: translateX(26px);
 }
 
-/* 用於細項表格的容器 */
-.detail-items-table-container {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid #eee;
-}
-/* --- 新增規則 (v2.5)：修正詳情頁中展開表格的樣式 --- */
+/* --- 修正詳情頁中展開表格的樣式 (v2.7) --- */
 .detail-view-table {
-    table-layout: fixed; /* 這是讓寬度百分比生效的關鍵 */
+    table-layout: fixed; /* 讓寬度百分比生效 */
     width: 100%;
-    min-width: 0; /* 覆蓋 distribution.css 的 min-width: 1200px */
+    min-width: 0; 
 }
 
-.detail-view-table th,
+/* 設定表格標頭(th)的樣式：不換行、垂直置中 */
+.detail-view-table th {
+    white-space: nowrap; /* 關鍵：禁止標頭文字換行 */
+    vertical-align: middle; /* 讓文字垂直置中，更美觀 */
+}
+
+/* 設定表格內容(td)的樣式：允許換行、強制斷詞 */
 .detail-view-table td {
-    white-space: normal; /* 允許文字自動換行 */
-    word-break: break-word; /* 如果有很長的英文或數字，強制斷詞 */
+    white-space: normal;   /* 允許內容文字自動換行 */
+    word-break: break-word; /* 當內容過長時強制斷詞 */
+}
+
+/* 修正從 distribution.css 繼承來的背景色問題 */
+.detail-view-table td:first-child {
+    background-color: transparent; 
+    font-weight: normal; 
 }
