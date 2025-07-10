@@ -64,13 +64,16 @@ function initTenderDetailPage() {
         }
     }
     
+    // --- 【核心 Bug 修正：排序問題】---
     async function loadMajorAndDetailItems() {
-        // 修正排序：先讀取，再用 naturalSequenceSort 排序
+        // 1. 從資料庫讀取大項時，移除排序參數
         const majorItemsResult = await safeFirestoreQuery('majorItems',
             [{ field: 'tenderId', operator: '==', value: tenderId }]
         );
         majorItems = majorItemsResult.docs;
-        majorItems.sort(naturalSequenceSort); // 使用正確的自然排序
+        
+        // 2. 在前端程式碼中使用更聰明的 naturalSequenceSort 進行排序
+        majorItems.sort(naturalSequenceSort);
 
         if (majorItems.length === 0) { detailItems = []; return; }
         const majorItemIds = majorItems.map(item => item.id);
@@ -81,7 +84,7 @@ function initTenderDetailPage() {
         }
         const detailChunks = await Promise.all(detailPromises);
         detailItems = detailChunks.flatMap(chunk => chunk.docs);
-        detailItems.sort(naturalSequenceSort); // 細項也使用自然排序
+        detailItems.sort(naturalSequenceSort);
     }
 
     async function loadDistributionData() {
@@ -285,11 +288,11 @@ function initTenderDetailPage() {
         }
     }
 
-    // --- 【核心 Bug 修正】---
+    // --- 【核心 Bug 修正：數量計算問題】---
     function createDetailItemsSummary(details, distributions) {
         if (details.length === 0) return '<div class="empty-state" style="padding:1rem"><p>此大項目尚無細項</p></div>';
         
-        // 修正：使用 item.quantity，並正確計算總金額
+        // 修正：使用 item.quantity 和 item.unitPrice
         const totalQuantity = details.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
         const totalAmount = details.reduce((sum, item) => sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)), 0);
         
@@ -322,7 +325,7 @@ function initTenderDetailPage() {
         document.getElementById('infoCreatedAt').textContent = formatDateTime(currentTender.createdAt);
         document.getElementById('infoUpdatedAt').textContent = formatDateTime(currentTender.updatedAt);
         const amount = currentTender.totalAmount || 0;
-        const tax = amount * 0.05; // 假設稅率為 5%
+        const tax = amount * 0.05; 
         const subtotal = amount - tax;
         document.getElementById('infoAmount').textContent = formatCurrency(subtotal);
         document.getElementById('infoTax').textContent = formatCurrency(tax);
