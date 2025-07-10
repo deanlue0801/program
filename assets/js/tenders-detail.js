@@ -1,6 +1,5 @@
 /**
- * 標單詳情頁面 (tenders/detail.js) (SPA 版本) - 修正自我執行問題
- * 由 router.js 呼叫 initTenderDetailPage() 函數來啟動
+ * 標單詳情頁面 (tenders-detail.js) - 修正大項排序問題
  */
 function initTenderDetailPage() {
 
@@ -13,11 +12,6 @@ function initTenderDetailPage() {
     let tenderId = null;
     let allMajorExpanded = false;
 
-    // 將內部變數暴露到 window 全域，方便從 console 存取
-    window.detailItems = [];
-    window.distributionData = [];
-
-
     const statusText = {
         'planning': '規劃中', 'active': '進行中', 'completed': '已完成',
         'paused': '暫停', 'bidding': '招標中', 'awarded': '得標'
@@ -27,10 +21,10 @@ function initTenderDetailPage() {
 
     function getTenderIdFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
-        tenderId = urlParams.get('id');
+        tenderId = urlParams.get('id') || urlParams.get('tenderId'); // 兼容兩種參數名
         if (!tenderId) {
             showAlert('無效的標單ID', 'error');
-            navigateTo('/program/tenders/list'); // 如果沒有ID，跳轉回列表
+            navigateTo('/program/tenders/list');
             return false;
         }
         return true;
@@ -38,7 +32,6 @@ function initTenderDetailPage() {
 
     async function loadAllData() {
         if (!getTenderIdFromUrl()) return;
-
         try {
             showLoading('載入標單資料...');
             const tenderDoc = await db.collection('tenders').doc(tenderId).get();
@@ -48,14 +41,11 @@ function initTenderDetailPage() {
                 return;
             }
             currentTender = { id: tenderDoc.id, ...tenderDoc.data() };
-
             await loadProjectData();
             await loadMajorAndDetailItems();
             await loadDistributionData();
-            
             renderAllData();
             showMainContent();
-            
         } catch (error) {
             console.error('❌ 載入標單詳情頁失敗:', error);
             showAlert('載入資料失敗: ' + error.message, 'error');
@@ -77,16 +67,19 @@ function initTenderDetailPage() {
         }
     }
 
+    // --- 【核心修改】從這裡開始 ---
     async function loadMajorAndDetailItems() {
+        // 1. 從資料庫讀取大項時，先不進行排序
         const majorItemsResult = await safeFirestoreQuery('majorItems',
-            [{ field: 'tenderId', operator: '==', value: tenderId }],
-            { field: 'sequence', direction: 'asc' }
+            [{ field: 'tenderId', operator: '==', value: tenderId }]
         );
         majorItems = majorItemsResult.docs;
-        
+
+        // 2. 在程式碼中，使用我們聰明的自然排序法進行排序
+        majorItems.sort(naturalSequenceSort);
+
         if (majorItems.length === 0) {
             detailItems = [];
-            window.detailItems = [];
             return;
         }
         const majorItemIds = majorItems.map(item => item.id);
@@ -98,13 +91,12 @@ function initTenderDetailPage() {
         const detailChunks = await Promise.all(detailPromises);
         detailItems = detailChunks.flatMap(chunk => chunk.docs);
         detailItems.sort(naturalSequenceSort);
-        window.detailItems = detailItems;
     }
+    // --- 【核心修改】到這裡結束 ---
 
     async function loadDistributionData() {
         if (detailItems.length === 0) {
             distributionData = [];
-            window.distributionData = [];
             return;
         }
         const detailItemIds = detailItems.map(item => item.id);
@@ -115,10 +107,9 @@ function initTenderDetailPage() {
         }
         const distChunks = await Promise.all(distPromises);
         distributionData = distChunks.flatMap(chunk => chunk.docs);
-        window.distributionData = distributionData;
     }
 
-    // --- 畫面渲染與計算 (省略未修改部分) ---
+    // --- 畫面渲染與計算 ---
     function renderAllData() {
         renderTenderHeader();
         renderStatistics();
@@ -131,22 +122,19 @@ function initTenderDetailPage() {
         const projectName = currentProject ? currentProject.name : '未知專案';
         const statusClass = `status-${currentTender.status || 'planning'}`;
         const statusLabel = statusText[currentTender.status] || currentTender.status;
-        
         document.getElementById('tenderName').textContent = currentTender.name || '未命名標單';
         document.getElementById('tenderCode').textContent = currentTender.code || '-';
         document.getElementById('projectName').textContent = projectName;
         document.getElementById('createdInfo').textContent = `建立於 ${formatDate(currentTender.createdAt)} by ${currentTender.createdBy || '未知'}`;
-        
         const statusBadge = document.getElementById('statusBadge');
         statusBadge.textContent = statusLabel;
         statusBadge.className = `status-badge ${statusClass}`;
-        
         const editBtn = document.getElementById('editBtn');
         const importBtn = document.getElementById('importBtn');
         const distBtn = document.getElementById('distributionBtn');
-        if(editBtn) editBtn.href = `/program/tenders/edit?id=${tenderId}`;
-        if(importBtn) importBtn.href = `/program/tenders/import?tenderId=${tenderId}`;
-        if(distBtn) distBtn.href = `/program/tenders/distribution?tenderId=${tenderId}`;
+        if (editBtn) editBtn.href = `/program/tenders/edit?tenderId=${tenderId}`;
+        if (importBtn) importBtn.href = `/program/tenders/import?tenderId=${tenderId}`;
+        if (distBtn) distBtn.href = `/program/tenders/distribution?tenderId=${tenderId}`;
     }
 
     function renderStatistics() {
@@ -157,7 +145,6 @@ function initTenderDetailPage() {
         const distributionProgress = majorItemsCount > 0 ? (distributedMajorItems / majorItemsCount) * 100 : 0;
         const overallProgress = 0;
         const billingAmount = totalAmount * (overallProgress / 100);
-
         document.getElementById('totalAmount').textContent = formatCurrency(totalAmount);
         document.getElementById('majorItemsCount').textContent = majorItemsCount;
         document.getElementById('detailItemsCount').textContent = detailItemsCount;
@@ -201,7 +188,6 @@ function initTenderDetailPage() {
         const relatedDistributions = distributionData.filter(dist => relatedDetails.some(detail => detail.id === dist.detailItemId));
         const distributionProgress = calculateMajorItemDistributionProgress(majorItem);
         const totalDetails = relatedDetails.length;
-        
         const majorItemDiv = document.createElement('div');
         majorItemDiv.className = 'major-item-card';
         majorItemDiv.id = `major-item-${majorItem.id}`;
@@ -212,7 +198,7 @@ function initTenderDetailPage() {
                         <h4>${majorItem.sequence || 'N/A'}. ${majorItem.name || '未命名大項目'}</h4>
                         <div class="major-item-meta">
                             <span>📋 ${totalDetails} 個細項</span>
-                            <span>🔧 ${new Set(relatedDistributions.map(d=>d.detailItemId)).size} 已分配細項</span>
+                            <span>🔧 ${new Set(relatedDistributions.map(d => d.detailItemId)).size} 已分配細項</span>
                             <span>📊 狀態: ${statusText[majorItem.status] || majorItem.status || '未設定'}</span>
                         </div>
                     </div>
@@ -226,33 +212,117 @@ function initTenderDetailPage() {
                 <div class="major-item-actions">
                     <button class="btn btn-warning" onclick="window.exposedFunctions.goToDistribution('${majorItem.id}')">🔧 設定分配</button>
                     <button class="btn btn-secondary" onclick="window.exposedFunctions.toggleMajorItemSummary('${majorItem.id}')">👁️ 細項預覽</button>
+                    <button class="btn btn-info" onclick="window.exposedFunctions.toggleDetailItemsTable(this, '${majorItem.id}')">📄 展開細項</button>
                 </div>
             </div>
-            <div class="detail-items-summary" id="summary-${majorItem.id}">${createDetailItemsSummary(relatedDetails, relatedDistributions)}</div>`;
+            <div class="detail-items-summary" id="summary-${majorItem.id}">${createDetailItemsSummary(relatedDetails, relatedDistributions)}</div>
+            <div class="detail-items-table-container" id="table-container-${majorItem.id}" style="display:none;"></div>`;
         return majorItemDiv;
+    }
+    
+    // 以下是為了實現新功能而新增/修改的函數
+    async function toggleDetailItemsTable(button, majorItemId) {
+        const tableContainer = document.getElementById(`table-container-${majorItemId}`);
+        const isOpening = tableContainer.style.display === 'none';
+        
+        button.textContent = isOpening ? '收合細項' : '展開細項';
+        tableContainer.style.display = isOpening ? 'block' : 'none';
+
+        if (isOpening && !tableContainer.dataset.loaded) {
+            tableContainer.innerHTML = '<div class="loading-small" style="padding: 2rem; text-align: center;">載入細項表格中...</div>';
+            const relatedDetails = detailItems.filter(item => item.majorItemId === majorItemId);
+            const table = createDetailItemsTable(relatedDetails);
+            tableContainer.innerHTML = '';
+            tableContainer.appendChild(table);
+            tableContainer.dataset.loaded = 'true';
+        }
+    }
+
+    function createDetailItemsTable(details) {
+        const table = document.createElement('table');
+        table.className = 'distribution-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th style="width: 5%;">項次</th>
+                    <th style="width: 40%;">項目名稱</th>
+                    <th style="width: 10%;">單位</th>
+                    <th style="width: 10%;">數量</th>
+                    <th style="width: 15%;">單價</th>
+                    <th style="width: 15%;">總價</th>
+                    <th style="width: 10%;">進度追蹤</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+        const tbody = table.querySelector('tbody');
+        if (details.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">無細項資料</td></tr>';
+        } else {
+            details.forEach(item => {
+                const row = tbody.insertRow();
+                row.dataset.id = item.id;
+                const quantity = parseFloat(item.quantity) || 0;
+                const unitPrice = parseFloat(item.unitPrice) || 0;
+                row.innerHTML = `
+                    <td>${item.sequence || ''}</td>
+                    <td>${item.name || ''}</td>
+                    <td>${item.unit || ''}</td>
+                    <td>${quantity}</td>
+                    <td>${unitPrice.toLocaleString()}</td>
+                    <td>${(quantity * unitPrice).toLocaleString()}</td>
+                    <td>
+                        <label class="toggle-switch">
+                            <input type="checkbox" class="progress-tracking-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </td>
+                `;
+                const toggle = row.querySelector('.progress-tracking-toggle');
+                toggle.checked = !item.excludeFromProgress;
+                toggle.addEventListener('change', handleProgressTrackingToggle);
+            });
+        }
+        return table;
+    }
+
+    async function handleProgressTrackingToggle(event) {
+        const toggle = event.target;
+        const row = toggle.closest('tr');
+        if (!row) return;
+        const detailItemId = row.dataset.id;
+        const exclude = !toggle.checked;
+        toggle.disabled = true;
+        try {
+            await db.collection('detailItems').doc(detailItemId).update({ excludeFromProgress: exclude });
+            const itemInModel = detailItems.find(item => item.id === detailItemId);
+            if(itemInModel) itemInModel.excludeFromProgress = exclude;
+        } catch (error) {
+            showAlert(`更新追蹤狀態失敗: ${error.message}`, 'error');
+            toggle.checked = !exclude;
+        } finally {
+            toggle.disabled = false;
+        }
     }
 
     function createDetailItemsSummary(details, distributions) {
         if (details.length === 0) return '<div class="empty-state" style="padding:1rem"><p>此大項目尚無細項</p></div>';
-        
-        const totalQuantity = details.reduce((sum, item) => sum + (parseFloat(item.totalQuantity) || 0), 0);
-        const totalAmount = details.reduce((sum, item) => sum + (parseFloat(item.totalPrice) || 0), 0);
+        const totalQuantity = details.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
+        const totalAmount = details.reduce((sum, item) => sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)), 0);
         const distributedQuantity = distributions.reduce((sum, dist) => sum + (parseFloat(dist.quantity) || 0), 0);
-        
         const distributedAmount = distributions.reduce((sum, dist) => {
              const detail = details.find(d => d.id === dist.detailItemId);
              const unitPrice = detail ? (parseFloat(detail.unitPrice) || 0) : 0;
              return sum + ((parseFloat(dist.quantity) || 0) * unitPrice);
         }, 0);
-
         return `<div class="summary-grid">
-            <div><div>${details.length}</div><div>細項總數</div></div>
-            <div><div>${totalQuantity}</div><div>總數量</div></div>
-            <div><div>${formatCurrency(totalAmount)}</div><div>總金額</div></div>
-            <div><div>${distributedQuantity}</div><div>已分配數量</div></div>
-            <div><div>${formatCurrency(distributedAmount)}</div><div>已分配金額</div></div>
-            <div><div>${Math.round((distributedQuantity / (totalQuantity || 1)) * 100)}%</div><div>分配進度</div></div>
-        </div>`;
+             <div><div>${details.length}</div><div>細項總數</div></div>
+             <div><div>${totalQuantity}</div><div>總數量</div></div>
+             <div><div>${formatCurrency(totalAmount)}</div><div>總金額</div></div>
+             <div><div>${distributedQuantity}</div><div>已分配數量</div></div>
+             <div><div>${formatCurrency(distributedAmount)}</div><div>已分配金額</div></div>
+             <div><div>${Math.round((distributedQuantity / (totalQuantity || 1)) * 100)}%</div><div>分配進度</div></div>
+         </div>`;
     }
 
     function renderInfoTab() {
@@ -267,7 +337,7 @@ function initTenderDetailPage() {
         document.getElementById('infoCreatedAt').textContent = formatDateTime(currentTender.createdAt);
         document.getElementById('infoUpdatedAt').textContent = formatDateTime(currentTender.updatedAt);
         const amount = currentTender.totalAmount || 0;
-        const tax = currentTender.tax || 0;
+        const tax = amount * 0.05;
         const subtotal = amount - tax;
         document.getElementById('infoAmount').textContent = formatCurrency(subtotal);
         document.getElementById('infoTax').textContent = formatCurrency(tax);
@@ -291,19 +361,12 @@ function initTenderDetailPage() {
     function calculateMajorItemDistributionProgress(majorItem) {
         const majorItemId = majorItem.id;
         const relatedDetails = detailItems.filter(item => item.majorItemId === majorItemId);
-        if (relatedDetails.length === 0) {
-            return 0;
-        }
-
-        const totalQuantity = relatedDetails.reduce((sum, item) => sum + (parseFloat(item.totalQuantity) || 0), 0);
-        if (totalQuantity === 0) {
-            return 100;
-        }
-
+        if (relatedDetails.length === 0) return 0;
+        const totalQuantity = relatedDetails.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
+        if (totalQuantity === 0) return 100;
         const relatedDetailIds = new Set(relatedDetails.map(item => item.id));
         const relatedDistributions = distributionData.filter(dist => relatedDetailIds.has(dist.detailItemId));
         const distributedQuantity = relatedDistributions.reduce((sum, dist) => sum + (parseFloat(dist.quantity) || 0), 0);
-
         return (distributedQuantity / totalQuantity) * 100;
     }
 
@@ -322,7 +385,6 @@ function initTenderDetailPage() {
         return diffDays > 0 ? diffDays : 0;
     }
 
-    // --- UI 互動事件 ---
     function switchTab(tabName) {
         document.querySelectorAll('.tab-btn').forEach(tab => tab.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
@@ -354,14 +416,16 @@ function initTenderDetailPage() {
         }
     }
 
-    // --- 頁面跳轉 ---
     function goToDistribution(majorItemId) {
         navigateTo(`/program/tenders/distribution?tenderId=${tenderId}&majorItemId=${majorItemId}`);
     }
 
     function showLoading(message = '載入中...') {
         const el = document.getElementById('loading');
-        if (el) el.style.display = 'flex';
+        if (el) {
+            el.style.display = 'flex';
+            el.querySelector('p').textContent = message;
+        }
     }
 
     function showMainContent() {
@@ -376,10 +440,10 @@ function initTenderDetailPage() {
         toggleAllMajorItems,
         refreshMajorItems,
         goToDistribution,
-        toggleMajorItemSummary
+        toggleMajorItemSummary,
+        toggleDetailItemsTable // 新增暴露此函數
     };
 
-    // 立即啟動頁面邏輯
     loadAllData();
 }
 
@@ -403,5 +467,3 @@ function naturalSequenceSort(a, b) {
     }
     return partsA.length - partsB.length;
 }
-
-// 【修正處】刪除了檔案結尾的 initTenderDetailPage(); 這行
