@@ -1,5 +1,5 @@
 /**
- * 標單詳情頁面 (tenders-detail.js) - v2.3 修正數量與總價為0的問題
+ * 標單詳情頁面 (tenders-detail.js) - v2.4 修正重新載入時的 TypeError
  */
 function initTenderDetailPage() {
 
@@ -65,49 +65,54 @@ function initTenderDetailPage() {
     }
     
     /**
-     * 【核心修正】
-     * 修正 majorItems 和 detailItems 的資料處理，
-     * 從 Firestore 的 DocumentSnapshot 中正確提取資料。
+     * 【v2.4 核心修正】
+     * 修正重新載入時的 TypeError: doc.data is not a function
+     * 增加對 doc.data 類型的檢查，讓函式能同時處理 Firestore 文件快照和普通 JavaScript 物件。
      */
     async function loadMajorAndDetailItems() {
         const majorItemsResult = await safeFirestoreQuery('majorItems',
             [{ field: 'tenderId', operator: '==', value: tenderId }]
         );
-        // 【修正】使用 .map(doc => ({...})) 來解包資料
-        majorItems = majorItemsResult.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // 【修正位置 1 - 約 77 行】
+        majorItems = majorItemsResult.docs.map(doc => {
+            const data = typeof doc.data === 'function' ? doc.data() : doc;
+            return { id: doc.id, ...data };
+        });
         
         majorItems.sort(naturalSequenceSort);
 
         if (majorItems.length === 0) { detailItems = []; return; }
         const majorItemIds = majorItems.map(item => item.id);
         const detailPromises = [];
-        // Firestore 'in' 查詢每次最多10個
+
         for (let i = 0; i < majorItemIds.length; i += 10) {
             const chunk = majorItemIds.slice(i, i + 10);
             detailPromises.push(safeFirestoreQuery('detailItems', [{ field: 'majorItemId', operator: 'in', value: chunk }]));
         }
         const detailChunks = await Promise.all(detailPromises);
-        // 【修正】使用 .flatMap(chunk => chunk.docs.map(...)) 來解包所有細項資料
-        detailItems = detailChunks.flatMap(chunk => chunk.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+        // 【修正位置 2 - 約 91 行】
+        detailItems = detailChunks.flatMap(chunk => chunk.docs.map(doc => {
+            const data = typeof doc.data === 'function' ? doc.data() : doc;
+            return { id: doc.id, ...data };
+        }));
         detailItems.sort(naturalSequenceSort);
     }
 
-    /**
-     * 【核心修正】
-     * 修正 distributionData 的資料處理，確保能正確讀取分配數量。
-     */
     async function loadDistributionData() {
         if (detailItems.length === 0) { distributionData = []; return; }
         const detailItemIds = detailItems.map(item => item.id);
         const distPromises = [];
-        // Firestore 'in' 查詢每次最多10個
         for (let i = 0; i < detailItemIds.length; i += 10) {
             const chunk = detailItemIds.slice(i, i + 10);
             distPromises.push(safeFirestoreQuery('distributionTable', [{ field: 'detailItemId', operator: 'in', value: chunk }]));
         }
         const distChunks = await Promise.all(distPromises);
-         // 【修正】使用 .flatMap(chunk => chunk.docs.map(...)) 來解包所有分配資料
-        distributionData = distChunks.flatMap(chunk => chunk.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        distributionData = distChunks.flatMap(chunk => chunk.docs.map(doc => {
+            const data = typeof doc.data === 'function' ? doc.data() : doc;
+            return { id: doc.id, ...data };
+        }));
     }
 
     // --- 畫面渲染與計算 ---
@@ -256,7 +261,6 @@ function initTenderDetailPage() {
             details.forEach(item => {
                 const row = tbody.insertRow();
                 row.dataset.id = item.id;
-                // 【第 253 行：修正】將 item.quantity 改為 item.totalQuantity
                 const quantity = parseFloat(item.totalQuantity) || 0;
                 const unitPrice = parseFloat(item.unitPrice) || 0;
                 row.innerHTML = `
@@ -303,7 +307,6 @@ function initTenderDetailPage() {
     function createDetailItemsSummary(details, distributions) {
         if (details.length === 0) return '<div class="empty-state" style="padding:1rem"><p>此大項目尚無細項</p></div>';
         
-        // 【第 303 行：修正】將 item.quantity 改為 item.totalQuantity
         const totalQuantity = details.reduce((sum, item) => sum + (parseFloat(item.totalQuantity) || 0), 0);
         const totalAmount = details.reduce((sum, item) => sum + ((parseFloat(item.totalQuantity) || 0) * (parseFloat(item.unitPrice) || 0)), 0);
         
@@ -415,7 +418,7 @@ function initTenderDetailPage() {
             showAlert('資料已更新', 'success');
         } catch (error) {
             console.error('重新載入失敗:', error);
-            showAlert('重新載入失敗', 'error');
+            showAlert('重新載入失敗: ' + error.message, 'error');
         }
     }
 
