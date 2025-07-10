@@ -536,7 +536,43 @@ input:checked + .slider:before {
     transform: translateX(26px);
 }
 
-/* --- 修正詳情頁中展開表格的樣式 (v2.9 - 最終覆蓋修正) --- */
+好的，非常抱歉，這個問題是我在上一步修正時考慮不周全所導致的。您說的完全正確，「項次」和「項目名稱」的背景色消失了。
+
+問題原因
+在我上一個版本的修正 (v2.9) 中，為了移除從 tables.css 繼承來的不需要的樣式，我使用了一段涵蓋範圍過廣的 CSS 規則：
+
+CSS
+
+/* 這段是 v2.9 中的錯誤程式碼 */
+.distribution-table.detail-view-table th:first-child,
+.distribution-table.detail-view-table td:first-child,
+.distribution-table.detail-view-table th:nth-child(2),
+.distribution-table.detail-view-table td:nth-child(2) {
+    ...
+    background-color: transparent; /* <-- 問題點 */
+    ...
+}
+這段程式碼同時選中了表格標頭 (th) 和表格內容 (td)，並將它們的背景都設定為 transparent（透明）。雖然這成功移除了內容儲存格 (td) 不需要的灰色背景，但也錯誤地移除了標頭儲存格 (th) 原本應該有的背景色。
+
+調整計畫
+為了解決這個問題，我將進行以下調整：
+
+區分目標：將 CSS 規則分開，一條專門設定所有表格標頭 (th) 的樣式，另一條則專門重置前兩欄表格內容 (td) 的樣式。
+
+恢復標頭背景：在針對 th 的規則中，我會為所有標頭儲-存格設定一個統一的、視覺上清晰的背景色（例如 #f8f9fa 淺灰色），這樣它們看起來才會像一個真正的表格標頭。
+
+移除內容背景：在針對 td 的規則中，我會維持將前兩個儲存格的背景設定為透明，以解決我們最初遇到的樣式覆蓋問題。
+
+這樣調整後，表格標頭就會有統一的背景色，而內容區域的樣式也會維持正常，並且之前解決的「欄位空隙」問題也不會再出現。
+
+最終解決方案
+請您再次打開 program/assets/css/detail.css 檔案，將檔案最末端所有關於 .detail-view-table 的舊規則（從註解 /* --- 修正詳情頁中展開表格的樣式... 開始到結尾）全部刪除，並用下面這一段最終修正版 (v2.10) 的程式碼完整替換。
+
+program/assets/css/detail.css 檔案末端要替換成的最終內容：
+
+CSS
+
+/* --- 修正詳情頁中展開表格的樣式 (v2.10 - 恢復標頭背景) --- */
 
 /* 1. 基本表格設定 */
 .distribution-table.detail-view-table {
@@ -545,28 +581,35 @@ input:checked + .slider:before {
     min-width: 0;
 }
 
-/* 2. 設定表格標頭(th)的樣式 */
+/* 2. 設定表格標頭(th)的整體樣式 */
 .distribution-table.detail-view-table th {
-    white-space: nowrap;      /* 禁止標頭文字換行 */
+    white-space: nowrap;
     vertical-align: middle;
-    font-weight: bold;        /* 讓標頭文字變粗體，更清晰 */
+    font-weight: bold;
+    background-color: #f8f9fa; /* 關鍵：為所有標頭恢復/設定一個統一的淺灰色背景 */
+    text-align: center;       /* 讓標頭文字置中，更美觀 */
 }
 
-/* 3. 設定表格內容(td)的樣式 */
+/* 3. 設定表格內容(td)的整體樣式 */
 .distribution-table.detail-view-table td {
-    white-space: normal;      /* 允許內容文字自動換行 */
-    word-break: break-word;   /* 當內容過長時強制斷詞 */
-    font-weight: normal;      /* 確保內容文字是正常粗細 */
+    white-space: normal;
+    word-break: break-word;
+    font-weight: normal;
 }
 
-/* 4. 核心修正：重置前兩欄從 tables.css 繼承來的 "sticky" 相關屬性 */
+/* 4. 核心修正：重置前兩欄 "th" 和 "td" 的定位 */
 .distribution-table.detail-view-table th:first-child,
 .distribution-table.detail-view-table td:first-child,
 .distribution-table.detail-view-table th:nth-child(2),
 .distribution-table.detail-view-table td:nth-child(2) {
-    position: static;             /* 關鍵：將定位方式改回預設的靜態定位 */
-    left: auto;                   /* 關鍵：移除 left 強制定位 */
-    background-color: transparent;/* 移除繼承來的灰色背景 */
-    min-width: 0;                 /* 移除最小寬度限制 */
-    max-width: none;              /* 移除最大寬度限制 */
+    position: static;
+    left: auto;
+    min-width: 0;
+    max-width: none;
+}
+
+/* 5. 僅將前兩欄的 "td" 背景設為透明，以覆蓋 sticky 樣式 */
+.distribution-table.detail-view-table td:first-child,
+.distribution-table.detail-view-table td:nth-child(2) {
+    background-color: transparent;
 }
