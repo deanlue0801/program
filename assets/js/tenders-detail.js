@@ -239,13 +239,13 @@ function initTenderDetailPage() {
 
     function createDetailItemsTable(details) {
         const table = document.createElement('table');
-        table.className = 'distribution-table';
+        table.className = 'distribution-table detail-view-table';
         table.innerHTML = `
             <thead>
                 <tr>
                     <th style="width: 5%;">項次</th>
                     <th style="width: 40%;">項目名稱</th>
-                    <th style="width: 10%;">單位</th>
+                    <th style="width: 5%;">單位</th>
                     <th style="width: 10%;">數量</th>
                     <th style="width: 15%;">單價</th>
                     <th style="width: 15%;">總價</th>
