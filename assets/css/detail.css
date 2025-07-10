@@ -536,27 +536,29 @@ input:checked + .slider:before {
     transform: translateX(26px);
 }
 
-/* --- 修正詳情頁中展開表格的樣式 (v2.7) --- */
-.detail-view-table {
+/* --- 修正詳情頁中展開表格的樣式 (v2.8 - 最終修正版) --- */
+/* 使用更高權重的選擇器，確保樣式不會被覆蓋 */
+
+.distribution-table.detail-view-table {
     table-layout: fixed; /* 讓寬度百分比生效 */
     width: 100%;
     min-width: 0; 
 }
 
 /* 設定表格標頭(th)的樣式：不換行、垂直置中 */
-.detail-view-table th {
-    white-space: nowrap; /* 關鍵：禁止標頭文字換行 */
-    vertical-align: middle; /* 讓文字垂直置中，更美觀 */
+.distribution-table.detail-view-table th {
+    white-space: nowrap;      /* 禁止標頭文字換行，解決斷行問題 */
+    vertical-align: middle;   /* 讓文字垂直置中 */
 }
 
 /* 設定表格內容(td)的樣式：允許換行、強制斷詞 */
-.detail-view-table td {
-    white-space: normal;   /* 允許內容文字自動換行 */
-    word-break: break-word; /* 當內容過長時強制斷詞 */
+.distribution-table.detail-view-table td {
+    white-space: normal;      /* 允許內容文字自動換行 */
+    word-break: break-word;   /* 當內容過長時強制斷詞 */
 }
 
 /* 修正從 distribution.css 繼承來的背景色問題 */
-.detail-view-table td:first-child {
+.distribution-table.detail-view-table td:first-child {
     background-color: transparent; 
     font-weight: normal; 
 }
