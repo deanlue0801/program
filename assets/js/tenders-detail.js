@@ -1,5 +1,5 @@
 /**
- * 標單詳情頁面 (tenders-detail.js) - v2.2 修正資料讀取邏輯
+ * 標單詳情頁面 (tenders-detail.js) - v2.3 修正數量與總價為0的問題
  */
 function initTenderDetailPage() {
 
@@ -133,7 +133,7 @@ function initTenderDetailPage() {
         const editBtn = document.getElementById('editBtn');
         const importBtn = document.getElementById('importBtn');
         const distBtn = document.getElementById('distributionBtn');
-        if (editBtn) editBtn.href = `/program/tenders/edit?tenderId=${tenderId}`;
+        if (editBtn) editBtn.href = `/program/tenders/edit?id=${tenderId}`;
         if (importBtn) importBtn.href = `/program/tenders/import?tenderId=${tenderId}`;
         if (distBtn) distBtn.href = `/program/tenders/distribution?tenderId=${tenderId}`;
     }
@@ -256,7 +256,8 @@ function initTenderDetailPage() {
             details.forEach(item => {
                 const row = tbody.insertRow();
                 row.dataset.id = item.id;
-                const quantity = parseFloat(item.quantity) || 0;
+                // 【第 253 行：修正】將 item.quantity 改為 item.totalQuantity
+                const quantity = parseFloat(item.totalQuantity) || 0;
                 const unitPrice = parseFloat(item.unitPrice) || 0;
                 row.innerHTML = `
                     <td>${item.sequence || ''}</td>
@@ -302,8 +303,9 @@ function initTenderDetailPage() {
     function createDetailItemsSummary(details, distributions) {
         if (details.length === 0) return '<div class="empty-state" style="padding:1rem"><p>此大項目尚無細項</p></div>';
         
-        const totalQuantity = details.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
-        const totalAmount = details.reduce((sum, item) => sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)), 0);
+        // 【第 303 行：修正】將 item.quantity 改為 item.totalQuantity
+        const totalQuantity = details.reduce((sum, item) => sum + (parseFloat(item.totalQuantity) || 0), 0);
+        const totalAmount = details.reduce((sum, item) => sum + ((parseFloat(item.totalQuantity) || 0) * (parseFloat(item.unitPrice) || 0)), 0);
         
         const distributedQuantity = distributions.reduce((sum, dist) => sum + (parseFloat(dist.quantity) || 0), 0);
         const distributedAmount = distributions.reduce((sum, dist) => {
@@ -360,7 +362,7 @@ function initTenderDetailPage() {
         const relatedDetails = detailItems.filter(item => item.majorItemId === majorItemId);
         if (relatedDetails.length === 0) return 0;
 
-        const totalQuantity = relatedDetails.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
+        const totalQuantity = relatedDetails.reduce((sum, item) => sum + (parseFloat(item.totalQuantity) || 0), 0);
         if (totalQuantity === 0) return 100;
 
         const relatedDetailIds = new Set(relatedDetails.map(item => item.id));
