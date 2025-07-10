@@ -611,6 +611,6 @@ CSS
     vertical-align: middle;
     font-weight: bold;
     text-align: center;
-    background-color: #f8f9fa !important; /* 關鍵：使用 !important 強制覆蓋外部樣式 */
-    color: #495057 !important;           /* 順便也強制設定文字顏色，確保一致性 */
+    background-color: #5d8fc2 !important; /* 關鍵：使用 !important 強制覆蓋外部樣式 */
+    color: #e3e6e8 !important;           /* 順便也強制設定文字顏色，確保一致性 */
 }
