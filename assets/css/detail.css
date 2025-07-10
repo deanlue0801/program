@@ -572,7 +572,7 @@ program/assets/css/detail.css 檔案末端要替換成的最終內容：
 
 CSS
 
-/* --- 修正詳情頁中展開表格的樣式 (v2.10 - 恢復標頭背景) --- */
+/* --- 修正詳情頁中展開表格的樣式 (v2.11 - 強制設定標頭背景) --- */
 
 /* 1. 基本表格設定 */
 .distribution-table.detail-view-table {
@@ -581,23 +581,14 @@ CSS
     min-width: 0;
 }
 
-/* 2. 設定表格標頭(th)的整體樣式 */
-.distribution-table.detail-view-table th {
-    white-space: nowrap;
-    vertical-align: middle;
-    font-weight: bold;
-    background-color: #f8f9fa; /* 關鍵：為所有標頭恢復/設定一個統一的淺灰色背景 */
-    text-align: center;       /* 讓標頭文字置中，更美觀 */
-}
-
-/* 3. 設定表格內容(td)的整體樣式 */
+/* 2. 設定表格內容(td)的樣式 */
 .distribution-table.detail-view-table td {
     white-space: normal;
     word-break: break-word;
     font-weight: normal;
 }
 
-/* 4. 核心修正：重置前兩欄 "th" 和 "td" 的定位 */
+/* 3. 核心修正：重置前兩欄的定位與內容(td)背景 */
 .distribution-table.detail-view-table th:first-child,
 .distribution-table.detail-view-table td:first-child,
 .distribution-table.detail-view-table th:nth-child(2),
@@ -607,9 +598,19 @@ CSS
     min-width: 0;
     max-width: none;
 }
-
-/* 5. 僅將前兩欄的 "td" 背景設為透明，以覆蓋 sticky 樣式 */
+/* 僅重置內容(td)的背景 */
 .distribution-table.detail-view-table td:first-child,
 .distribution-table.detail-view-table td:nth-child(2) {
     background-color: transparent;
+}
+
+
+/* 4. 強制設定所有標頭(th)的樣式，覆蓋所有外部樣式 */
+.distribution-table.detail-view-table th {
+    white-space: nowrap;
+    vertical-align: middle;
+    font-weight: bold;
+    text-align: center;
+    background-color: #f8f9fa !important; /* 關鍵：使用 !important 強制覆蓋外部樣式 */
+    color: #495057 !important;           /* 順便也強制設定文字顏色，確保一致性 */
 }
