@@ -1,5 +1,5 @@
 /**
- * 標單詳情頁面 (tenders-detail.js) - 修正排序、數量BUG，並新增追蹤開關
+ * 標單詳情頁面 (tenders-detail.js) - v2.1 修正排序邏輯
  */
 function initTenderDetailPage() {
 
@@ -64,15 +64,12 @@ function initTenderDetailPage() {
         }
     }
     
-    // --- 【核心 Bug 修正：排序問題】---
     async function loadMajorAndDetailItems() {
-        // 1. 從資料庫讀取大項時，移除排序參數
         const majorItemsResult = await safeFirestoreQuery('majorItems',
             [{ field: 'tenderId', operator: '==', value: tenderId }]
         );
         majorItems = majorItemsResult.docs;
         
-        // 2. 在前端程式碼中使用更聰明的 naturalSequenceSort 進行排序
         majorItems.sort(naturalSequenceSort);
 
         if (majorItems.length === 0) { detailItems = []; return; }
@@ -288,11 +285,9 @@ function initTenderDetailPage() {
         }
     }
 
-    // --- 【核心 Bug 修正：數量計算問題】---
     function createDetailItemsSummary(details, distributions) {
         if (details.length === 0) return '<div class="empty-state" style="padding:1rem"><p>此大項目尚無細項</p></div>';
         
-        // 修正：使用 item.quantity 和 item.unitPrice
         const totalQuantity = details.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
         const totalAmount = details.reduce((sum, item) => sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)), 0);
         
@@ -351,7 +346,6 @@ function initTenderDetailPage() {
         const relatedDetails = detailItems.filter(item => item.majorItemId === majorItemId);
         if (relatedDetails.length === 0) return 0;
 
-        // 修正：使用 item.quantity
         const totalQuantity = relatedDetails.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
         if (totalQuantity === 0) return 100;
 
@@ -440,22 +434,42 @@ function initTenderDetailPage() {
     loadAllData();
 }
 
+/**
+ * 【核心修正】
+ * 新的自然排序函式，能夠正確處理中文數字與天干地支。
+ */
 function naturalSequenceSort(a, b) {
+    const CHINESE_NUM_MAP = {
+        '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+        '甲': 1, '乙': 2, '丙': 3, '丁': 4, '戊': 5, '己': 6, '庚': 7, '辛': 8, '壬': 9, '癸': 10
+    };
+
+    const re = /(\d+(\.\d+)?)|([一二三四五六七八九十甲乙丙丁戊己庚辛壬癸])|(\D+)/g;
     const seqA = String(a.sequence || '');
     const seqB = String(b.sequence || '');
-    const re = /(\d+(\.\d+)?)|(\D+)/g;
     const partsA = seqA.match(re) || [];
     const partsB = seqB.match(re) || [];
     const len = Math.min(partsA.length, partsB.length);
+
     for (let i = 0; i < len; i++) {
         const partA = partsA[i];
         const partB = partsB[i];
-        const numA = parseFloat(partA);
-        const numB = parseFloat(partB);
-        if (!isNaN(numA) && !isNaN(numB)) {
+
+        // 嘗試解析為阿拉伯數字
+        let numA = parseFloat(partA);
+        let numB = parseFloat(partB);
+
+        // 如果不是阿拉伯數字，嘗試解析為中文數字
+        if (isNaN(numA)) numA = CHINESE_NUM_MAP[partA];
+        if (isNaN(numB)) numB = CHINESE_NUM_MAP[partB];
+
+        // 如果兩者都是數字 (無論是阿拉伯還是中文轉換的)
+        if (numA !== undefined && numB !== undefined) {
             if (numA !== numB) return numA - numB;
         } else {
-            if (partA !== partB) return partA.localeCompare(partB);
+            // 如果其中一個不是數字，或兩者都不是，則進行文字比較
+            const comparison = partA.localeCompare(partB);
+            if (comparison !== 0) return comparison;
         }
     }
     return partsA.length - partsB.length;
