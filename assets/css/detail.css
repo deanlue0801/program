@@ -536,29 +536,37 @@ input:checked + .slider:before {
     transform: translateX(26px);
 }
 
-/* --- 修正詳情頁中展開表格的樣式 (v2.8 - 最終修正版) --- */
-/* 使用更高權重的選擇器，確保樣式不會被覆蓋 */
+/* --- 修正詳情頁中展開表格的樣式 (v2.9 - 最終覆蓋修正) --- */
 
+/* 1. 基本表格設定 */
 .distribution-table.detail-view-table {
-    table-layout: fixed; /* 讓寬度百分比生效 */
+    table-layout: fixed;
     width: 100%;
-    min-width: 0; 
+    min-width: 0;
 }
 
-/* 設定表格標頭(th)的樣式：不換行、垂直置中 */
+/* 2. 設定表格標頭(th)的樣式 */
 .distribution-table.detail-view-table th {
-    white-space: nowrap;      /* 禁止標頭文字換行，解決斷行問題 */
-    vertical-align: middle;   /* 讓文字垂直置中 */
+    white-space: nowrap;      /* 禁止標頭文字換行 */
+    vertical-align: middle;
+    font-weight: bold;        /* 讓標頭文字變粗體，更清晰 */
 }
 
-/* 設定表格內容(td)的樣式：允許換行、強制斷詞 */
+/* 3. 設定表格內容(td)的樣式 */
 .distribution-table.detail-view-table td {
     white-space: normal;      /* 允許內容文字自動換行 */
     word-break: break-word;   /* 當內容過長時強制斷詞 */
+    font-weight: normal;      /* 確保內容文字是正常粗細 */
 }
 
-/* 修正從 distribution.css 繼承來的背景色問題 */
-.distribution-table.detail-view-table td:first-child {
-    background-color: transparent; 
-    font-weight: normal; 
+/* 4. 核心修正：重置前兩欄從 tables.css 繼承來的 "sticky" 相關屬性 */
+.distribution-table.detail-view-table th:first-child,
+.distribution-table.detail-view-table td:first-child,
+.distribution-table.detail-view-table th:nth-child(2),
+.distribution-table.detail-view-table td:nth-child(2) {
+    position: static;             /* 關鍵：將定位方式改回預設的靜態定位 */
+    left: auto;                   /* 關鍵：移除 left 強制定位 */
+    background-color: transparent;/* 移除繼承來的灰色背景 */
+    min-width: 0;                 /* 移除最小寬度限制 */
+    max-width: none;              /* 移除最大寬度限制 */
 }
