@@ -1,5 +1,7 @@
 // assets/js/tenders-tracking-setup.js
-(async function() {
+
+// 將所有程式碼放入一個全域可呼叫的函式中
+function initTenderTrackingSetupPage() {
     // 檢查 Firebase 是否已初始化
     if (typeof firebase === 'undefined' || !firebase.apps.length) {
         console.error("Firebase is not initialized. Make sure firebase-config.js is loaded.");
@@ -31,7 +33,6 @@
         let currentMajorItemName = '';
 
         detailItems.forEach(item => {
-            // 如果是大項，顯示標題
             if (item.data.majorItemName && item.data.majorItemName !== currentMajorItemName) {
                 currentMajorItemName = item.data.majorItemName;
                 const majorItemHeader = document.createElement('h5');
@@ -40,7 +41,6 @@
                 listContainer.appendChild(majorItemHeader);
             }
             
-            // 建立每個細項的列表項目
             const listItem = document.createElement('label');
             listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
 
@@ -56,7 +56,6 @@
             input.role = 'switch';
             input.id = `switch-${item.id}`;
             input.dataset.itemId = item.id;
-            // 如果 excludeFromProgress 是 false 或 undefined，則表示需要追蹤，應勾選
             input.checked = !item.data.excludeFromProgress;
             
             switchContainer.appendChild(input);
@@ -80,16 +79,15 @@
                 const itemId = switchEl.dataset.itemId;
                 const shouldBeTracked = switchEl.checked;
                 const docRef = db.collection('detailItems').doc(itemId);
-                
-                // 如果勾選，則 excludeFromProgress 應為 false 或直接刪除該欄位
-                // 如果未勾選，則 excludeFromProgress 應為 true
                 batch.update(docRef, { excludeFromProgress: !shouldBeTracked });
             });
 
             await batch.commit();
             
             alert('設定已成功儲存！');
-            window.location.hash = `#/tenders/list`; // 操作成功後返回列表頁
+            // 使用新的路由導航方式
+            const navigateTo = window.navigateTo || function(url) { window.location.href = url; };
+            navigateTo('/#/tenders/list');
 
         } catch (error) {
             console.error("儲存設定時發生錯誤:", error);
@@ -99,25 +97,23 @@
             saveButton.innerHTML = '<i class="fas fa-save me-1"></i> 儲存設定';
         }
     }
+    
+    // --- 頁面初始化的主邏輯 ---
+    currentTenderId = getTenderIdFromUrl();
+    if (!currentTenderId) {
+        console.error("找不到標單 ID");
+        document.getElementById('page-title').textContent = '錯誤';
+        document.getElementById('items-list').innerHTML = '<div class="alert alert-danger">無效的標單 ID。</div>';
+        return;
+    }
 
-    // 頁面初始化函式
-    async function initializePage() {
-        currentTenderId = getTenderIdFromUrl();
-        if (!currentTenderId) {
-            console.error("找不到標單 ID");
-            document.getElementById('page-title').textContent = '錯誤';
-            document.getElementById('items-list').innerHTML = '<div class="alert alert-danger">無效的標單 ID。</div>';
-            return;
-        }
-
+    (async () => {
         try {
-            // 獲取標單名稱
             const tenderDoc = await db.collection('tenders').doc(currentTenderId).get();
             if (tenderDoc.exists) {
                 document.getElementById('tender-name-header').textContent = `標單: ${tenderDoc.data().name}`;
             }
 
-            // 獲取所有相關的施工細項
             const itemsSnapshot = await db.collection('detailItems')
                 .where('tenderId', '==', currentTenderId)
                 .orderBy('order')
@@ -133,14 +129,5 @@
         }
 
         document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
-    }
-
-    // 當 DOM 載入完成後執行初始化
-    document.addEventListener('DOMContentLoaded', initializePage);
-    
-    // 如果是 SPA 環境，我們可能需要手動觸發初始化
-    if (document.readyState === "complete" || document.readyState === "interactive") {
-        setTimeout(initializePage, 0);
-    }
-
-})();
+    })();
+}
