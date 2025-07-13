@@ -1,4 +1,4 @@
-// assets/js/tracking-setup.js (vFinal - 採用您的設計)
+// assets/js/tenders-tracking-setup.js (v6.3 - The Final .data() Fix)
 
 function initTenderTrackingSetupPage() {
 
@@ -89,9 +89,7 @@ function initTenderTrackingSetupPage() {
             }
         }
 
-        // --- 【核心修改】渲染成表格 (Table) ---
         function renderItemsTable() {
-            // 設定表格標頭
             ui.tableHeader.innerHTML = `
                 <tr>
                     <th style="width: 8%;">項次</th>
@@ -103,17 +101,13 @@ function initTenderTrackingSetupPage() {
                     <th style="width: 10%;">進度追蹤</th>
                 </tr>
             `;
-
-            // 清空表格內容
             ui.tableBody.innerHTML = '';
             if (detailItems.length === 0) {
                 ui.tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem;">此大項目下沒有可設定的施工細項。</td></tr>';
                 return;
             }
-
-            // 產生每一行
-            detailItems.forEach(itemDoc => {
-                const item = itemDoc.data() || itemDoc;
+            detailItems.forEach(item => {
+                // 【核心修正】直接使用 item 物件，不再呼叫 .data()
                 const row = ui.tableBody.insertRow();
                 row.innerHTML = `
                     <td>${item.sequence || ''}</td>
@@ -124,7 +118,7 @@ function initTenderTrackingSetupPage() {
                     <td style="text-align: right;">${(item.totalPrice || 0).toLocaleString()}</td>
                     <td style="text-align: center;">
                         <label class="toggle-switch">
-                            <input type="checkbox" role="switch" data-item-id="${itemDoc.id}" ${!item.excludeFromProgress ? 'checked' : ''}>
+                            <input type="checkbox" role="switch" data-item-id="${item.id}" ${!item.excludeFromProgress ? 'checked' : ''}>
                             <span class="slider"></span>
                         </label>
                     </td>
@@ -166,9 +160,10 @@ function initTenderTrackingSetupPage() {
             const majorItemId = ui.majorItemSelect.value;
             if (!majorItemId) { showMainContent(false); return; }
             selectedMajorItem = majorItems.find(m => m.id === majorItemId);
+            // 【核心修正】直接使用 selectedMajorItem.name
             ui.itemsListHeader.textContent = `標單項目列表：${selectedMajorItem.name}`;
             await loadDetailItems(majorItemId);
-            renderItemsTable(); // 改為呼叫渲染表格的函式
+            renderItemsTable();
             showMainContent(true);
         }
 
@@ -198,7 +193,6 @@ function initTenderTrackingSetupPage() {
             ui.uncheckAllBtn.addEventListener('click', () => toggleAllSwitches(false));
         }
 
-        // --- 主流程啟動點 ---
         showMainContent(false);
         setupEventListeners();
         await loadProjects();
