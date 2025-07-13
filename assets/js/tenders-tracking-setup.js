@@ -1,24 +1,19 @@
-// assets/js/tracking-setup.js (v6.1 - Correct Function Name)
+// assets/js/tenders-tracking-setup.js (v6.2 - The .data() Fix)
 
-// 【核心修正】將函式名稱更正為 router.js 中指定的 initTenderTrackingSetupPage
 function initTenderTrackingSetupPage() {
 
-    // 使用 onAuthStateChanged 來「監聽」Firebase 的使用者狀態，確保在正確的時機執行
     firebase.auth().onAuthStateChanged(user => {
         if (user) {
-            // ✅ Firebase 確認使用者已登入，現在才真正開始執行我們的頁面邏輯。
             initializePageForUser(user);
         } else {
-            // ❌ Firebase 確認使用者未登入。
             console.error("❌ Firebase Auth: 使用者未登入，無法初始化頁面。");
             alert("錯誤：您的登入狀態已失效，請重新整理頁面或登入。");
         }
     });
 
-    // 這個函式只有在 Firebase 確認使用者已登入後，才會被呼叫。
     async function initializePageForUser(currentUser) {
 
-        console.log("🚀 初始化『批次追蹤設定』頁面 (v6.1 - 採用正確函式名稱)");
+        console.log("🚀 初始化『批次追蹤設定』頁面 (v6.2 - 修正 .data() 錯誤)");
 
         const db = firebase.firestore();
 
@@ -38,13 +33,16 @@ function initTenderTrackingSetupPage() {
         let projects = [], tenders = [], majorItems = [], detailItems = [];
         let selectedMajorItem = null;
 
+        // --- 資料載入函式 (已修正) ---
+
         async function loadProjects() {
             try {
                 const projectDocs = await safeFirestoreQuery("projects", [{ field: "createdBy", operator: "==", value: currentUser.email }], { field: "name", direction: "asc" });
                 projects = projectDocs.docs;
                 ui.projectSelect.innerHTML = '<option value="">請選擇專案...</option>';
                 projects.forEach(project => {
-                    ui.projectSelect.innerHTML += `<option value="${project.id}">${project.data().name}</option>`;
+                    // 【核心修正】直接使用 project.name，不再呼叫 .data()
+                    ui.projectSelect.innerHTML += `<option value="${project.id}">${project.name}</option>`;
                 });
             } catch (error) {
                 console.error("❌ 讀取專案失敗:", error);
@@ -60,7 +58,8 @@ function initTenderTrackingSetupPage() {
                 tenders = tenderDocs.docs;
                 ui.tenderSelect.innerHTML = '<option value="">請選擇標單...</option>';
                 tenders.forEach(tender => {
-                    ui.tenderSelect.innerHTML += `<option value="${tender.id}">${tender.data().name}</option>`;
+                    // 【核心修正】直接使用 tender.name，不再呼叫 .data()
+                    ui.tenderSelect.innerHTML += `<option value="${tender.id}">${tender.name}</option>`;
                 });
                 ui.tenderSelect.disabled = false;
             } catch (error) {
@@ -77,7 +76,8 @@ function initTenderTrackingSetupPage() {
                 majorItems = majorItemDocs.docs;
                 ui.majorItemSelect.innerHTML = '<option value="">請選擇大項目...</option>';
                 majorItems.forEach(item => {
-                    ui.majorItemSelect.innerHTML += `<option value="${item.id}">${item.data().name}</option>`;
+                    // 【核心修正】直接使用 item.name，不再呼叫 .data()
+                    ui.majorItemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
                 });
                 ui.majorItemSelect.disabled = false;
             } catch (error) {
@@ -95,6 +95,8 @@ function initTenderTrackingSetupPage() {
             }
         }
 
+        // --- 核心功能函式 ---
+
         function renderItemsList() {
             ui.itemsListContainer.innerHTML = '';
             if (detailItems.length === 0) {
@@ -102,7 +104,8 @@ function initTenderTrackingSetupPage() {
                 return;
             }
             detailItems.forEach(itemDoc => {
-                const item = itemDoc.data();
+                // 這裡因為是細項，我們還是需要 .data() 來取得裡面的欄位
+                const item = itemDoc.data ? itemDoc.data() : itemDoc; 
                 const listItem = document.createElement('label');
                 listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
                 listItem.style.cursor = 'pointer';
@@ -137,6 +140,8 @@ function initTenderTrackingSetupPage() {
             }
         }
         
+        // --- 事件處理與輔助函式 ---
+        
         function toggleAllSwitches(checkedState) {
             ui.itemsListContainer.querySelectorAll('.form-check-input').forEach(sw => sw.checked = checkedState);
         }
@@ -149,8 +154,9 @@ function initTenderTrackingSetupPage() {
         async function onMajorItemChange() {
             const majorItemId = ui.majorItemSelect.value;
             if (!majorItemId) { showMainContent(false); return; }
+            // 【核心修正】
             selectedMajorItem = majorItems.find(m => m.id === majorItemId);
-            ui.itemsListHeader.textContent = `設定列表：${selectedMajorItem.data().name}`;
+            ui.itemsListHeader.textContent = `設定列表：${selectedMajorItem.name}`;
             await loadDetailItems(majorItemId);
             renderItemsList();
             showMainContent(true);
@@ -182,6 +188,7 @@ function initTenderTrackingSetupPage() {
             ui.uncheckAllBtn.addEventListener('click', () => toggleAllSwitches(false));
         }
 
+        // --- 主流程啟動點 ---
         showMainContent(false);
         setupEventListeners();
         await loadProjects();
