@@ -1,18 +1,28 @@
 // assets/js/tracking-setup.js
 
 function initTrackingSetupPage() {
-    console.log("🚀 開始初始化『批次追蹤設定』頁面...");
+    // 偵錯訊息：確認函式已被 router.js 呼叫
+    console.log("🚀 tracking-setup.js: initTrackingSetupPage() 函式已成功執行。");
+
+    // 檢查 Firebase 是否已初始化，這是所有操作的前提
+    if (typeof firebase === 'undefined' || !firebase.apps.length) {
+        console.error("❌ Firebase 尚未初始化，請檢查 firebase-config.js 的載入順序。");
+        return;
+    }
 
     const db = firebase.firestore();
 
-    const projectSelect = document.getElementById('projectSelect');
-    const tenderSelect = document.getElementById('tenderSelect');
-    const majorItemSelect = document.getElementById('majorItemSelect');
-    const itemsListContainer = document.getElementById('items-list-container');
-    const itemsListHeader = document.getElementById('items-list-header');
-    const saveBtn = document.getElementById('save-settings-btn');
-    const checkAllBtn = document.getElementById('check-all-btn');
-    const uncheckAllBtn = document.getElementById('uncheck-all-btn');
+    // 將所有頁面元素集中管理，方便存取
+    const ui = {
+        projectSelect: document.getElementById('projectSelect'),
+        tenderSelect: document.getElementById('tenderSelect'),
+        majorItemSelect: document.getElementById('majorItemSelect'),
+        itemsListContainer: document.getElementById('items-list-container'),
+        itemsListHeader: document.getElementById('items-list-header'),
+        saveBtn: document.getElementById('save-settings-btn'),
+        checkAllBtn: document.getElementById('check-all-btn'),
+        uncheckAllBtn: document.getElementById('uncheck-all-btn')
+    };
 
     let allTenders = [];
     let allDetailItems = [];
@@ -33,55 +43,77 @@ function initTrackingSetupPage() {
         selectEl.disabled = true;
     };
 
-    // --- Event Listeners ---
-    projectSelect.addEventListener('change', async () => {
-        const projectId = projectSelect.value;
-        resetSelect(tenderSelect, '載入中...');
-        resetSelect(majorItemSelect, '請先選擇標單');
-        itemsListContainer.innerHTML = '<div class="text-center text-muted p-5">請繼續選擇標單...</div>';
-        
-        const tendersSnapshot = await db.collection('tenders').where('projectId', '==', projectId).get();
-        allTenders = tendersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        populateSelect(tenderSelect, allTenders, '請選擇標單...');
-        tenderSelect.disabled = false;
-    });
+    // --- Event Handlers ---
+    const setupEventListeners = () => {
+        ui.projectSelect.addEventListener('change', onProjectSelect);
+        ui.tenderSelect.addEventListener('change', onTenderSelect);
+        ui.majorItemSelect.addEventListener('change', onMajorItemSelect);
+        ui.checkAllBtn.addEventListener('click', () => toggleAllSwitches(true));
+        ui.uncheckAllBtn.addEventListener('click', () => toggleAllSwitches(false));
+        ui.saveBtn.addEventListener('click', saveSettings);
+        console.log("✅ 所有頁面元素的事件監聽器已設定完成。");
+    };
 
-    tenderSelect.addEventListener('change', async () => {
-        const tenderId = tenderSelect.value;
-        resetSelect(majorItemSelect, '載入中...');
-        itemsListContainer.innerHTML = '<div class="text-center text-muted p-5">請繼續選擇大項目...</div>';
+    const onProjectSelect = async (e) => {
+        const projectId = e.target.value;
+        if (!projectId) return;
 
-        const detailItemsSnapshot = await db.collection('detailItems').where('tenderId', '==', tenderId).orderBy('order').get();
-        allDetailItems = detailItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        const majorItems = [...new Set(allDetailItems.filter(item => item.majorItemName).map(item => item.majorItemName))]
-                           .map((name, index) => ({ id: name, name: name }));
-                           
-        populateSelect(majorItemSelect, majorItems, '請選擇大項目...');
-        majorItemSelect.disabled = false;
-    });
+        resetSelect(ui.tenderSelect, '載入中...');
+        resetSelect(ui.majorItemSelect, '請先選擇標單');
+        ui.itemsListContainer.innerHTML = '<div class="text-center text-muted p-5">請繼續選擇標單...</div>';
 
-    majorItemSelect.addEventListener('change', () => {
-        const selectedMajorItem = majorItemSelect.value;
-        itemsListHeader.textContent = `設定列表：${selectedMajorItem}`;
-        
+        try {
+            const tendersSnapshot = await db.collection('tenders').where('projectId', '==', projectId).get();
+            allTenders = tendersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            populateSelect(ui.tenderSelect, allTenders, '請選擇標單...');
+            ui.tenderSelect.disabled = false;
+        } catch (error) {
+            console.error("❌ 讀取標單列表時發生錯誤:", error);
+            resetSelect(ui.tenderSelect, '讀取標單失敗');
+        }
+    };
+
+    const onTenderSelect = async (e) => {
+        const tenderId = e.target.value;
+        if (!tenderId) return;
+
+        resetSelect(ui.majorItemSelect, '載入中...');
+        ui.itemsListContainer.innerHTML = '<div class="text-center text-muted p-5">請繼續選擇大項目...</div>';
+
+        try {
+            const detailItemsSnapshot = await db.collection('detailItems').where('tenderId', '==', tenderId).orderBy('order').get();
+            allDetailItems = detailItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            const majorItems = [...new Set(allDetailItems.filter(item => item.majorItemName).map(item => item.majorItemName))]
+                               .map(name => ({ id: name, name: name }));
+                               
+            populateSelect(ui.majorItemSelect, majorItems, '請選擇大項目...');
+            ui.majorItemSelect.disabled = false;
+        } catch (error) {
+            console.error("❌ 讀取細項列表時發生錯誤:", error);
+            resetSelect(ui.majorItemSelect, '讀取大項失敗');
+        }
+    };
+
+    const onMajorItemSelect = (e) => {
+        const selectedMajorItem = e.target.value;
+        if (!selectedMajorItem) return;
+
+        ui.itemsListHeader.textContent = `設定列表：${selectedMajorItem}`;
         const itemsToDisplay = allDetailItems.filter(item => item.majorItemName === selectedMajorItem);
         renderItemsList(itemsToDisplay);
         
-        saveBtn.disabled = false;
-        checkAllBtn.disabled = false;
-        uncheckAllBtn.disabled = false;
-    });
+        ui.saveBtn.disabled = itemsToDisplay.length === 0;
+        ui.checkAllBtn.disabled = itemsToDisplay.length === 0;
+        ui.uncheckAllBtn.disabled = itemsToDisplay.length === 0;
+    };
 
-    checkAllBtn.addEventListener('click', () => toggleAllSwitches(true));
-    uncheckAllBtn.addEventListener('click', () => toggleAllSwitches(false));
-    
-    saveBtn.addEventListener('click', async () => {
-        saveBtn.disabled = true;
-        saveBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 儲存中...`;
+    const saveSettings = async () => {
+        ui.saveBtn.disabled = true;
+        ui.saveBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 儲存中...`;
 
         const batch = db.batch();
-        const switches = itemsListContainer.querySelectorAll('.form-check-input');
+        const switches = ui.itemsListContainer.querySelectorAll('.form-check-input');
         switches.forEach(sw => {
             const docRef = db.collection('detailItems').doc(sw.dataset.itemId);
             batch.update(docRef, { excludeFromProgress: !sw.checked });
@@ -94,19 +126,18 @@ function initTrackingSetupPage() {
             console.error("❌ 儲存設定時發生錯誤:", error);
             alert('儲存失敗，請查看主控台錯誤訊息。');
         } finally {
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = `<i class="fas fa-save me-1"></i> 儲存設定`;
+            ui.saveBtn.disabled = false;
+            ui.saveBtn.innerHTML = `<i class="fas fa-save me-1"></i> 儲存設定`;
         }
-    });
+    };
 
     // --- Rendering Logic ---
     function renderItemsList(items) {
-        itemsListContainer.innerHTML = '';
+        ui.itemsListContainer.innerHTML = '';
         if (items.length === 0) {
-            itemsListContainer.innerHTML = '<div class="text-center text-muted p-5">此大項目下沒有施工細項。</div>';
+            ui.itemsListContainer.innerHTML = '<div class="text-center text-muted p-5">此大項目下沒有施工細項。</div>';
             return;
         }
-
         items.forEach(item => {
             const listItem = document.createElement('label');
             listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
@@ -116,49 +147,49 @@ function initTrackingSetupPage() {
                     <input class="form-check-input" type="checkbox" role="switch" data-item-id="${item.id}" ${!item.excludeFromProgress ? 'checked' : ''}>
                 </div>
             `;
-            itemsListContainer.appendChild(listItem);
+            ui.itemsListContainer.appendChild(listItem);
         });
     }
 
     function toggleAllSwitches(checkedState) {
-        const switches = itemsListContainer.querySelectorAll('.form-check-input');
+        const switches = ui.itemsListContainer.querySelectorAll('.form-check-input');
         switches.forEach(sw => sw.checked = checkedState);
     }
 
     // --- Page Initialization ---
-    // 這是在頁面載入時，最先執行的區塊
-    (async function initialize() {
-        resetSelect(tenderSelect, '請先選擇專案');
-        resetSelect(majorItemSelect, '請先選擇標單');
+    // 這是模仿您成功頁面模式的核心函式
+    async function initializePage() {
+        console.log("🔄 開始執行頁面初始化 `initializePage()`...");
+        resetSelect(ui.tenderSelect, '請先選擇專案');
+        resetSelect(ui.majorItemSelect, '請先選擇標單');
         
         try {
             console.log("🔄 正在從 Firestore 讀取『專案』列表...");
             const projectsSnapshot = await db.collection('projects').get();
             
-            // 【偵錯點#1】我們在這裡檢查到底找到了幾個專案
-            console.log(`✅ 成功讀取！共找到 ${projectsSnapshot.docs.length} 個專案。`);
-
-            if (projectsSnapshot.docs.length === 0) {
-                console.warn("⚠️ 警告：'projects' 集合是空的，或沒有讀取權限。");
-                populateSelect(projectSelect, [], '沒有找到任何專案');
-                projectSelect.disabled = true;
+            if (projectsSnapshot.empty) {
+                console.warn("⚠️ 'projects' 集合是空的，或沒有讀取權限。");
+                populateSelect(ui.projectSelect, [], '沒有找到任何專案');
+                ui.projectSelect.disabled = true;
                 return;
             }
 
             const projects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log(`✅ 成功讀取並轉換了 ${projects.length} 個專案。`);
             
-            // 【偵錯點#2】我們在這裡檢查轉換後的專案資料是否正確
-            console.log("📊 轉換後的專案資料:", projects);
+            populateSelect(ui.projectSelect, projects, '請選擇專案...');
+            ui.projectSelect.disabled = false;
             
-            // 【修正】我也修正了這裡的錯字 "專AN" -> "專案"
-            populateSelect(projectSelect, projects, '請選擇專案...');
-            projectSelect.disabled = false;
+            // 最後才設定事件監聽，確保頁面已準備就緒
+            setupEventListeners();
 
         } catch (error) {
-            // 【偵錯點#3】如果過程中發生任何錯誤，會在這裡顯示
             console.error("❌ 讀取『專案』列表時發生嚴重錯誤:", error);
-            populateSelect(projectSelect, [], '讀取專案時發生錯誤');
-            projectSelect.disabled = true;
+            populateSelect(ui.projectSelect, [], '讀取專案時發生錯誤');
+            ui.projectSelect.disabled = true;
         }
-    })();
+    }
+
+    // 執行初始化
+    initializePage();
 }
