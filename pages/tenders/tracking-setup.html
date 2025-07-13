@@ -1,59 +1,41 @@
-<div class="container-fluid px-4">
-    <h1 class="mt-4">批次追蹤項目設定</h1>
-    <ol class="breadcrumb mb-4">
-        <li class="breadcrumb-item active">批次設定</li>
-    </ol>
+<section class="selection-panel">
+    <div class="selection-grid">
+        <div>
+            <label class="selection-label" for="projectSelect">📁 選擇專案</label>
+            <select class="form-select" id="projectSelect">
+                <option value="">載入中...</option>
+            </select>
+        </div>
+        <div>
+            <label class="selection-label" for="tenderSelect">📋 選擇標單</label>
+            <select class="form-select" id="tenderSelect" disabled>
+                <option value="">請先選擇專案</option>
+            </select>
+        </div>
+        <div>
+            <label class="selection-label" for="majorItemSelect">🔧 選擇大項目</label>
+            <select class="form-select" id="majorItemSelect" disabled>
+                <option value="">請先選擇標單</option>
+            </select>
+        </div>
+    </div>
+</section>
 
-    <div class="card mb-4">
-        <div class="card-header">
-            <i class="fas fa-filter me-1"></i>
-            篩選條件
-        </div>
-        <div class="card-body">
-            <div class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <label for="projectSelect" class="form-label">1. 選擇專案</label>
-                    <select id="projectSelect" class="form-select">
-                        <option selected disabled value="">請先選擇專案...</option>
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label for="tenderSelect" class="form-label">2. 選擇標單</label>
-                    <select id="tenderSelect" class="form-select" disabled>
-                        <option selected disabled value="">請先選擇專案</option>
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label for="majorItemSelect" class="form-label">3. 選擇大項目</label>
-                    <select id="majorItemSelect" class="form-select" disabled>
-                        <option selected disabled value="">請先選擇標單</option>
-                    </select>
-                </div>
-            </div>
+<div class="content-card" id="mainContent" style="display: none;">
+    <div class="actions-panel">
+        <h2 style="color: #333; font-size: 20px;" id="items-list-header">設定列表</h2>
+        <div class="action-buttons">
+            <button id="check-all-btn" class="btn btn-primary">✅ 全部追蹤</button>
+            <button id="uncheck-all-btn" class="btn btn-secondary">⬜️ 全部不追蹤</button>
+            <button id="save-settings-btn" class="btn btn-success">💾 儲存設定</button>
         </div>
     </div>
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <div>
-                <i class="fas fa-list-check me-1"></i>
-                <span id="items-list-header">設定列表</span>
-            </div>
-            <div>
-                <button class="btn btn-sm btn-outline-secondary me-2" id="check-all-btn" disabled>全部追蹤</button>
-                <button class="btn btn-sm btn-outline-secondary" id="uncheck-all-btn" disabled>全部不追蹤</button>
-            </div>
+
+    <div id="items-list-container" class="list-group">
         </div>
-        <div class="card-body">
-            <div id="items-list-container" class="list-group">
-                <div class="text-center text-muted p-5">
-                    請依序選擇上方篩選條件，以載入施工細項列表。
-                </div>
-            </div>
-        </div>
-        <div class="card-footer text-end">
-            <button class="btn btn-primary" id="save-settings-btn" disabled>
-                <i class="fas fa-save me-1"></i> 儲存設定
-            </button>
-        </div>
-    </div>
+</div>
+ 
+<div id="emptyState" class="empty-state" style="display: flex;">
+    <div class="empty-state-icon">↖️</div>
+    <p>請從上方的下拉選單選擇「專案」、「標單」及「大項目」以開始作業</p>
 </div>
