@@ -15,7 +15,6 @@ const routes = {
     '/tenders/tracking-setup': 'pages/tenders/tracking-setup.html',
     '/tenders/import': { html: `pages/tenders/import.html`, init: 'initImportPage' },
     '/projects/create': { html: 'pages/projects/create.html' },
-    '/projects/edit': { html: 'pages/projects/edit.html' },
     // 【新增規則】編輯專案的路由
     '/projects/edit': { html: `pages/projects/edit.html`, init: 'initProjectEditPage' },
     '/tenders/edit': { html: `pages/tenders/edit.html`, init: 'initTenderEditPage' },
