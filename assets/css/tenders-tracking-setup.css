@@ -15,3 +15,33 @@
 #save-settings-btn {
     transition: all 0.3s ease;
 }
+/* --- 修正追蹤設定頁面的表格寬度問題 --- */
+
+/* 1. 讓表格佈局自動計算，覆蓋掉 distribution.css 的固定寬度影響 */
+.distribution-table {
+    min-width: 100%; /* 取消最小寬度限制 */
+    table-layout: auto; /* 改為自動佈局 */
+}
+
+/* 2. 重設第一欄和第二欄的樣式，取消固定定位和最小寬度 */
+.distribution-table th:first-child,
+.distribution-table td:first-child,
+.distribution-table th:nth-child(2),
+.distribution-table td:nth-child(2) {
+    position: static;  /* 取消固定定位 */
+    left: auto;
+    min-width: 0;      /* 【關鍵】取消最小寬度限制 */
+    max-width: none;
+    background-color: transparent; /* 確保背景色正常 */
+}
+
+/* 3. 確保表頭背景色正確 */
+.distribution-table th {
+    background-color: #2c3e50; /* 恢復您原本的表頭背景色 */
+}
+
+/* 4. 確保第一欄和第二欄的表頭背景色也正確 */
+.distribution-table thead th:first-child, 
+.distribution-table thead th:nth-child(2) {
+    background-color: #2c3e50; /* 再次確保表頭背景色 */
+}
