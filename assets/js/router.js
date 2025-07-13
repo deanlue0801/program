@@ -12,7 +12,7 @@ const routes = {
     '/tenders/distribution': { html: `pages/tenders/distribution.html`, init: 'initDistributionPage' },
     '/tenders/space-distribution': { html: `pages/tenders/space-distribution.html`, init: 'initSpaceDistributionPage' },
     '/tenders/progress-management': { html: `pages/tenders/progress-management.html`, init: 'initProgressManagementPage' },
-    '/tenders/tracking-setup': 'pages/tenders/tracking-setup.html',
+    '/tenders/tracking-setup': { html: 'pages/tenders/tracking-setup.html', init: 'initTenderTrackingSetupPage' },
     '/tenders/import': { html: `pages/tenders/import.html`, init: 'initImportPage' },
     '/projects/create': { html: 'pages/projects/create.html' },
     // 【新增規則】編輯專案的路由
