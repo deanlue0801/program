@@ -1,0 +1,30 @@
+<div class="container-fluid px-4">
+    <h1 class="mt-4" id="page-title">標單追蹤項目設定</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="#/dashboard">儀表板</a></li>
+        <li class="breadcrumb-item"><a href="#/tenders/list">標單列表</a></li>
+        <li class="breadcrumb-item active">追蹤項目設定</li>
+    </ol>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-check-square me-1"></i>
+            <span id="tender-name-header">讀取中...</span>
+        </div>
+        <div class="card-body">
+            <p>請勾選所有需要納入進度追蹤的施工細項。未勾選的項目將不會出現在進度追蹤頁面中。</p>
+            <div id="items-list" class="list-group">
+                <div class="text-center my-5">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer text-end">
+            <button class="btn btn-primary" id="save-settings-btn">
+                <i class="fas fa-save me-1"></i> 儲存設定
+            </button>
+        </div>
+    </div>
+</div>
