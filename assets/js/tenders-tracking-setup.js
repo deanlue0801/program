@@ -1,14 +1,12 @@
-// assets/js/tracking-setup.js (v6.0 - The Definitive, Self-Reliant Version)
+// assets/js/tracking-setup.js (v6.1 - Correct Function Name)
 
-function initTrackingSetupPage() {
+// 【核心修正】將函式名稱更正為 router.js 中指定的 initTenderTrackingSetupPage
+function initTenderTrackingSetupPage() {
 
-    // 【核心修正】我們不再假設 currentUser 存在。
-    // 我們使用 onAuthStateChanged 來「監聽」Firebase 的使用者狀態。
-    // 這能保證我們的程式在正確的時機，用最正確的方式拿到使用者資訊。
+    // 使用 onAuthStateChanged 來「監聽」Firebase 的使用者狀態，確保在正確的時機執行
     firebase.auth().onAuthStateChanged(user => {
         if (user) {
             // ✅ Firebase 確認使用者已登入，現在才真正開始執行我們的頁面邏輯。
-            // 我們將這個確認過的 'user' 物件傳遞下去，不再依賴任何全域變數。
             initializePageForUser(user);
         } else {
             // ❌ Firebase 確認使用者未登入。
@@ -20,11 +18,10 @@ function initTrackingSetupPage() {
     // 這個函式只有在 Firebase 確認使用者已登入後，才會被呼叫。
     async function initializePageForUser(currentUser) {
 
-        console.log("🚀 初始化『批次追蹤設定』頁面 (v6.0 - 使用 onAuthStateChanged)");
+        console.log("🚀 初始化『批次追蹤設定』頁面 (v6.1 - 採用正確函式名稱)");
 
         const db = firebase.firestore();
 
-        // 集中管理所有頁面上的 HTML 元素
         const ui = {
             projectSelect: document.getElementById('projectSelect'),
             tenderSelect: document.getElementById('tenderSelect'),
@@ -38,11 +35,8 @@ function initTrackingSetupPage() {
             uncheckAllBtn: document.getElementById('uncheck-all-btn')
         };
 
-        // --- 頁面級別變數 ---
         let projects = [], tenders = [], majorItems = [], detailItems = [];
         let selectedMajorItem = null;
-
-        // --- 資料載入函式 ---
 
         async function loadProjects() {
             try {
@@ -101,8 +95,6 @@ function initTrackingSetupPage() {
             }
         }
 
-        // --- 核心功能函式 ---
-
         function renderItemsList() {
             ui.itemsListContainer.innerHTML = '';
             if (detailItems.length === 0) {
@@ -144,8 +136,6 @@ function initTrackingSetupPage() {
                 ui.saveBtn.innerHTML = `💾 儲存設定`;
             }
         }
-        
-        // --- 事件處理與輔助函式 ---
         
         function toggleAllSwitches(checkedState) {
             ui.itemsListContainer.querySelectorAll('.form-check-input').forEach(sw => sw.checked = checkedState);
@@ -192,7 +182,6 @@ function initTrackingSetupPage() {
             ui.uncheckAllBtn.addEventListener('click', () => toggleAllSwitches(false));
         }
 
-        // --- 主流程啟動點 ---
         showMainContent(false);
         setupEventListeners();
         await loadProjects();
