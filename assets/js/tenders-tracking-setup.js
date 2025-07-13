@@ -1,20 +1,25 @@
 // assets/js/tenders-tracking-setup.js
 
-// 將所有程式碼放入一個全域可呼叫的函式中
+/**
+ * 初始化「標單追蹤項目設定」頁面
+ * 這個函式只應該在 router.js 呼叫時執行
+ */
 function initTenderTrackingSetupPage() {
     // 檢查 Firebase 是否已初始化
     if (typeof firebase === 'undefined' || !firebase.apps.length) {
-        console.error("Firebase is not initialized. Make sure firebase-config.js is loaded.");
+        console.error("Firebase is not initialized.");
         return;
     }
 
     const db = firebase.firestore();
-    let currentTenderId = null;
-    let detailItems = []; // 用於存放所有細項的原始資料
+    let detailItems = []; 
 
-    // 從 URL 獲取標單 ID
+    /**
+     * 【修正#1】從 URL 的 search query 中獲取標單 ID
+     * 您的新版路由器是基於路徑的，所以參數在 window.location.search 中
+     */
     function getTenderIdFromUrl() {
-        const params = new URLSearchParams(window.location.hash.split('?')[1]);
+        const params = new URLSearchParams(window.location.search);
         return params.get('id');
     }
 
@@ -23,7 +28,7 @@ function initTenderTrackingSetupPage() {
         const listContainer = document.getElementById('items-list');
         if (!listContainer) return;
         
-        listContainer.innerHTML = ''; // 清空載入動畫
+        listContainer.innerHTML = ''; 
 
         if (detailItems.length === 0) {
             listContainer.innerHTML = '<div class="alert alert-info">此標單尚無施工細項可供設定。</div>';
@@ -83,11 +88,13 @@ function initTenderTrackingSetupPage() {
             });
 
             await batch.commit();
-            
             alert('設定已成功儲存！');
-            // 使用新的路由導航方式
-            const navigateTo = window.navigateTo || function(url) { window.location.href = url; };
-            navigateTo('/#/tenders/list');
+
+            if (typeof navigateTo === 'function') {
+                navigateTo('/tenders/list'); 
+            } else {
+                window.location.href = '/#/tenders/list';
+            }
 
         } catch (error) {
             console.error("儲存設定時發生錯誤:", error);
@@ -99,11 +106,15 @@ function initTenderTrackingSetupPage() {
     }
     
     // --- 頁面初始化的主邏輯 ---
-    currentTenderId = getTenderIdFromUrl();
+    // 這段程式碼現在只會在 initTenderTrackingSetupPage 被呼叫時執行
+    const currentTenderId = getTenderIdFromUrl();
     if (!currentTenderId) {
-        console.error("找不到標單 ID");
-        document.getElementById('page-title').textContent = '錯誤';
-        document.getElementById('items-list').innerHTML = '<div class="alert alert-danger">無效的標單 ID。</div>';
+        // 這個錯誤現在只應該在直接訪問無效 URL 時出現，而不是在儀表板頁面
+        console.error("在追蹤設定頁面中找不到標單 ID。");
+        const listContainer = document.getElementById('items-list');
+        if (listContainer) {
+            listContainer.innerHTML = '<div class="alert alert-danger">無效的標單 ID，請從標單列表重新進入。</div>';
+        }
         return;
     }
 
@@ -120,12 +131,11 @@ function initTenderTrackingSetupPage() {
                 .get();
             
             detailItems = itemsSnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }));
-            
             renderItemsList();
 
         } catch (error) {
             console.error("讀取資料時發生錯誤:", error);
-            document.getElementById('items-list').innerHTML = '<div class="alert alert-danger">讀取資料失敗，請檢查主控台錯誤訊息。</div>';
+            document.getElementById('items-list').innerHTML = '<div class="alert alert-danger">讀取資料失敗。</div>';
         }
 
         document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
