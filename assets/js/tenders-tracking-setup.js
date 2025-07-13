@@ -1,4 +1,4 @@
-// assets/js/tenders-tracking-setup.js (v6.2 - The .data() Fix)
+// assets/js/tracking-setup.js (vFinal - 採用您的設計)
 
 function initTenderTrackingSetupPage() {
 
@@ -13,8 +13,6 @@ function initTenderTrackingSetupPage() {
 
     async function initializePageForUser(currentUser) {
 
-        console.log("🚀 初始化『批次追蹤設定』頁面 (v6.2 - 修正 .data() 錯誤)");
-
         const db = firebase.firestore();
 
         const ui = {
@@ -23,7 +21,8 @@ function initTenderTrackingSetupPage() {
             majorItemSelect: document.getElementById('majorItemSelect'),
             mainContent: document.getElementById('mainContent'),
             emptyState: document.getElementById('emptyState'),
-            itemsListContainer: document.getElementById('items-list-container'),
+            tableHeader: document.getElementById('tableHeader'),
+            tableBody: document.getElementById('tableBody'),
             itemsListHeader: document.getElementById('items-list-header'),
             saveBtn: document.getElementById('save-settings-btn'),
             checkAllBtn: document.getElementById('check-all-btn'),
@@ -33,15 +32,12 @@ function initTenderTrackingSetupPage() {
         let projects = [], tenders = [], majorItems = [], detailItems = [];
         let selectedMajorItem = null;
 
-        // --- 資料載入函式 (已修正) ---
-
         async function loadProjects() {
             try {
                 const projectDocs = await safeFirestoreQuery("projects", [{ field: "createdBy", operator: "==", value: currentUser.email }], { field: "name", direction: "asc" });
                 projects = projectDocs.docs;
                 ui.projectSelect.innerHTML = '<option value="">請選擇專案...</option>';
                 projects.forEach(project => {
-                    // 【核心修正】直接使用 project.name，不再呼叫 .data()
                     ui.projectSelect.innerHTML += `<option value="${project.id}">${project.name}</option>`;
                 });
             } catch (error) {
@@ -58,7 +54,6 @@ function initTenderTrackingSetupPage() {
                 tenders = tenderDocs.docs;
                 ui.tenderSelect.innerHTML = '<option value="">請選擇標單...</option>';
                 tenders.forEach(tender => {
-                    // 【核心修正】直接使用 tender.name，不再呼叫 .data()
                     ui.tenderSelect.innerHTML += `<option value="${tender.id}">${tender.name}</option>`;
                 });
                 ui.tenderSelect.disabled = false;
@@ -76,7 +71,6 @@ function initTenderTrackingSetupPage() {
                 majorItems = majorItemDocs.docs;
                 ui.majorItemSelect.innerHTML = '<option value="">請選擇大項目...</option>';
                 majorItems.forEach(item => {
-                    // 【核心修正】直接使用 item.name，不再呼叫 .data()
                     ui.majorItemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
                 });
                 ui.majorItemSelect.disabled = false;
@@ -95,27 +89,46 @@ function initTenderTrackingSetupPage() {
             }
         }
 
-        // --- 核心功能函式 ---
+        // --- 【核心修改】渲染成表格 (Table) ---
+        function renderItemsTable() {
+            // 設定表格標頭
+            ui.tableHeader.innerHTML = `
+                <tr>
+                    <th style="width: 8%;">項次</th>
+                    <th style="width: 42%;">項目名稱</th>
+                    <th style="width: 10%;">單位</th>
+                    <th style="width: 10%;">數量</th>
+                    <th style="width: 15%;">單價</th>
+                    <th style="width: 15%;">複價</th>
+                    <th style="width: 10%;">進度追蹤</th>
+                </tr>
+            `;
 
-        function renderItemsList() {
-            ui.itemsListContainer.innerHTML = '';
+            // 清空表格內容
+            ui.tableBody.innerHTML = '';
             if (detailItems.length === 0) {
-                ui.itemsListContainer.innerHTML = '<div class="text-center text-muted p-5">此大項目下沒有可設定的施工細項。</div>';
+                ui.tableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem;">此大項目下沒有可設定的施工細項。</td></tr>';
                 return;
             }
+
+            // 產生每一行
             detailItems.forEach(itemDoc => {
-                // 這裡因為是細項，我們還是需要 .data() 來取得裡面的欄位
-                const item = itemDoc.data ? itemDoc.data() : itemDoc; 
-                const listItem = document.createElement('label');
-                listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
-                listItem.style.cursor = 'pointer';
-                listItem.innerHTML = `
-                    <span>${item.sequence || ''}. ${item.name} (${item.unit || '-'})</span>
-                    <div class="form-check form-switch fs-5">
-                        <input class="form-check-input" type="checkbox" role="switch" data-item-id="${itemDoc.id}" ${!item.excludeFromProgress ? 'checked' : ''}>
-                    </div>
+                const item = itemDoc.data() || itemDoc;
+                const row = ui.tableBody.insertRow();
+                row.innerHTML = `
+                    <td>${item.sequence || ''}</td>
+                    <td>${item.name || ''}</td>
+                    <td>${item.unit || ''}</td>
+                    <td style="text-align: right;">${item.totalQuantity || 0}</td>
+                    <td style="text-align: right;">${(item.unitPrice || 0).toLocaleString()}</td>
+                    <td style="text-align: right;">${(item.totalPrice || 0).toLocaleString()}</td>
+                    <td style="text-align: center;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" role="switch" data-item-id="${itemDoc.id}" ${!item.excludeFromProgress ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                    </td>
                 `;
-                ui.itemsListContainer.appendChild(listItem);
             });
         }
 
@@ -124,7 +137,7 @@ function initTenderTrackingSetupPage() {
             ui.saveBtn.innerHTML = `💾 儲存中...`;
             try {
                 const batch = db.batch();
-                const switches = ui.itemsListContainer.querySelectorAll('.form-check-input');
+                const switches = ui.tableBody.querySelectorAll('input[type="checkbox"]');
                 switches.forEach(sw => {
                     const docRef = db.collection('detailItems').doc(sw.dataset.itemId);
                     batch.update(docRef, { excludeFromProgress: !sw.checked });
@@ -140,10 +153,8 @@ function initTenderTrackingSetupPage() {
             }
         }
         
-        // --- 事件處理與輔助函式 ---
-        
         function toggleAllSwitches(checkedState) {
-            ui.itemsListContainer.querySelectorAll('.form-check-input').forEach(sw => sw.checked = checkedState);
+            ui.tableBody.querySelectorAll('input[type="checkbox"]').forEach(sw => sw.checked = checkedState);
         }
 
         function showMainContent(shouldShow) {
@@ -154,11 +165,10 @@ function initTenderTrackingSetupPage() {
         async function onMajorItemChange() {
             const majorItemId = ui.majorItemSelect.value;
             if (!majorItemId) { showMainContent(false); return; }
-            // 【核心修正】
             selectedMajorItem = majorItems.find(m => m.id === majorItemId);
-            ui.itemsListHeader.textContent = `設定列表：${selectedMajorItem.name}`;
+            ui.itemsListHeader.textContent = `標單項目列表：${selectedMajorItem.name}`;
             await loadDetailItems(majorItemId);
-            renderItemsList();
+            renderItemsTable(); // 改為呼叫渲染表格的函式
             showMainContent(true);
         }
 
