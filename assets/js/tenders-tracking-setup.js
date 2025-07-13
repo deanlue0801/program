@@ -1,4 +1,4 @@
-// assets/js/tracking-setup.js (vFinal - 採用您的設計)
+// assets/js/tenders-tracking-setup.js (vFinal-Responsive)
 
 function initTenderTrackingSetupPage() {
 
@@ -89,16 +89,16 @@ function initTenderTrackingSetupPage() {
             }
         }
 
-        // --- 【核心修改】渲染成表格 (Table)，並加上寬度設定 ---
+        // --- 【核心修改】改為使用百分比寬度，讓表格更有彈性 ---
         function renderItemsTable() {
-            // 設定表格標頭，並為「項次」設定較窄的寬度
+            // 設定表格標頭
             ui.tableHeader.innerHTML = `
                 <tr>
-                    <th style="width: 80px;">項次</th>
-                    <th>項目名稱</th>
-                    <th style="width: 100px;">單位</th>
-                    <th style="width: 100px;">數量</th>
-                    <th style="width: 120px;">進度追蹤</th>
+                    <th style="width: 5%;">項次</th>
+                    <th style="width: 55%;">項目名稱</th>
+                    <th style="width: 10%;">單位</th>
+                    <th style="width: 10%;">數量</th>
+                    <th style="width: 20%;">進度追蹤</th>
                 </tr>
             `;
 
@@ -163,7 +163,7 @@ function initTenderTrackingSetupPage() {
             selectedMajorItem = majorItems.find(m => m.id === majorItemId);
             ui.itemsListHeader.textContent = `標單項目列表：${selectedMajorItem.name}`;
             await loadDetailItems(majorItemId);
-            renderItemsTable(); // 改為呼叫渲染表格的函式
+            renderItemsTable();
             showMainContent(true);
         }
 
