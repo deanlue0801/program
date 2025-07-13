@@ -1,0 +1,17 @@
+/* assets/css/tenders-tracking-setup.css */
+
+/* 讓整個列表項目都可以被點擊 */
+.list-group-item {
+    cursor: pointer;
+}
+
+/* 讓文字和開關之間的對齊更美觀 */
+.list-group-item .form-check-input {
+    width: 3.5em; /* 增加開關的點擊區域 */
+    height: 1.8em;
+}
+
+/* 儲存按鈕的樣式 */
+#save-settings-btn {
+    transition: all 0.3s ease;
+}
