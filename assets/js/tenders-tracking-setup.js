@@ -1,6 +1,8 @@
 // assets/js/tracking-setup.js
 
 function initTrackingSetupPage() {
+    console.log("🚀 開始初始化『批次追蹤設定』頁面...");
+
     const db = firebase.firestore();
 
     const projectSelect = document.getElementById('projectSelect');
@@ -89,7 +91,7 @@ function initTrackingSetupPage() {
             await batch.commit();
             alert('設定已成功儲存！');
         } catch (error) {
-            console.error("儲存設定時發生錯誤:", error);
+            console.error("❌ 儲存設定時發生錯誤:", error);
             alert('儲存失敗，請查看主控台錯誤訊息。');
         } finally {
             saveBtn.disabled = false;
@@ -124,12 +126,39 @@ function initTrackingSetupPage() {
     }
 
     // --- Page Initialization ---
+    // 這是在頁面載入時，最先執行的區塊
     (async function initialize() {
         resetSelect(tenderSelect, '請先選擇專案');
         resetSelect(majorItemSelect, '請先選擇標單');
         
-        const projectsSnapshot = await db.collection('projects').get();
-        const projects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        populateSelect(projectSelect, projects, '請選擇專案...');
+        try {
+            console.log("🔄 正在從 Firestore 讀取『專案』列表...");
+            const projectsSnapshot = await db.collection('projects').get();
+            
+            // 【偵錯點#1】我們在這裡檢查到底找到了幾個專案
+            console.log(`✅ 成功讀取！共找到 ${projectsSnapshot.docs.length} 個專案。`);
+
+            if (projectsSnapshot.docs.length === 0) {
+                console.warn("⚠️ 警告：'projects' 集合是空的，或沒有讀取權限。");
+                populateSelect(projectSelect, [], '沒有找到任何專案');
+                projectSelect.disabled = true;
+                return;
+            }
+
+            const projects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // 【偵錯點#2】我們在這裡檢查轉換後的專案資料是否正確
+            console.log("📊 轉換後的專案資料:", projects);
+            
+            // 【修正】我也修正了這裡的錯字 "專AN" -> "專案"
+            populateSelect(projectSelect, projects, '請選擇專案...');
+            projectSelect.disabled = false;
+
+        } catch (error) {
+            // 【偵錯點#3】如果過程中發生任何錯誤，會在這裡顯示
+            console.error("❌ 讀取『專案』列表時發生嚴重錯誤:", error);
+            populateSelect(projectSelect, [], '讀取專案時發生錯誤');
+            projectSelect.disabled = true;
+        }
     })();
 }
