@@ -226,3 +226,42 @@
     font-size: 16px;
     margin: 0;
 }
+
+/* 【新增】查驗照片欄位樣式 */
+.photo-cell {
+    text-align: center;
+    vertical-align: middle;
+    min-width: 120px; /* 給予足夠寬度容納按鈕和圖示 */
+}
+
+.btn-upload-photo {
+    background-color: #6c757d;
+    color: white;
+    padding: 4px 8px;
+    font-size: 12px;
+    margin-right: 8px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.btn-upload-photo:hover {
+    background-color: #5a6268;
+}
+
+.photo-indicator {
+    font-size: 18px;
+    color: #cccccc; /* 預設為灰色，表示無照片 */
+    cursor: pointer;
+    transition: color 0.3s;
+    vertical-align: middle; /* 垂直置中 */
+}
+
+.photo-indicator.active {
+    color: #ffc107; /* 有照片時變為黃色 */
+}
+
+.photo-indicator:hover {
+    opacity: 0.8;
+}
