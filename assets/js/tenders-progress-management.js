@@ -1,5 +1,5 @@
 /**
- * 施工進度管理 (progress-management.js) (SPA 版本 v2.8 - 整合照片預覽與刪除)
+ * 施工進度管理 (progress-management.js) (SPA 版本 v2.9 - 修正專案載入問題)
  */
 function initProgressManagementPage() {
 
@@ -22,7 +22,36 @@ function initProgressManagementPage() {
     }
 
     // --- 資料載入系列函數 ---
-    async function loadProjects() { showLoading(true, '載入專案中...'); try { const projectDocs = await safeFirestoreQuery("projects", [{ field: "createdBy", operator: "==", value: currentUser.email }], { field: "name", direction: "asc" }); projects = projectDocs.docs.map(doc => ({ id: doc.id, ...doc.data() })); populateSelect(document.getElementById('projectSelect'), projects, '請選擇專案...'); } catch (error) { showAlert('載入專案失敗', 'error'); } finally { showLoading(false); } }
+
+    /**
+     * 【核心修改】載入專案列表
+     * 將原本呼叫 safeFirestoreQuery 的方式，改為直接呼叫 db.collection，以繞過 config 檔內的潛在問題。
+     */
+    async function loadProjects() {
+        showLoading(true, '載入專案中...');
+        try {
+            // 直接使用 Firestore 標準語法查詢
+            const projectQuery = db.collection("projects")
+                .where("createdBy", "==", currentUser.email)
+                .orderBy("name", "asc");
+            
+            const projectDocs = await projectQuery.get();
+            
+            projects = projectDocs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            populateSelect(document.getElementById('projectSelect'), projects, '請選擇專案...');
+        } catch (error) {
+            console.error("載入專案時發生錯誤:", error);
+            // 如果是索引問題，提供更明確的提示
+            if (error.code === 'failed-precondition') {
+                showAlert('載入專案失敗：缺少資料庫索引。請至 Firebase -> Firestore Database -> 索引 頁面，依照錯誤訊息中的連結建立索引。', 'error', 15000);
+            } else {
+                showAlert('載入專案失敗，錯誤訊息請見開發者主控台 (F12)', 'error');
+            }
+        } finally {
+            showLoading(false);
+        }
+    }
+
     async function onProjectChange(projectId) { resetSelects('tender'); if (!projectId) return; const tenderSelect = document.getElementById('tenderSelect'); tenderSelect.disabled = true; tenderSelect.innerHTML = `<option value="">載入中...</option>`; try { const tenderDocs = await safeFirestoreQuery("tenders", [{ field: "projectId", operator: "==", value: projectId }], { field: "name", direction: "asc" }); tenders = tenderDocs.docs.map(doc => ({ id: doc.id, ...doc.data() })); populateSelect(tenderSelect, tenders, '請選擇標單...'); } catch (error) { showAlert('載入標單失敗', 'error'); } }
     async function onTenderChange(tenderId) { resetSelects('majorItem'); if(!tenderId) return; selectedTender = tenders.find(t => t.id === tenderId); const majorItemSelect = document.getElementById('majorItemSelect'); majorItemSelect.disabled = true; majorItemSelect.innerHTML = `<option value="">載入中...</option>`; try { const [majorItemDocs, floorSettingsDoc, workItemSettingsDoc] = await Promise.all([ safeFirestoreQuery("majorItems", [{ field: "tenderId", operator: "==", value: tenderId }], { field: "name", direction: "asc" }), db.collection("floorSettings").where("tenderId", "==", tenderId).limit(1).get(), db.collection("workItemSettings").where("tenderId", "==", tenderId).limit(1).get() ]); majorItems = majorItemDocs.docs.map(doc => ({ id: doc.id, ...doc.data() })); populateSelect(majorItemSelect, majorItems, '請選擇大項目...'); floors = floorSettingsDoc.empty ? [] : (floorSettingsDoc.docs[0].data().floors || []); if (!workItemSettingsDoc.empty) { workItems = workItemSettingsDoc.docs[0].data().workItems || workItems; } else { workItems = ['配管', '配線', '設備安裝', '測試']; } document.getElementById('newWorkItemInput').value = workItems.join(','); } catch (error) { showAlert('載入標單資料失敗', 'error'); } }
     async function onMajorItemChange(majorItemId) { resetSelects('floor'); if(!majorItemId) return; selectedMajorItem = majorItems.find(m => m.id === majorItemId); const allItemsSnapshot = (await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }])); allDetailItems = allItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.excludeFromProgress); populateSelect(document.getElementById('floorSelect'), floors.map(f => ({id:f, name:f})), '請選擇樓層...'); }
@@ -207,7 +236,6 @@ function initProgressManagementPage() {
                 }
                 closeModal('photoViewerModal');
             } else {
-                // 如果刪除後還有照片，檢查 Grid 是否為空
                 const grid = document.getElementById('photoGrid');
                 if (!grid.querySelector('.photo-thumbnail')) {
                     grid.innerHTML = '<p style="text-align:center; width:100%; padding: 20px 0;">目前沒有照片，請點擊「上傳」按鈕新增。</p>';
@@ -239,7 +267,7 @@ function initProgressManagementPage() {
         document.getElementById('closePhotoViewerBtn')?.addEventListener('click', () => closeModal('photoViewerModal'));
     }
     
-    // --- 折疊不變的函數以求簡潔 ---
+    // --- 其他輔助函數 ---
     async function onStatusChange(selectElement) { const tr = selectElement.closest('tr'); const uniqueId = tr.dataset.uniqueId; const detailItemId = tr.dataset.detailItemId; const spaceName = tr.dataset.spaceName; const workItem = selectElement.dataset.workItem; const newStatus = selectElement.value; try { const querySnapshot = await db.collection("progressItems").where("uniqueId", "==", uniqueId).limit(1).get(); if (querySnapshot.empty) { const docRef = db.collection("progressItems").doc(); await docRef.set({ tenderId: selectedTender.id, majorItemId: selectedMajorItem.id, detailItemId: detailItemId, floorName: selectedFloor, spaceName: spaceName, uniqueId: uniqueId, workStatuses: { [workItem]: newStatus }, createdBy: currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }); } else { const docId = querySnapshot.docs[0].id; const updateData = { [`workStatuses.${workItem}`]: newStatus, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }; await db.collection("progressItems").doc(docId).update(updateData); } } catch (error) { showAlert('儲存狀態失敗: ' + error.message, 'error'); } }
     function handlePhotoUploadClick(button) { const tr = button.closest('tr'); const itemName = tr.cells[0].textContent; currentUploadTarget = { uniqueId: tr.dataset.uniqueId, detailItemId: tr.dataset.detailItemId, spaceName: tr.dataset.spaceName, fullItemName: itemName }; document.getElementById('photoUploadInput').click(); }
     async function uploadPhotos(files) { if (!files || files.length === 0 || !currentUploadTarget) return; showLoading(true, `準備上傳 ${files.length} 張照片中...`); const tenderName = selectedTender?.name || '未知標單'; const projectDoc = projects.find(p => p.id === selectedTender?.projectId); const projectName = projectDoc ? projectDoc.name : '未知專案'; for (const file of Array.from(files)) { if (!file.type.startsWith('image/')) continue; showLoading(true, `正在為 ${file.name} 加上浮水印...`); try { const watermarkText = [ `專案: ${projectName}`, `標單: ${tenderName}`, `位置: ${selectedFloor}`, `工項: ${currentUploadTarget.fullItemName}`, `時間: ${new Date().toLocaleString('sv-SE')}` ]; const watermarkedBlob = await addWatermarkToImage(file, watermarkText); const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`; const storagePath = `inspections/${selectedTender.id}/${fileName}`; const storageRef = storage.ref(storagePath); showLoading(true, `正在上傳 ${file.name}...`); const snapshot = await storageRef.put(watermarkedBlob); const photoUrl = await snapshot.ref.getDownloadURL(); const photoData = { tenderId: selectedTender.id, majorItemId: selectedMajorItem.id, detailItemId: currentUploadTarget.detailItemId, floorName: selectedFloor, spaceName: currentUploadTarget.spaceName, uniqueId: currentUploadTarget.uniqueId, photoUrl: photoUrl, fileName: fileName, uploaderId: currentUser.uid, uploaderEmail: currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp() }; const newDoc = await db.collection('inspectionPhotos').add(photoData); allProgressPhotos.push({id: newDoc.id, ...photoData}); const tr = document.querySelector(`tr[data-unique-id="${currentUploadTarget.uniqueId}"]`); if (tr) { const indicator = tr.querySelector('.photo-indicator'); if (!indicator.classList.contains('active')) { indicator.classList.add('active'); indicator.addEventListener('click', () => openPhotoViewer(indicator)); } } } catch (error) { console.error('上傳單張照片失敗:', error); showAlert(`照片 ${file.name} 上傳失敗: ${error.message}`, 'error'); break; } } showAlert(`照片上傳處理完成！`, 'success'); showLoading(false); document.getElementById('photoUploadInput').value = ''; }
