@@ -1,16 +1,16 @@
 /**
- * 施工進度管理 (progress-management.js) (SPA 版本 v3.0 - 全面修正查詢問題)
+ * 施工進度管理 (progress-management.js) (SPA 版本 v3.1 - 修正資料映射問題)
  */
 function initProgressManagementPage() {
 
     // --- 頁面級別變數 ---
     let projects = [], tenders = [], majorItems = [], floors = [], spaces = [];
     let selectedTender = null, selectedMajorItem = null, selectedFloor = null, selectedSpace = null;
-    let workItems = ['配管', '配線', '設備安裝', '測試']; 
+    let workItems = ['配管', '配線', '設備安裝', '測試'];
     let currentViewMode = 'floor';
     let allDetailItems = [];
     let allProgressPhotos = [];
-    let currentUploadTarget = null; 
+    let currentUploadTarget = null;
 
     const storage = firebase.storage();
 
@@ -42,9 +42,6 @@ function initProgressManagementPage() {
         }
     }
 
-    /**
-     * 【核心修改】載入標單列表
-     */
     async function onProjectChange(projectId) {
         resetSelects('tender');
         if (!projectId) return;
@@ -66,18 +63,15 @@ function initProgressManagementPage() {
         }
     }
 
-    /**
-     * 【核心修改】載入大項列表
-     */
     async function onTenderChange(tenderId) {
         resetSelects('majorItem');
         if(!tenderId) return;
         selectedTender = tenders.find(t => t.id === tenderId);
-        
+
         const majorItemSelect = document.getElementById('majorItemSelect');
         majorItemSelect.disabled = true;
         majorItemSelect.innerHTML = `<option value="">載入中...</option>`;
-        
+
         try {
             const majorItemsQuery = db.collection("majorItems").where("tenderId", "==", tenderId).orderBy("name", "asc");
             const [majorItemDocs, floorSettingsDoc, workItemSettingsDoc] = await Promise.all([
@@ -85,15 +79,15 @@ function initProgressManagementPage() {
                  db.collection("floorSettings").where("tenderId", "==", tenderId).limit(1).get(),
                  db.collection("workItemSettings").where("tenderId", "==", tenderId).limit(1).get()
             ]);
-            
+
             majorItems = majorItemDocs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             populateSelect(majorItemSelect, majorItems, '請選擇大項目...');
-            
+
             floors = floorSettingsDoc.empty ? [] : (floorSettingsDoc.docs[0].data().floors || []);
             if (!workItemSettingsDoc.empty) {
                 workItems = workItemSettingsDoc.docs[0].data().workItems || workItems;
             } else {
-                workItems = ['配管', '配線', '設備安裝', '測試']; 
+                workItems = ['配管', '配線', '設備安裝', '測試'];
             }
             document.getElementById('newWorkItemInput').value = workItems.join(',');
         } catch (error) {
@@ -105,74 +99,85 @@ function initProgressManagementPage() {
             }
         }
     }
-    
-    async function onMajorItemChange(majorItemId) { 
-        resetSelects('floor'); 
-        if(!majorItemId) return; 
-        selectedMajorItem = majorItems.find(m => m.id === majorItemId); 
+
+    /**
+     * 【核心修改】載入細項列表
+     */
+    async function onMajorItemChange(majorItemId) {
+        resetSelects('floor');
+        if(!majorItemId) return;
+        selectedMajorItem = majorItems.find(m => m.id === majorItemId);
+
         // 這個查詢沒有排序，使用 safeFirestoreQuery 是安全的
-        const allItemsSnapshot = (await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }])); 
-        allDetailItems = allItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.excludeFromProgress); 
-        populateSelect(document.getElementById('floorSelect'), floors.map(f => ({id:f, name:f})), '請選擇樓層...'); 
+        const allItemsSnapshot = await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }]);
+
+        // 直接使用 .docs，因為 safeFirestoreQuery 已處理好資料
+        allDetailItems = allItemsSnapshot.docs.filter(item => !item.excludeFromProgress);
+
+        populateSelect(document.getElementById('floorSelect'), floors.map(f => ({id:f, name:f})), '請選擇樓層...');
     }
 
     async function onFloorChange(floorName) { resetSelects('space'); if(!floorName) return; selectedFloor = floorName; currentViewMode = 'floor'; loadProgressData(); }
     async function onSpaceChange(spaceName) { selectedSpace = spaceName; if(spaceName) { currentViewMode = 'space'; document.getElementById('spaceFilterContainer').style.display = 'none'; } else { currentViewMode = 'floor'; } loadProgressData(); }
-    
-    async function loadProgressData() { 
-        if (!selectedFloor) { hideContent(); return; } 
-        showLoading(true, "載入進度資料..."); 
-        try { 
-            const baseQuery = [ { field: "tenderId", operator: "==", value: selectedTender.id }, { field: "majorItemId", operator: "==", value: selectedMajorItem.id }, { field: "floorName", operator: "==", value: selectedFloor } ]; 
-            const floorDistQuery = [ { field: "tenderId", operator: "==", value: selectedTender.id }, { field: "majorItemId", operator: "==", value: selectedMajorItem.id }, { field: "areaName", operator: "==", value: selectedFloor } ]; 
-            const [floorDistDocs, spaceDistDocs, progressItemDocs, spaceSettingsDoc, progressPhotosDocs] = await Promise.all([ 
-                safeFirestoreQuery("distributionTable", floorDistQuery), 
-                safeFirestoreQuery("spaceDistribution", baseQuery), 
-                safeFirestoreQuery("progressItems", baseQuery), 
-                db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get(), 
-                safeFirestoreQuery("inspectionPhotos", baseQuery) 
-            ]); 
-            
-            const floorDists = floorDistDocs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const spaceDists = spaceDistDocs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const progressItems = progressItemDocs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            allProgressPhotos = progressPhotosDocs.docs.map(doc => ({ id: doc.id, ...doc.data() })); 
 
-            const trackedItemIds = allDetailItems.map(item => item.id); 
-            const trackedFloorDists = floorDists.filter(doc => trackedItemIds.includes(doc.detailItemId)); 
-            const trackedSpaceDists = spaceDists.filter(doc => trackedItemIds.includes(doc.detailItemId)); 
-            
-            const finalFloorDistDocs = (currentViewMode === 'space' && selectedSpace) 
-                ? trackedFloorDists.filter(doc => trackedSpaceDists.some(sDoc => sDoc.detailItemId === doc.detailItemId && sDoc.spaceName === selectedSpace)) 
-                : trackedFloorDists; 
+    /**
+     * 【核心修改】載入進度相關資料
+     */
+    async function loadProgressData() {
+        if (!selectedFloor) { hideContent(); return; }
+        showLoading(true, "載入進度資料...");
+        try {
+            const baseQuery = [ { field: "tenderId", operator: "==", value: selectedTender.id }, { field: "majorItemId", operator: "==", value: selectedMajorItem.id }, { field: "floorName", operator: "==", value: selectedFloor } ];
+            const floorDistQuery = [ { field: "tenderId", operator: "==", value: selectedTender.id }, { field: "majorItemId", operator: "==", value: selectedMajorItem.id }, { field: "areaName", operator: "==", value: selectedFloor } ];
+            const [floorDistDocsResult, spaceDistDocsResult, progressItemDocsResult, spaceSettingsDoc, progressPhotosDocsResult] = await Promise.all([
+                safeFirestoreQuery("distributionTable", floorDistQuery),
+                safeFirestoreQuery("spaceDistribution", baseQuery),
+                safeFirestoreQuery("progressItems", baseQuery),
+                db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get(),
+                safeFirestoreQuery("inspectionPhotos", baseQuery)
+            ]);
 
-            spaces = spaceSettingsDoc.empty ? [] : (spaceSettingsDoc.docs[0].data().spaces || []); 
-            
-            if (currentViewMode === 'floor') { 
-                populateSelect(document.getElementById('spaceSelect'), spaces.map(s => ({id:s, name:s})), '可選，以檢視單一空間...'); 
-                buildSpaceFilter(); 
-            } 
-            
-            buildProgressTable(finalFloorDistDocs, trackedSpaceDists, progressItems, allDetailItems); 
-            showContent(); 
-        } catch (error) { 
-            showAlert('載入進度資料失敗: ' + error.message, 'error'); 
-        } finally { 
-            showLoading(false); 
-        } 
+            // 直接使用 .docs，因為 safeFirestoreQuery 已處理好資料
+            const floorDists = floorDistDocsResult.docs;
+            const spaceDists = spaceDistDocsResult.docs;
+            const progressItems = progressItemDocsResult.docs;
+            allProgressPhotos = progressPhotosDocsResult.docs;
+
+            const trackedItemIds = allDetailItems.map(item => item.id);
+            const trackedFloorDists = floorDists.filter(doc => trackedItemIds.includes(doc.detailItemId));
+            const trackedSpaceDists = spaceDists.filter(doc => trackedItemIds.includes(doc.detailItemId));
+
+            const finalFloorDistDocs = (currentViewMode === 'space' && selectedSpace)
+                ? trackedFloorDists.filter(doc => trackedSpaceDists.some(sDoc => sDoc.detailItemId === doc.detailItemId && sDoc.spaceName === selectedSpace))
+                : trackedFloorDists;
+
+            spaces = spaceSettingsDoc.empty ? [] : (spaceSettingsDoc.docs[0].data().spaces || []);
+
+            if (currentViewMode === 'floor') {
+                populateSelect(document.getElementById('spaceSelect'), spaces.map(s => ({id:s, name:s})), '可選，以檢視單一空間...');
+                buildSpaceFilter();
+            }
+
+            buildProgressTable(finalFloorDistDocs, trackedSpaceDists, progressItems, allDetailItems);
+            showContent();
+        } catch (error) {
+            showAlert('載入進度資料失敗: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
     }
 
     // --- UI 建構 ---
     function buildProgressTable(floorDists, spaceDists, progressItems, detailItems) {
         const tableHeader = document.getElementById('tableHeader');
         const tableBody = document.getElementById('tableBody');
-        
+
         let headerHTML = '<tr><th>項目名稱</th>';
         if (currentViewMode === 'floor') { headerHTML += '<th>所在空間</th>'; }
         workItems.forEach(w => headerHTML += `<th>${w}</th>`);
         headerHTML += '<th>查驗照片</th></tr>';
         tableHeader.innerHTML = headerHTML;
-        
+
         let bodyHTML = '';
         const spaceDistsForFloor = spaceDists.filter(sd => sd.floorName === selectedFloor);
 
@@ -187,7 +192,7 @@ function initProgressManagementPage() {
                 cumulativeQty += sd.quantity;
                 return { space: sd.spaceName, start, end: cumulativeQty };
             });
-            
+
             let totalQuantity = floorDist.quantity;
             if (currentViewMode === 'space' && selectedSpace) {
                 totalQuantity = itemSpaceDists.find(sd => sd.spaceName === selectedSpace)?.quantity || 0;
@@ -207,7 +212,7 @@ function initProgressManagementPage() {
                 bodyHTML += `<tr data-unique-id="${uniqueId}" data-detail-item-id="${floorDist.detailItemId}" data-space-name="${spaceName}">`;
                 bodyHTML += `<td>${detailItem.name} #${i}</td>`;
                 if (currentViewMode === 'floor') bodyHTML += `<td>${spaceName}</td>`;
-                
+
                 workItems.forEach(workItem => {
                     const currentStatus = progressItem?.workStatuses?.[workItem] || '未施工';
                     bodyHTML += `<td><select class="form-select progress-status-select" data-work-item="${workItem}">
@@ -229,7 +234,7 @@ function initProgressManagementPage() {
         tableBody.querySelectorAll('.btn-upload-photo').forEach(el => el.addEventListener('click', () => handlePhotoUploadClick(el)));
         tableBody.querySelectorAll('.photo-indicator.active').forEach(el => el.addEventListener('click', () => openPhotoViewer(el)));
     }
-    
+
     // --- 核心功能邏輯 ---
     function openPhotoViewer(indicator) {
         const tr = indicator.closest('tr');
@@ -240,7 +245,7 @@ function initProgressManagementPage() {
         const modal = document.getElementById('photoViewerModal');
         document.getElementById('photoViewerTitle').textContent = `查驗照片: ${itemName}`;
         const grid = document.getElementById('photoGrid');
-        
+
         if (photosForItem.length === 0) {
             grid.innerHTML = '<p style="text-align:center; width:100%; padding: 20px 0;">目前沒有照片，請點擊「上傳」按鈕新增。</p>';
         } else {
@@ -253,7 +258,7 @@ function initProgressManagementPage() {
                 </div>
             `).join('');
         }
-        
+
         modal.style.display = 'flex';
 
         grid.querySelectorAll('.photo-delete-btn').forEach(btn => {
@@ -273,7 +278,7 @@ function initProgressManagementPage() {
             const storageRef = storage.ref(`inspections/${selectedTender.id}/${fileName}`);
             await storageRef.delete();
             await db.collection('inspectionPhotos').doc(photoId).delete();
-            
+
             allProgressPhotos = allProgressPhotos.filter(p => p.id !== photoId);
 
             const thumbnail = document.getElementById(`thumb-${photoId}`);
@@ -320,7 +325,7 @@ function initProgressManagementPage() {
         document.getElementById('photoUploadInput')?.addEventListener('change', e => uploadPhotos(e.target.files));
         document.getElementById('closePhotoViewerBtn')?.addEventListener('click', () => closeModal('photoViewerModal'));
     }
-    
+
     // --- 其他輔助函數 ---
     async function onStatusChange(selectElement) { const tr = selectElement.closest('tr'); const uniqueId = tr.dataset.uniqueId; const detailItemId = tr.dataset.detailItemId; const spaceName = tr.dataset.spaceName; const workItem = selectElement.dataset.workItem; const newStatus = selectElement.value; try { const querySnapshot = await db.collection("progressItems").where("uniqueId", "==", uniqueId).limit(1).get(); if (querySnapshot.empty) { const docRef = db.collection("progressItems").doc(); await docRef.set({ tenderId: selectedTender.id, majorItemId: selectedMajorItem.id, detailItemId: detailItemId, floorName: selectedFloor, spaceName: spaceName, uniqueId: uniqueId, workStatuses: { [workItem]: newStatus }, createdBy: currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }); } else { const docId = querySnapshot.docs[0].id; const updateData = { [`workStatuses.${workItem}`]: newStatus, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }; await db.collection("progressItems").doc(docId).update(updateData); } } catch (error) { showAlert('儲存狀態失敗: ' + error.message, 'error'); } }
     function handlePhotoUploadClick(button) { const tr = button.closest('tr'); const itemName = tr.cells[0].textContent; currentUploadTarget = { uniqueId: tr.dataset.uniqueId, detailItemId: tr.dataset.detailItemId, spaceName: tr.dataset.spaceName, fullItemName: itemName }; document.getElementById('photoUploadInput').click(); }
