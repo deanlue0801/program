@@ -1,5 +1,5 @@
 /**
- * 施工進度管理 (progress-management.js) (SPA 版本 v2.9 - 修正專案載入問題)
+ * 施工進度管理 (progress-management.js) (SPA 版本 v3.0 - 全面修正查詢問題)
  */
 function initProgressManagementPage() {
 
@@ -21,27 +21,17 @@ function initProgressManagementPage() {
         await loadProjects();
     }
 
-    // --- 資料載入系列函數 ---
+    // --- 資料載入系列函數 (已全面修正) ---
 
-    /**
-     * 【核心修改】載入專案列表
-     * 將原本呼叫 safeFirestoreQuery 的方式，改為直接呼叫 db.collection，以繞過 config 檔內的潛在問題。
-     */
     async function loadProjects() {
         showLoading(true, '載入專案中...');
         try {
-            // 直接使用 Firestore 標準語法查詢
-            const projectQuery = db.collection("projects")
-                .where("createdBy", "==", currentUser.email)
-                .orderBy("name", "asc");
-            
+            const projectQuery = db.collection("projects").where("createdBy", "==", currentUser.email).orderBy("name", "asc");
             const projectDocs = await projectQuery.get();
-            
             projects = projectDocs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             populateSelect(document.getElementById('projectSelect'), projects, '請選擇專案...');
         } catch (error) {
             console.error("載入專案時發生錯誤:", error);
-            // 如果是索引問題，提供更明確的提示
             if (error.code === 'failed-precondition') {
                 showAlert('載入專案失敗：缺少資料庫索引。請至 Firebase -> Firestore Database -> 索引 頁面，依照錯誤訊息中的連結建立索引。', 'error', 15000);
             } else {
@@ -52,9 +42,80 @@ function initProgressManagementPage() {
         }
     }
 
-    async function onProjectChange(projectId) { resetSelects('tender'); if (!projectId) return; const tenderSelect = document.getElementById('tenderSelect'); tenderSelect.disabled = true; tenderSelect.innerHTML = `<option value="">載入中...</option>`; try { const tenderDocs = await safeFirestoreQuery("tenders", [{ field: "projectId", operator: "==", value: projectId }], { field: "name", direction: "asc" }); tenders = tenderDocs.docs.map(doc => ({ id: doc.id, ...doc.data() })); populateSelect(tenderSelect, tenders, '請選擇標單...'); } catch (error) { showAlert('載入標單失敗', 'error'); } }
-    async function onTenderChange(tenderId) { resetSelects('majorItem'); if(!tenderId) return; selectedTender = tenders.find(t => t.id === tenderId); const majorItemSelect = document.getElementById('majorItemSelect'); majorItemSelect.disabled = true; majorItemSelect.innerHTML = `<option value="">載入中...</option>`; try { const [majorItemDocs, floorSettingsDoc, workItemSettingsDoc] = await Promise.all([ safeFirestoreQuery("majorItems", [{ field: "tenderId", operator: "==", value: tenderId }], { field: "name", direction: "asc" }), db.collection("floorSettings").where("tenderId", "==", tenderId).limit(1).get(), db.collection("workItemSettings").where("tenderId", "==", tenderId).limit(1).get() ]); majorItems = majorItemDocs.docs.map(doc => ({ id: doc.id, ...doc.data() })); populateSelect(majorItemSelect, majorItems, '請選擇大項目...'); floors = floorSettingsDoc.empty ? [] : (floorSettingsDoc.docs[0].data().floors || []); if (!workItemSettingsDoc.empty) { workItems = workItemSettingsDoc.docs[0].data().workItems || workItems; } else { workItems = ['配管', '配線', '設備安裝', '測試']; } document.getElementById('newWorkItemInput').value = workItems.join(','); } catch (error) { showAlert('載入標單資料失敗', 'error'); } }
-    async function onMajorItemChange(majorItemId) { resetSelects('floor'); if(!majorItemId) return; selectedMajorItem = majorItems.find(m => m.id === majorItemId); const allItemsSnapshot = (await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }])); allDetailItems = allItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.excludeFromProgress); populateSelect(document.getElementById('floorSelect'), floors.map(f => ({id:f, name:f})), '請選擇樓層...'); }
+    /**
+     * 【核心修改】載入標單列表
+     */
+    async function onProjectChange(projectId) {
+        resetSelects('tender');
+        if (!projectId) return;
+        const tenderSelect = document.getElementById('tenderSelect');
+        tenderSelect.disabled = true;
+        tenderSelect.innerHTML = `<option value="">載入中...</option>`;
+        try {
+            const tendersQuery = db.collection("tenders").where("projectId", "==", projectId).orderBy("name", "asc");
+            const tenderDocs = await tendersQuery.get();
+            tenders = tenderDocs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            populateSelect(tenderSelect, tenders, '請選擇標單...');
+        } catch (error) {
+            console.error("載入標單時發生錯誤:", error);
+            if (error.code === 'failed-precondition') {
+                showAlert('載入標單失敗：缺少資料庫索引。請至 Firebase 控制台建立。', 'error', 15000);
+            } else {
+                showAlert('載入標單失敗，錯誤訊息請見開發者主控台 (F12)', 'error');
+            }
+        }
+    }
+
+    /**
+     * 【核心修改】載入大項列表
+     */
+    async function onTenderChange(tenderId) {
+        resetSelects('majorItem');
+        if(!tenderId) return;
+        selectedTender = tenders.find(t => t.id === tenderId);
+        
+        const majorItemSelect = document.getElementById('majorItemSelect');
+        majorItemSelect.disabled = true;
+        majorItemSelect.innerHTML = `<option value="">載入中...</option>`;
+        
+        try {
+            const majorItemsQuery = db.collection("majorItems").where("tenderId", "==", tenderId).orderBy("name", "asc");
+            const [majorItemDocs, floorSettingsDoc, workItemSettingsDoc] = await Promise.all([
+                 majorItemsQuery.get(),
+                 db.collection("floorSettings").where("tenderId", "==", tenderId).limit(1).get(),
+                 db.collection("workItemSettings").where("tenderId", "==", tenderId).limit(1).get()
+            ]);
+            
+            majorItems = majorItemDocs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            populateSelect(majorItemSelect, majorItems, '請選擇大項目...');
+            
+            floors = floorSettingsDoc.empty ? [] : (floorSettingsDoc.docs[0].data().floors || []);
+            if (!workItemSettingsDoc.empty) {
+                workItems = workItemSettingsDoc.docs[0].data().workItems || workItems;
+            } else {
+                workItems = ['配管', '配線', '設備安裝', '測試']; 
+            }
+            document.getElementById('newWorkItemInput').value = workItems.join(',');
+        } catch (error) {
+            console.error("載入大項時發生錯誤:", error);
+            if (error.code === 'failed-precondition') {
+                showAlert('載入大項失敗：缺少資料庫索引。請至 Firebase 控制台建立。', 'error', 15000);
+            } else {
+                showAlert('載入大項失敗，錯誤訊息請見開發者主控台 (F12)', 'error');
+            }
+        }
+    }
+    
+    async function onMajorItemChange(majorItemId) { 
+        resetSelects('floor'); 
+        if(!majorItemId) return; 
+        selectedMajorItem = majorItems.find(m => m.id === majorItemId); 
+        // 這個查詢沒有排序，使用 safeFirestoreQuery 是安全的
+        const allItemsSnapshot = (await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }])); 
+        allDetailItems = allItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => !item.excludeFromProgress); 
+        populateSelect(document.getElementById('floorSelect'), floors.map(f => ({id:f, name:f})), '請選擇樓層...'); 
+    }
+
     async function onFloorChange(floorName) { resetSelects('space'); if(!floorName) return; selectedFloor = floorName; currentViewMode = 'floor'; loadProgressData(); }
     async function onSpaceChange(spaceName) { selectedSpace = spaceName; if(spaceName) { currentViewMode = 'space'; document.getElementById('spaceFilterContainer').style.display = 'none'; } else { currentViewMode = 'floor'; } loadProgressData(); }
     
@@ -102,8 +163,6 @@ function initProgressManagementPage() {
     }
 
     // --- UI 建構 ---
-    function buildSpaceFilter() { /* ...維持不變... */ }
-    function filterTableBySpace() { /* ...維持不變... */ }
     function buildProgressTable(floorDists, spaceDists, progressItems, detailItems) {
         const tableHeader = document.getElementById('tableHeader');
         const tableBody = document.getElementById('tableBody');
@@ -170,13 +229,8 @@ function initProgressManagementPage() {
         tableBody.querySelectorAll('.btn-upload-photo').forEach(el => el.addEventListener('click', () => handlePhotoUploadClick(el)));
         tableBody.querySelectorAll('.photo-indicator.active').forEach(el => el.addEventListener('click', () => openPhotoViewer(el)));
     }
-
-    // --- 核心功能邏輯 ---
-    async function onStatusChange(selectElement) { /* ...維持不變... */ }
-    function handlePhotoUploadClick(button) { /* ...維持不變... */ }
-    async function uploadPhotos(files) { /* ...維持不變... */ }
-    function addWatermarkToImage(imageFile, textLines) { /* ...維持不變... */ }
     
+    // --- 核心功能邏輯 ---
     function openPhotoViewer(indicator) {
         const tr = indicator.closest('tr');
         const uniqueId = tr.dataset.uniqueId;
