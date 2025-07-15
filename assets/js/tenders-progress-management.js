@@ -1,5 +1,5 @@
 /**
- * 施工進度管理 (progress-management.js) (SPA 版本 v2.4 - 遵守進度追蹤開關)
+ * 施工進度管理 (progress-management.js) (SPA 版本 v2.6 - 整合浮水印照片上傳)
  */
 function initProgressManagementPage() {
 
@@ -9,8 +9,13 @@ function initProgressManagementPage() {
     let workItems = ['配管', '配線', '設備安裝', '測試']; 
     let currentViewMode = 'floor';
     let allDetailItems = [];
+    let allProgressPhotos = [];
+    let currentUploadTarget = null; 
 
-    // --- 初始化與資料載入 ---
+    // --- Firebase Storage 參考 ---
+    const storage = firebase.storage();
+
+    // --- 初始化與資料載入 (此部分函數維持不變) ---
     async function initializePage() {
         if (!currentUser) return showAlert("無法獲取用戶資訊", "error");
         setupEventListeners();
@@ -66,20 +71,16 @@ function initProgressManagementPage() {
         } catch (error) { showAlert('載入標單資料失敗', 'error'); }
     }
 
-    // --- 【第 259 行：開始，這是本次修改的核心函數】 ---
     async function onMajorItemChange(majorItemId) {
         resetSelects('floor');
         if(!majorItemId) return;
         selectedMajorItem = majorItems.find(m => m.id === majorItemId);
         
-        // 預先載入「需要被追蹤」的細項
         const allItems = (await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }])).docs;
-        // 在這裡就進行過濾！
         allDetailItems = allItems.filter(item => !item.excludeFromProgress);
 
         populateSelect(document.getElementById('floorSelect'), floors.map(f => ({id:f, name:f})), '請選擇樓層...');
     }
-    // --- 【第 270 行：結束，以上是本次修改的核心函數】 ---
 
     async function onFloorChange(floorName) {
         resetSelects('space');
@@ -120,15 +121,16 @@ function initProgressManagementPage() {
                 { field: "areaName", operator: "==", value: selectedFloor }
             ];
             
-            // 這裡不再需要載入 detailItems，因為 onMajorItemChange 已經載入並過濾完畢
-            const [floorDistDocs, spaceDistDocs, progressItemDocs, spaceSettingsDoc] = await Promise.all([
+            const [floorDistDocs, spaceDistDocs, progressItemDocs, spaceSettingsDoc, progressPhotosDocs] = await Promise.all([
                 safeFirestoreQuery("distributionTable", floorDistQuery),
                 safeFirestoreQuery("spaceDistribution", baseQuery),
                 safeFirestoreQuery("progressItems", baseQuery),
-                db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get()
+                db.collection("spaceSettings").where("tenderId", "==", selectedTender.id).where("floorName", "==", selectedFloor).limit(1).get(),
+                safeFirestoreQuery("inspectionPhotos", baseQuery) 
             ]);
             
-            // 過濾掉不需追蹤的項目的分配資料
+            allProgressPhotos = progressPhotosDocs.docs; 
+            
             const trackedItemIds = allDetailItems.map(item => item.id);
             const trackedFloorDists = floorDistDocs.docs.filter(doc => trackedItemIds.includes(doc.detailItemId));
             const trackedSpaceDists = spaceDistDocs.docs.filter(doc => trackedItemIds.includes(doc.detailItemId));
@@ -153,7 +155,6 @@ function initProgressManagementPage() {
         }
     }
 
-    // ... (檔案剩餘的其他函數，維持不變) ...
     function buildSpaceFilter() {
         const container = document.getElementById('spaceFilterCheckboxes');
         const filterContainer = document.getElementById('spaceFilterContainer');
@@ -195,6 +196,7 @@ function initProgressManagementPage() {
             headerHTML += '<th>所在空間</th>';
         }
         workItems.forEach(w => headerHTML += `<th>${w}</th>`);
+        headerHTML += '<th>查驗照片</th>';
         headerHTML += '</tr>';
         tableHeader.innerHTML = headerHTML;
         
@@ -230,6 +232,9 @@ function initProgressManagementPage() {
 
                 if (currentViewMode === 'space' && selectedSpace && spaceName !== selectedSpace) continue;
 
+                const hasPhotos = allProgressPhotos.some(p => p.uniqueId === uniqueId);
+                const photoIndicatorClass = hasPhotos ? 'active' : '';
+
                 bodyHTML += `<tr data-unique-id="${uniqueId}" data-detail-item-id="${floorDist.detailItemId}" data-space-name="${spaceName}">`;
                 bodyHTML += `<td>${detailItem.name} #${i}</td>`;
                 if (currentViewMode === 'floor') {
@@ -246,6 +251,14 @@ function initProgressManagementPage() {
                         </select>
                     </td>`;
                 });
+
+                bodyHTML += `
+                    <td class="photo-cell">
+                        <button class="btn btn-sm btn-upload-photo" data-action="upload-photo">上傳</button>
+                        <span class="photo-indicator ${photoIndicatorClass}" title="${hasPhotos ? '已有照片' : '無照片'}">📷</span>
+                    </td>
+                `;
+
                 bodyHTML += '</tr>';
             }
         });
@@ -253,6 +266,9 @@ function initProgressManagementPage() {
 
         tableBody.querySelectorAll('.progress-status-select').forEach(select => {
             select.addEventListener('change', (e) => onStatusChange(e.target));
+        });
+        tableBody.querySelectorAll('.btn-upload-photo').forEach(button => {
+            button.addEventListener('click', (e) => handlePhotoUploadClick(e.target));
         });
     }
 
@@ -273,6 +289,7 @@ function initProgressManagementPage() {
                     tenderId: selectedTender.id, majorItemId: selectedMajorItem.id, detailItemId: detailItemId,
                     floorName: selectedFloor, spaceName: spaceName, uniqueId: uniqueId,
                     workStatuses: { [workItem]: newStatus },
+                    createdBy: currentUser.email,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
@@ -286,7 +303,168 @@ function initProgressManagementPage() {
             showAlert('儲存狀態失敗: ' + error.message, 'error');
         }
     }
-    
+
+    // --- 照片上傳與浮水印核心邏輯 ---
+    function handlePhotoUploadClick(button) {
+        const tr = button.closest('tr');
+        const itemName = tr.cells[0].textContent;
+
+        currentUploadTarget = {
+            uniqueId: tr.dataset.uniqueId,
+            detailItemId: tr.dataset.detailItemId,
+            spaceName: tr.dataset.spaceName,
+            fullItemName: itemName 
+        };
+        document.getElementById('photoUploadInput').click();
+    }
+
+    async function uploadPhotos(files) {
+        if (!files || files.length === 0 || !currentUploadTarget) return;
+
+        showLoading(true, `準備上傳 ${files.length} 張照片中...`);
+
+        const tenderName = selectedTender?.name || '未知標單';
+        const projectDoc = projects.find(p => p.id === selectedTender?.projectId);
+        const projectName = projectDoc ? projectDoc.name : '未知專案';
+
+        for (const file of Array.from(files)) {
+            if (!file.type.startsWith('image/')) continue;
+
+            showLoading(true, `正在為 ${file.name} 加上浮水印...`);
+            try {
+                const watermarkText = [
+                    `專案: ${projectName}`,
+                    `標單: ${tenderName}`,
+                    `位置: ${selectedFloor}`,
+                    `工項: ${currentUploadTarget.fullItemName}`,
+                    `時間: ${new Date().toLocaleString('sv-SE')}`
+                ];
+
+                const watermarkedBlob = await addWatermarkToImage(file, watermarkText);
+
+                const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+                const storagePath = `inspections/${selectedTender.id}/${fileName}`;
+                const storageRef = storage.ref(storagePath);
+                
+                showLoading(true, `正在上傳 ${file.name}...`);
+                const snapshot = await storageRef.put(watermarkedBlob);
+                const photoUrl = await snapshot.ref.getDownloadURL();
+
+                const photoData = {
+                    tenderId: selectedTender.id,
+                    majorItemId: selectedMajorItem.id,
+                    detailItemId: currentUploadTarget.detailItemId,
+                    floorName: selectedFloor,
+                    spaceName: currentUploadTarget.spaceName,
+                    uniqueId: currentUploadTarget.uniqueId,
+                    photoUrl: photoUrl,
+                    fileName: fileName,
+                    uploaderId: currentUser.uid,
+                    uploaderEmail: currentUser.email,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                const newDoc = await db.collection('inspectionPhotos').add(photoData);
+                allProgressPhotos.push({id: newDoc.id, ...photoData});
+
+                const tr = document.querySelector(`tr[data-unique-id="${currentUploadTarget.uniqueId}"]`);
+                if (tr) {
+                    const indicator = tr.querySelector('.photo-indicator');
+                    indicator.classList.add('active');
+                    indicator.title = '已有照片';
+                }
+
+            } catch (error) {
+                console.error('上傳單張照片失敗:', error);
+                showAlert(`照片 ${file.name} 上傳失敗: ${error.message}`, 'error');
+                break; 
+            }
+        }
+        
+        showAlert(`照片上傳處理完成！`, 'success');
+        showLoading(false);
+        // 清空選擇，避免重複上傳
+        document.getElementById('photoUploadInput').value = '';
+    }
+
+    function addWatermarkToImage(imageFile, textLines) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+
+                    const fontSize = Math.max(18, Math.min(img.width, img.height) / 40);
+                    ctx.font = `bold ${fontSize}px "Arial", "Microsoft JhengHei", sans-serif`;
+                    ctx.textBaseline = 'bottom';
+                    const padding = fontSize * 0.5;
+                    
+                    const textMetrics = textLines.map(line => ctx.measureText(line));
+                    const maxWidth = Math.max(...textMetrics.map(m => m.width));
+                    const boxWidth = maxWidth + padding * 2;
+                    const lineHeight = fontSize * 1.2;
+                    const boxHeight = (lineHeight * textLines.length) + (padding * 2);
+
+                    const x = canvas.width - boxWidth - padding;
+                    const y = canvas.height - boxHeight - padding;
+
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(x, y, boxWidth, boxHeight);
+
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                    textLines.forEach((line, index) => {
+                        const textY = y + padding + (lineHeight * (index + 1));
+                        ctx.fillText(line, x + padding, textY);
+                    });
+
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            resolve(blob);
+                        } else {
+                            reject(new Error('Canvas to Blob conversion failed'));
+                        }
+                    }, 'image/jpeg', 0.9);
+                };
+                img.onerror = (err) => reject(err);
+                img.src = event.target.result;
+            };
+            reader.onerror = (err) => reject(err);
+            reader.readAsDataURL(imageFile);
+        });
+    }
+
+    // --- 其他輔助函數與事件監聽 ---
+    function setupEventListeners() {
+        document.getElementById('projectSelect')?.addEventListener('change', (e) => onProjectChange(e.target.value));
+        document.getElementById('tenderSelect')?.addEventListener('change', (e) => onTenderChange(e.target.value));
+        document.getElementById('majorItemSelect')?.addEventListener('change', (e) => onMajorItemChange(e.target.value));
+        document.getElementById('floorSelect')?.addEventListener('change', (e) => onFloorChange(e.target.value));
+        document.getElementById('spaceSelect')?.addEventListener('change', (e) => onSpaceChange(e.target.value));
+        
+        document.getElementById('importBtn')?.addEventListener('click', () => {
+            if (!selectedFloor) return showAlert('請先選擇一個樓層後才能匯入', 'warning');
+            document.getElementById('importInput').click()
+        });
+        document.getElementById('importInput')?.addEventListener('change', handleFileImport);
+        document.getElementById('exportBtn')?.addEventListener('click', exportToExcel);
+
+        document.getElementById('workItemsManagerBtn')?.addEventListener('click', () => {
+            if(!selectedTender) return showAlert('請先選擇一個標單', 'warning');
+            document.getElementById('workItemsModal').style.display = 'flex';
+        });
+        document.getElementById('saveWorkItemsBtn')?.addEventListener('click', saveWorkItems);
+        document.getElementById('cancelWorkItemsModalBtn')?.addEventListener('click', () => closeModal('workItemsModal'));
+
+        document.getElementById('photoUploadInput')?.addEventListener('change', (e) => {
+            uploadPhotos(e.target.files);
+        });
+    }
+
     function exportToExcel() {
         if (!selectedFloor) return showAlert('沒有資料可匯出', 'error');
 
