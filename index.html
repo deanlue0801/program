@@ -11,7 +11,6 @@
     <link rel="stylesheet" href="/program/assets/css/distribution.css">
     <link rel="stylesheet" href="/program/assets/css/import.css">
     <link rel="stylesheet" href="/program/assets/css/edit.css">
-    <link rel="stylesheet" href="/program/assets/css/layout.css">
     <link rel="stylesheet" href="/program/assets/css/components/buttons.css">
     <link rel="stylesheet" href="/program/assets/css/components/tables.css">
     <link rel="stylesheet" href="/program/assets/css/tenders-edit.css">
@@ -33,9 +32,11 @@
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header"><h3>🏗️ 專案管理</h3></div>
             <ul class="nav-list">
+                <!-- 【修正】重新組織導航列 -->
                 <li><a href="/program/dashboard" data-route>📊 儀表板</a></li>
+                <li><a href="/program/projects/list" data-route>📁 專案管理</a></li>
                 <li>
-                    <a href="/program/tenders/list" data-route>📋 專案管理</a>
+                    <a href="/program/tenders/list" data-route>📋 標單管理</a>
                     <ul class="sub-nav">
                         <li><a href="/program/tenders/distribution" data-route>🏢 分配管理</a></li>
                         <li><a href="/program/tenders/space-distribution" data-route>🚪 空間分配管理</a></li>
@@ -72,6 +73,8 @@
     <script src="/program/assets/js/tenders-import.js"></script>
     <script src="/program/assets/js/tenders-edit.js"></script>
     <script src="/program/assets/js/projects-edit.js"></script>
+    <!-- 【新增】載入新的專案列表 JS 檔案 -->
+    <script src="/program/assets/js/projects-list.js"></script>
     <script src="/program/assets/js/tenders-tracking-setup.js"></script>
 </body>
 </html>
