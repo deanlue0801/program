@@ -1,9 +1,10 @@
 <div class="content-card">
     <div class="page-header">
-        <h1 class="page-title">📋 專案管理</h1>
+        <h1 class="page-title">📋 專案與標單管理</h1>
         <div>
+            <!-- 這兩個按鈕使用 data-route，由 router.js 處理，是正確的 -->
             <a href="/program/tenders/import" data-route class="btn btn-success">📊 EXCEL匯入</a>
-            <a href="/program/tenders/create" data-route class="btn btn-primary">➕ 建立標單</a>
+            <a href="/program/projects/create" data-route class="btn btn-primary">🚀 新增專案</a>
         </div>
     </div>
 
@@ -17,13 +18,15 @@
             <div class="filter-row">
                 <div class="form-group">
                     <label for="projectFilter">專案篩選</label>
-                    <select id="projectFilter" class="form-control" onchange="window.exposedListFuncs.applyFilters()">
+                    <!-- 【修正】移除 onchange 屬性 -->
+                    <select id="projectFilter" class="form-control">
                         <option value="">所有專案</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="statusFilter">狀態篩選</label>
-                    <select id="statusFilter" class="form-control" onchange="window.exposedListFuncs.applyFilters()">
+                    <!-- 【修正】移除 onchange 屬性 -->
+                    <select id="statusFilter" class="form-control">
                         <option value="">所有狀態</option>
                         <option value="planning">規劃中</option>
                         <option value="active">進行中</option>
@@ -32,11 +35,13 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="searchInput">搜尋標單</label>
-                    <input type="text" id="searchInput" class="form-control" placeholder="輸入標單名稱或編號" oninput="window.exposedListFuncs.applyFilters()">
+                    <label for="searchInput">關鍵字搜尋</label>
+                    <!-- 【修正】移除 oninput 屬性 -->
+                    <input type="text" id="searchInput" class="form-control" placeholder="輸入標單名稱或編號">
                 </div>
                 <div class="form-group">
-                    <button class="btn btn-secondary" onclick="window.exposedListFuncs.clearFilters()">清除篩選</button>
+                    <!-- 【修正】移除 onclick，改用 data-action -->
+                    <button class="btn btn-secondary" data-action="clear-filters">清除篩選</button>
                 </div>
             </div>
         </div>
