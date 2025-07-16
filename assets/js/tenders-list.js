@@ -1,5 +1,5 @@
 /**
- * 標單列表頁面 (tenders/list.js) (SPA 版本) - v3.0 SPA 標準化
+ * 標單列表頁面 (tenders/list.js) (SPA 版本) - v3.0 (權限守衛)
  * 由 router.js 呼叫 initTendersListPage() 函數來啟動
  */
 function initTendersListPage() {
@@ -8,15 +8,6 @@ function initTendersListPage() {
     let allTenders = [];
     let allProjects = [];
     let filteredAndGroupedData = [];
-
-    // --- Firebase 資料庫相關函式 ---
-    // (此處假設您在 firebase-config.js 或其他地方定義了 loadTenders, loadProjects, deleteTenderAndRelatedData 等函式)
-    // 如果沒有，您需要確保這些函式可用
-    // 範例:
-    // async function loadProjects() { ... }
-    // async function loadTenders() { ... }
-    // async function deleteTenderAndRelatedData(tenderId) { ... }
-
 
     // --- 資料載入 ---
     async function loadAllData() {
@@ -91,7 +82,17 @@ function initTendersListPage() {
         emptyState.style.display = 'none';
 
         let html = '';
+        const currentUserEmail = auth.currentUser.email;
+
         filteredAndGroupedData.forEach(group => {
+            // 取得使用者在此專案的角色與權限
+            const memberInfo = group.project.members.find(m => m.email === currentUserEmail);
+            const userRole = memberInfo ? memberInfo.role : null;
+            const userPermissions = (memberInfo && memberInfo.permissions) ? memberInfo.permissions : {};
+            
+            // 【權限守衛】判斷是否有編輯專案的權限 (owner 或 admin)
+            const canEditProject = userRole === 'owner'; // 未來可加入 admin
+
             html += `
                 <tr class="project-group-header">
                     <td colspan="6">
@@ -99,12 +100,15 @@ function initTendersListPage() {
                         <span class="project-code">(${escapeHtml(group.project.code || 'N/A')})</span>
                     </td>
                     <td class="project-actions">
-                        <button class="btn btn-sm btn-edit-project" data-action="edit-project" data-project-id="${group.project.id}">編輯專案</button>
+                        ${canEditProject ? `<button class="btn btn-sm btn-edit-project" data-action="edit-project" data-project-id="${group.project.id}">編輯專案</button>` : ''}
                     </td>
                 </tr>
             `;
 
             if (group.tenders && group.tenders.length > 0) {
+                // 【權限守衛】判斷是否有編輯標單的權限
+                const canEditTenders = userRole === 'owner' || (userRole === 'editor' && userPermissions.canAccessTenders);
+
                 group.tenders.forEach(tender => {
                     html += `
                         <tr class="tender-row">
@@ -117,8 +121,10 @@ function initTendersListPage() {
                             <td>
                                 <div class="action-buttons">
                                     <button class="btn btn-sm btn-view" data-action="view-tender" data-tender-id="${tender.id}">查看</button>
+                                    ${canEditTenders ? `
                                     <button class="btn btn-sm btn-edit" data-action="edit-tender" data-tender-id="${tender.id}">編輯標單</button>
                                     <button class="btn btn-sm btn-delete" data-action="delete-tender" data-tender-id="${tender.id}" data-tender-name="${escapeHtml(tender.name)}">刪除</button>
+                                    ` : ''}
                                 </div>
                             </td>
                         </tr>
@@ -136,7 +142,6 @@ function initTendersListPage() {
         const mainContent = document.getElementById('mainContent');
         if (!mainContent) return;
 
-        // 使用事件委派來處理所有按鈕點擊事件
         mainContent.addEventListener('click', (event) => {
             const target = event.target.closest('button[data-action]');
             if (!target) return;
@@ -144,30 +149,17 @@ function initTendersListPage() {
             const { action, tenderId, tenderName, projectId } = target.dataset;
 
             switch (action) {
-                case 'view-tender':
-                    viewTender(tenderId);
-                    break;
-                case 'edit-tender':
-                    editTender(tenderId);
-                    break;
-                case 'delete-tender':
-                    deleteTender(tenderId, tenderName);
-                    break;
-                case 'edit-project':
-                    editProject(projectId);
-                    break;
-                case 'clear-filters':
-                    clearFilters();
-                    break;
+                case 'view-tender': viewTender(tenderId); break;
+                case 'edit-tender': editTender(tenderId); break;
+                case 'delete-tender': deleteTender(tenderId, tenderName); break;
+                case 'edit-project': editProject(projectId); break;
+                case 'clear-filters': clearFilters(); break;
             }
         });
 
-        // 為篩選器和搜尋框單獨綁定事件
         document.getElementById('projectFilter')?.addEventListener('change', applyFiltersAndGroup);
         document.getElementById('statusFilter')?.addEventListener('change', applyFiltersAndGroup);
         document.getElementById('searchInput')?.addEventListener('input', applyFiltersAndGroup);
-        
-        // 【修正】移除 document.querySelector('button[onclick... 這行，因為已不再需要
     }
 
     function applyFiltersAndGroup() {
@@ -189,10 +181,14 @@ function initTendersListPage() {
         filteredTenders.forEach(tender => {
             const projectId = tender.projectId || 'unassigned';
             if (!groups[projectId]) {
-                const projectInfo = allProjects.find(p => p.id === projectId) || { id: 'unassigned', name: '未歸屬專案', code: 'N/A' };
-                groups[projectId] = { project: projectInfo, tenders: [] };
+                const projectInfo = allProjects.find(p => p.id === projectId);
+                if (projectInfo) {
+                    groups[projectId] = { project: projectInfo, tenders: [] };
+                }
             }
-            groups[projectId].tenders.push(tender);
+            if (groups[projectId]) {
+                groups[projectId].tenders.push(tender);
+            }
         });
 
         filteredAndGroupedData = Object.values(groups);
