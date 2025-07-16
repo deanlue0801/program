@@ -58,7 +58,6 @@
     </div>
 
     <script>
-    // 定義一個全域的初始化函數，供 router.js 呼叫
     function initProjectCreatePage() {
         console.log("✅ Create Page: initProjectCreatePage() 已被 router 正確呼叫！");
 
@@ -70,7 +69,6 @@
             return;
         }
         
-        // 防止重複綁定事件
         if (form.dataset.initialized === 'true') {
             console.log("Create Page: 事件已綁定，跳過。");
             return;
@@ -92,16 +90,27 @@
             submitBtn.textContent = '建立中...';
 
             try {
+                // 【權限修改】建立專案時，直接存入新的權限結構
                 const projectData = {
                     name: document.getElementById('projectName').value.trim(),
                     code: document.getElementById('projectCode').value.trim(),
                     status: document.getElementById('projectStatus').value,
                     budget: parseFloat(document.getElementById('projectBudget').value) || 0,
                     description: document.getElementById('projectDescription').value.trim(),
-                    createdBy: currentUser.email,
+                    
+                    // 權限相關欄位
+                    createdBy: currentUser.email, // 保留建立者是誰的紀錄
+                    memberEmails: [currentUser.email], // 用於高效查詢的 Email 列表
+                    members: [ // 儲存詳細權限的陣列
+                        {
+                            email: currentUser.email,
+                            role: 'owner' // 建立者預設為擁有者
+                        }
+                    ],
+
+                    // 時間戳
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    memberEmails: [currentUser.email] // 預設將建立者加入成員列表
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
                 if (!projectData.name || !projectData.code) {
