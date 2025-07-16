@@ -4,62 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>新增專案 - 專案管理系統</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif; background: #f5f6fa; line-height: 1.6; }
-        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 1000; }
-        .nav-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; }
-        .nav-left { display: flex; align-items: center; gap: 30px; }
-        .logo { display: flex; align-items: center; gap: 10px; font-size: 1.3rem; font-weight: bold; text-decoration: none; color: white; }
-        .breadcrumb { display: flex; align-items: center; gap: 10px; color: rgba(255,255,255,0.8); font-size: 0.9rem; }
-        .breadcrumb a { color: rgba(255,255,255,0.8); text-decoration: none; transition: color 0.3s; }
-        .breadcrumb a:hover { color: white; }
-        .nav-right { display: flex; align-items: center; gap: 20px; }
-        .user-info { display: flex; align-items: center; gap: 10px; color: white; }
-        .back-btn { background: rgba(255,255,255,0.1); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; transition: all 0.3s ease; font-family: inherit; text-decoration: none; display: flex; align-items: center; gap: 8px; }
-        .back-btn:hover { background: rgba(255,255,255,0.2); }
-        .main-container { max-width: 800px; margin: 0 auto; padding: 30px 20px; }
-        .page-header { text-align: center; margin-bottom: 40px; }
-        .page-title { font-size: 2.2rem; color: #333; margin-bottom: 10px; }
-        .page-subtitle { color: #666; font-size: 1.1rem; }
-        .form-container { background: white; border-radius: 15px; padding: 40px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); position: relative; overflow: hidden; }
-        .form-container::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #667eea, #764ba2); }
-        .form-section { margin-bottom: 35px; }
-        .section-title { font-size: 1.3rem; color: #333; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 2px solid #f0f0f0; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 20px; }
-        .form-group { margin-bottom: 25px; }
-        .form-label { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-weight: 600; color: #333; font-size: 0.95rem; }
-        .required { color: #e74c3c; font-weight: bold; }
-        .form-input { width: 100%; padding: 15px 18px; border: 2px solid #e1e5e9; border-radius: 10px; font-size: 16px; transition: all 0.3s ease; background: #fafbfc; font-family: inherit; }
-        .form-input:focus { outline: none; border-color: #667eea; background: white; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2); }
-        .form-textarea { height: 120px; resize: vertical; font-family: inherit; }
-        .currency-input { position: relative; }
-        .currency-symbol { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); color: #666; font-weight: bold; z-index: 1; }
-        .currency-input .form-input { padding-left: 45px; }
-        .form-hint { font-size: 0.85rem; color: #666; margin-top: 5px; display: flex; align-items: center; gap: 5px; }
-        .form-error { font-size: 0.85rem; color: #e74c3c; margin-top: 5px; display: none; }
-        .form-actions { display: flex; gap: 15px; justify-content: center; margin-top: 40px; padding-top: 30px; border-top: 2px solid #f0f0f0; }
-        .btn { padding: 15px 30px; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; min-width: 140px; justify-content: center; }
-        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3); }
-        .btn-secondary { background: #f8f9fa; color: #666; border: 2px solid #e1e5e9; }
-        .btn-secondary:hover { background: #e9ecef; border-color: #adb5bd; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
-        .loading-spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 1s ease-in-out infinite; display: none; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .success-message, .error-message { padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; display: none; align-items: center; gap: 10px; }
-        .success-message { background: #d4edda; color: #155724; border-left: 4px solid #28a745; }
-        .error-message { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
-        @media (max-width: 768px) {
-            .nav-container { padding: 10px 15px; }
-            .main-container { padding: 20px 15px; }
-            .form-container { padding: 25px 20px; }
-            .form-grid { grid-template-columns: 1fr; gap: 20px; }
-            .page-title { font-size: 1.8rem; }
-            .form-actions { flex-direction: column; }
-            .btn { width: 100%; }
-        }
-    </style>
+    <link rel="stylesheet" href="../../assets/css/layout.css">
+    <link rel="stylesheet" href="../../assets/css/components/forms.css">
+    <link rel="stylesheet" href="../../assets/css/components/buttons.css">
+    <link rel="stylesheet" href="../../assets/css/components/alerts.css">
+    <link rel="stylesheet" href="../../assets/css/components/loading.css">
 </head>
 <body>
     <nav class="navbar">
@@ -97,11 +46,11 @@
         </div>
 
         <div class="form-container">
-            <div id="successMessage" class="success-message">
+            <div id="successMessage" class="success-message" style="display: none;">
                 <span>✅</span>
                 <span id="successText"></span>
             </div>
-            <div id="errorMessage" class="error-message">
+            <div id="errorMessage" class="error-message" style="display: none;">
                 <span>❌</span>
                 <span id="errorText"></span>
             </div>
@@ -111,42 +60,12 @@
                     <h3 class="section-title"><span>📋</span>基本資訊</h3>
                     <div class="form-grid">
                         <div class="form-group">
-                            <label class="form-label"><span>🏷️</span>專案名稱<span class="required">*</span></label>
-                            <input type="text" id="projectName" class="form-input" placeholder="例：台北市信義區商業大樓" required>
-                            <div class="form-error" id="projectNameError"></div>
+                            <label class="form-label">專案名稱<span class="required">*</span></label>
+                            <input type="text" id="projectName" class="form-input" required>
                         </div>
                         <div class="form-group">
-                            <label class="form-label"><span>🔢</span>專案編號<span class="required">*</span></label>
-                            <input type="text" id="projectCode" class="form-input" placeholder="例：PROJ-2024-001" required>
-                             <div class="form-error" id="projectCodeError"></div>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label"><span>📝</span>專案描述</label>
-                        <textarea id="projectDescription" class="form-input form-textarea" placeholder="請描述專案的詳細內容..."></textarea>
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h3 class="section-title"><span>💰</span>專案規模</h3>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label class="form-label"><span>💵</span>專案預算<span class="required">*</span></label>
-                            <div class="currency-input">
-                                <span class="currency-symbol">NT$</span>
-                                <input type="number" id="projectBudget" class="form-input" placeholder="0" required min="0">
-                            </div>
-                             <div class="form-error" id="projectBudgetError"></div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label"><span>📊</span>專案狀態</label>
-                            <select id="projectStatus" class="form-input form-select">
-                                <option value="planning">規劃中</option>
-                                <option value="ready">準備開始</option>
-                                <option value="active">進行中</option>
-                                <option value="paused">暫停</option>
-                                <option value="completed">已完成</option>
-                            </select>
+                            <label class="form-label">專案編號<span class="required">*</span></label>
+                            <input type="text" id="projectCode" class="form-input" required>
                         </div>
                     </div>
                 </div>
@@ -165,28 +84,19 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <script src="../../assets/js/firebase-config.js"></script>
 
     <script>
         // 全域變數
-        let app, auth, db, currentUser;
+        let currentUser;
         let isEditMode = false;
         let editProjectId = null;
 
-        // 頁面載入完成後，執行所有初始化
+        // 頁面載入完成後執行
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOM 已載入，開始初始化 Firebase...');
-            try {
-                app = firebase.initializeApp({
-                    apiKey: "AIzaSyDV26PsFl_nH9SkfQAYgbCPjbanDluFrvo",
-                    authDomain: "project-management-syste-4c9ce.firebaseapp.com",
-                    projectId: "project-management-syste-4c9ce",
-                    storageBucket: "project-management-syste-4c9ce.firebasestorage.app",
-                    messagingSenderId: "153223609209",
-                    appId: "1:153223609209:web:f4504f7ac52fc76b910da8"
-                });
-                auth = firebase.auth();
-                db = firebase.firestore();
-
+            // initApp 現在由 firebase-config.js 呼叫，我們只需監聽認證狀態
+            if (typeof auth !== 'undefined') {
                 auth.onAuthStateChanged(user => {
                     if (user) {
                         currentUser = user;
@@ -197,9 +107,9 @@
                         window.location.href = '../../login_page.html';
                     }
                 });
-            } catch (error) {
-                console.error('Firebase 初始化失敗:', error);
-                showError('系統初始化失敗，請重新整理頁面');
+            } else {
+                console.error('Firebase Auth 物件未定義，請檢查 firebase-config.js 的載入順序。');
+                showError('系統設定檔載入失敗。');
             }
         });
 
@@ -220,8 +130,6 @@
             if (editProjectId) {
                 isEditMode = true;
                 document.getElementById('pageTitle').textContent = '✏️ 編輯專案';
-                document.getElementById('pageSubtitle').textContent = '修改專案資訊';
-                document.getElementById('pageMode').textContent = '編輯專案';
                 document.getElementById('submitText').innerHTML = '<span>💾</span><span>更新專案</span>';
                 loadProjectForEdit(editProjectId);
             } else {
@@ -238,20 +146,15 @@
                     setTimeout(() => window.location.href = 'list.html', 2000);
                     return;
                 }
-                const project = doc.data();
-                fillFormWithProject(project);
+                fillFormWithProject(doc.data());
             } catch (error) {
-                console.error('載入專案資料失敗:', error);
                 showError('載入專案資料失敗: ' + error.message);
             }
         }
 
         function fillFormWithProject(project) {
             document.getElementById('projectName').value = project.projectName || ''; 
-            document.getElementById('projectCode').value = project.projectCode || ''; 
-            document.getElementById('projectDescription').value = project.description || '';
-            document.getElementById('projectBudget').value = project.budget || '';
-            document.getElementById('projectStatus').value = project.status || 'planning';
+            document.getElementById('projectCode').value = project.projectCode || '';
         }
 
         function generateProjectCode() {
@@ -259,98 +162,59 @@
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const day = String(now.getDate()).padStart(2, '0');
-            const time = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
-            document.getElementById('projectCode').value = `PROJ-${year}${month}${day}-${time}`;
+            document.getElementById('projectCode').value = `PROJ-${year}${month}${day}`;
         }
 
         function bindEvents() {
             document.getElementById('projectForm').addEventListener('submit', handleSubmit);
-            // 您可以在這裡重新綁定其他的即時驗證事件
-            // document.getElementById('projectName').addEventListener('blur', validateProjectName);
         }
 
         async function handleSubmit(e) {
             e.preventDefault();
-            
-            // 可以在這裡加入完整的表單驗證
-            // if (!validateForm()) { return; }
-
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
-            document.getElementById('loadingSpinner').style.display = 'block';
-            document.getElementById('submitText').innerHTML = isEditMode ? '<span>⏳</span><span>更新中...</span>' : '<span>⏳</span><span>建立中...</span>';
 
             try {
-                const projectData = collectFormData();
+                const projectData = {
+                    projectName: document.getElementById('projectName').value.trim(),
+                    projectCode: document.getElementById('projectCode').value.trim(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
                 if (isEditMode) {
-                    await updateProject(editProjectId, projectData);
+                    await db.collection('projects').doc(editProjectId).update(projectData);
+                    showSuccess('專案更新成功！');
                 } else {
-                    await saveProject(projectData);
+                    const codeQuery = await db.collection('projects').where('projectCode', '==', projectData.projectCode).get();
+                    if (!codeQuery.empty) throw new Error('專案編號已存在');
+                    
+                    projectData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    projectData.members = [{ email: currentUser.email, role: 'owner' }];
+                    projectData.memberEmails = [currentUser.email];
+                    await db.collection('projects').add(projectData);
+                    showSuccess('專案建立成功！');
                 }
+                setTimeout(() => window.location.href = 'list.html', 1500);
             } catch (error) {
-                console.error('操作失敗:', error);
                 showError('操作失敗: ' + error.message);
-                resetSubmitButton();
+                submitBtn.disabled = false;
             }
-        }
-
-        function collectFormData() {
-            const baseData = {
-                projectName: document.getElementById('projectName').value.trim(),
-                projectCode: document.getElementById('projectCode').value.trim(),
-                description: document.getElementById('projectDescription').value.trim(),
-                budget: parseFloat(document.getElementById('projectBudget').value) || 0,
-                status: document.getElementById('projectStatus').value,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
-            if (!isEditMode) {
-                baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                baseData.members = [{ email: currentUser.email, role: 'owner' }];
-                baseData.memberEmails = [currentUser.email];
-            }
-            return baseData;
-        }
-
-        async function saveProject(projectData) {
-            const codeQuery = await db.collection('projects').where('projectCode', '==', projectData.projectCode).get();
-            if (!codeQuery.empty) throw new Error('專案編號已存在，請使用其他編號');
-            
-            await db.collection('projects').add(projectData);
-            showSuccess('專案建立成功！');
-            setTimeout(() => window.location.href = 'list.html', 2000);
-        }
-
-        async function updateProject(projectId, projectData) {
-            await db.collection('projects').doc(projectId).update(projectData);
-            showSuccess('專案更新成功！');
-            setTimeout(() => window.location.href = 'list.html', 2000);
         }
 
         function goToDashboard() {
             window.location.href = '../dashboard.html';
         }
 
-        function resetSubmitButton() {
-            const submitBtn = document.getElementById('submitBtn');
-            submitBtn.disabled = false;
-            document.getElementById('loadingSpinner').style.display = 'none';
-            document.getElementById('submitText').innerHTML = isEditMode ? '<span>💾</span><span>更新專案</span>' : '<span>💾</span><span>建立專案</span>';
-        }
-
         function showSuccess(message) {
-            const successMsg = document.getElementById('successMessage');
-            document.getElementById('errorMessage').style.display = 'none';
             document.getElementById('successText').textContent = message;
-            successMsg.style.display = 'flex';
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            document.getElementById('successMessage').style.display = 'flex';
+            document.getElementById('errorMessage').style.display = 'none';
         }
 
         function showError(message) {
-            const errorMsg = document.getElementById('errorMessage');
-            document.getElementById('successMessage').style.display = 'none';
             document.getElementById('errorText').textContent = message;
-            errorMsg.style.display = 'flex';
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            document.getElementById('errorMessage').style.display = 'flex';
+            document.getElementById('successMessage').style.display = 'none';
         }
     </script>
 </body>
