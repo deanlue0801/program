@@ -1,6 +1,6 @@
 /**
- * 簡易前端路由器 (SPA Router) - v14.0 (腳本執行修正版)
- * 實現了動態樣式載入、路徑修正與自動清理，並能正確執行子頁面的腳本。
+ * 簡易前端路由器 (SPA Router) - v15.0 (最終穩定版)
+ * 修正了腳本執行的競爭條件，確保初始化函數能被穩定呼叫。
  */
 
 const routes = {
@@ -54,7 +54,7 @@ async function handleLocation() {
         const doc = parser.parseFromString(html, 'text/html');
         const fetchUrlBase = new URL(fetchPath, window.location.origin);
 
-        // --- 動態樣式處理 (維持不變) ---
+        // 動態樣式處理
         document.querySelectorAll('[data-dynamic-style]').forEach(el => el.remove());
         doc.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
             const originalHref = link.getAttribute('href');
@@ -68,30 +68,31 @@ async function handleLocation() {
             }
         });
 
-        // --- ✨ 核心修正：替換內容並手動執行腳本 ---
-        appContainer.innerHTML = doc.body.innerHTML; // 1. 先載入 HTML 結構
-
-        // 2. 找到所有腳本並重新建立以執行它們
+        // 替換內容並手動執行腳本
+        appContainer.innerHTML = doc.body.innerHTML;
         const scripts = appContainer.querySelectorAll('script');
         for (const script of scripts) {
             const newScript = document.createElement('script');
-            // 複製所有屬性 (例如 type, async)
             for (const attr of script.attributes) {
                 newScript.setAttribute(attr.name, attr.value);
             }
-            newScript.textContent = script.textContent; // 複製腳本內容
-            // 替換舊的、未執行的腳本節點
+            newScript.textContent = script.textContent;
             script.parentNode.replaceChild(newScript, script);
         }
+
+        // --- ✨ 核心修正：解決競爭條件 ---
+        // 將初始化函數的呼叫延遲到下一個事件循環，確保腳本已執行
+        setTimeout(() => {
+            if (route.init && typeof window[route.init] === 'function') {
+                console.log(`✅ Router: 找到並成功執行初始化函數: ${route.init}`);
+                window[route.init]();
+            } else if (route.init) {
+                // 這個警告現在理論上不應該再出現了
+                console.error(`❌ Router: 路由需要函數 ${route.init}，但它在延遲後仍未被定義。請檢查 ${route.html} 中的腳本是否有誤。`);
+            }
+        }, 0); // 使用 0 毫秒延遲即可
         // --- 修正結束 ---
 
-        // 3. 現在，初始化函數應該已經被定義了，可以安全呼叫
-        if (route.init && typeof window[route.init] === 'function') {
-            console.log(`✅ Router: 找到並準備執行初始化函數: ${route.init}`);
-            window[route.init]();
-        } else if (route.init) {
-            console.warn(`⚠️ Router: 路由需要函數 ${route.init}，但它未被定義。請檢查 ${route.html} 中的腳本。`);
-        }
         updateSidebarActiveState();
 
     } catch (error) {
