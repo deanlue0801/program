@@ -1,6 +1,10 @@
 <div class="content-card">
     <div class="page-header">
         <h1 class="page-title">✏️ 編輯專案</h1>
+        <!-- 我們將在這裡動態加入權限提示 -->
+        <div id="permissionAlert" class="alert alert-warning" style="display: none; margin-top: 1rem;">
+            您在此專案中為「檢視者」或權限不足，僅能查看資料，無法進行任何編輯。
+        </div>
     </div>
 
     <div id="loading" class="loading" style="display: flex;">
@@ -8,25 +12,24 @@
         <p>載入專案資料中...</p>
     </div>
 
-    <form id="editTenderForm" style="display: none;" onsubmit="window.exposedEditFuncs.handleFormSubmit(event)">
+    <!-- 【結構整理】將 form 的 ID 改為 projectEditForm，並移除 onsubmit -->
+    <form id="projectEditForm" style="display: none;">
         <div class="form-container">
+            <!-- 主要專案資訊 -->
             <div class="form-grid">
                 <div class="form-section">
                     <h3>基本資訊</h3>
+                    <!-- 【結構整理】將 ID 從 tenderName/tenderCode 改為 projectName/projectCode -->
                     <div class="form-group">
-                        <label for="tenderName">標單名稱 *</label>
-                        <input type="text" id="tenderName" class="form-control" required>
+                        <label for="projectName">專案名稱 *</label>
+                        <input type="text" id="projectName" class="form-control" required>
                     </div>
                     <div class="form-group">
-                        <label for="tenderCode">標單編號</label>
-                        <input type="text" id="tenderCode" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="projectSelect">所屬專案 *</label>
-                        <select id="projectSelect" class="form-control" required></select>
+                        <label for="projectCode">專案編號</label>
+                        <input type="text" id="projectCode" class="form-control">
                     </div>
                      <div class="form-group">
-                        <label for="statusSelect">標單狀態</label>
+                        <label for="statusSelect">專案狀態</label>
                         <select id="statusSelect" class="form-control">
                             <option value="planning">規劃中</option>
                             <option value="active">進行中</option>
@@ -59,7 +62,7 @@
                 <div class="form-section" style="grid-column: 1 / -1;">
                      <h3>描述與備註</h3>
                     <div class="form-group">
-                        <label for="description">標單描述</label>
+                        <label for="description">專案描述</label>
                         <textarea id="description" class="form-control"></textarea>
                     </div>
                     <div class="form-group">
@@ -69,9 +72,68 @@
                 </div>
             </div>
 
+            <!-- ================================================================= -->
+            <!-- ✨✨✨ 第二階段：新增「成員管理」區塊 ✨✨✨ -->
+            <!-- ================================================================= -->
+            <div id="memberManagementSection" class="form-section" style="grid-column: 1 / -1; margin-top: 2rem;">
+                <h3 class="section-title"><span>👥</span> 成員管理</h3>
+                
+                <!-- 現有成員列表 -->
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>成員 Email</th>
+                                <th>角色</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="membersTableBody">
+                            <!-- 成員列表將由 JavaScript 動態生成 -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 新增成員表單 -->
+                <div class="add-member-form" style="margin-top: 1.5rem; border-top: 1px solid #eee; padding-top: 1.5rem;">
+                    <h4>新增成員</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="newMemberEmail">電子郵件</label>
+                            <input type="email" id="newMemberEmail" class="form-control" placeholder="輸入新成員的 Email">
+                        </div>
+                        <div class="form-group">
+                            <label for="newMemberRole">角色</label>
+                            <select id="newMemberRole" class="form-control">
+                                <option value="editor">編輯者</option>
+                                <option value="viewer">檢視者</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- 精細權限設定 (預設隱藏) -->
+                    <div id="permissionsContainer" class="permissions-container" style="margin-top: 1rem;">
+                        <h5>精細權限 (僅對「編輯者」有效)</h5>
+                        <div class="permission-checkboxes">
+                            <label><input type="checkbox" data-permission="canAccessTenders"> 存取標單管理</label>
+                            <label><input type="checkbox" data-permission="canAccessDistribution"> 存取樓層分配</label>
+                            <label><input type="checkbox" data-permission="canUploadPhotos"> 允許上傳照片</label>
+                            <label><input type="checkbox" data-permission="canManageMembers"> 允許管理成員</label>
+                            <!-- 更多權限可在此處添加 -->
+                        </div>
+                    </div>
+                    
+                    <button type="button" id="addMemberBtn" class="btn btn-info" style="margin-top: 1rem;">新增成員</button>
+                </div>
+            </div>
+            <!-- ================================================================= -->
+            <!-- ✨✨✨ 區塊結束 ✨✨✨ -->
+            <!-- ================================================================= -->
+
+
             <div class="form-actions">
-                <button type="button" class="btn btn-secondary" onclick="window.exposedEditFuncs.cancelEdit()">取消</button>
-                <button type="submit" class="btn btn-success">儲存變更</button>
+                <button type="button" id="cancelBtn" class="btn btn-secondary">取消</button>
+                <button type="submit" id="saveChangesBtn" class="btn btn-success">儲存變更</button>
             </div>
         </div>
     </form>
