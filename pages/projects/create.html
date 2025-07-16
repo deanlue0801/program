@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-<head>
+<head>db.collection('projects').add
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>新增專案 - 專案管理系統</title>
@@ -609,495 +609,452 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
-    <script>
-        // Firebase 配置
-        const firebaseConfig = {
-            apiKey: "AIzaSyDV26PsFl_nH9SkfQAYgbCPjbanDluFrvo",
-            authDomain: "project-management-syste-4c9ce.firebaseapp.com",
-            projectId: "project-management-syste-4c9ce",
-            storageBucket: "project-management-syste-4c9ce.firebasestorage.app",
-            messagingSenderId: "153223609209",
-            appId: "1:153223609209:web:f4504f7ac52fc76b910da8",
-            measurementId: "G-P57N5Y5BE2"
-        };
+<script>
+    // Firebase 配置
+    const firebaseConfig = {
+        apiKey: "AIzaSyDV26PsFl_nH9SkfQAYgbCPjbanDluFrvo",
+        authDomain: "project-management-syste-4c9ce.firebaseapp.com",
+        projectId: "project-management-syste-4c9ce",
+        storageBucket: "project-management-syste-4c9ce.firebasestorage.app",
+        messagingSenderId: "153223609209",
+        appId: "1:153223609209:web:f4504f7ac52fc76b910da8",
+        measurementId: "G-P57N5Y5BE2"
+    };
 
-        // 初始化 Firebase
-        let app, auth, db, currentUser;
-        let isEditMode = false;
-        let editProjectId = null;
+    // 初始化 Firebase
+    let app, auth, db, currentUser;
+    let isEditMode = false;
+    let editProjectId = null;
 
-        async function initApp() {
-            try {
-                // 初始化 Firebase
-                app = firebase.initializeApp(firebaseConfig);
-                auth = firebase.auth();
-                db = firebase.firestore();
+    async function initApp() {
+        try {
+            // 初始化 Firebase
+            app = firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            db = firebase.firestore();
 
-                console.log('Firebase 初始化成功');
+            console.log('Firebase 初始化成功');
 
-                // 監聽認證狀態
-                auth.onAuthStateChanged(user => {
-                    if (user) {
-                        currentUser = user;
-                        document.getElementById('currentUser').textContent = user.email;
-                        
-                        // 檢查是否為編輯模式
-                        checkEditMode();
-                        
-                        // 設定預設值
-                        setupForm();
-                        
-                    } else {
-                        window.location.href = '../../login_page.html';
-                    }
-                });
-
-            } catch (error) {
-                console.error('Firebase 初始化失敗:', error);
-                showError('系統初始化失敗，請重新整理頁面');
-            }
-        }
-
-        // 導航功能
-        function goToDashboard() {
-            // 智能路徑偵測
-            const currentPath = window.location.pathname;
-            console.log('當前路徑:', currentPath);
-            
-            // 嘗試多種可能的路徑
-            const possiblePaths = [
-                '../dashboard.html',
-                '../../dashboard.html', 
-                '/dashboard.html',
-                'dashboard.html'
-            ];
-            
-            // 使用相對路徑返回上層目錄
-            window.location.href = '../dashboard.html';
-        }
-
-        // 檢查編輯模式
-        function checkEditMode() {
-            const urlParams = new URLSearchParams(window.location.search);
-            editProjectId = urlParams.get('edit');
-            
-            if (editProjectId) {
-                isEditMode = true;
-                document.getElementById('pageTitle').textContent = '✏️ 編輯專案';
-                document.getElementById('pageSubtitle').textContent = '修改專案資訊';
-                document.getElementById('pageMode').textContent = '編輯專案';
-                document.getElementById('submitText').innerHTML = '<span>💾</span><span>更新專案</span>';
-                
-                // 載入專案資料
-                loadProjectForEdit(editProjectId);
-            }
-        }
-
-        // 載入專案資料用於編輯
-        async function loadProjectForEdit(projectId) {
-            try {
-                console.log('載入專案資料用於編輯:', projectId);
-                
-                const doc = await db.collection('projects').doc(projectId).get();
-                
-                if (!doc.exists) {
-                    alert('找不到指定的專案');
-                    window.location.href = 'list.html';
-                    return;
+            // 監聽認證狀態
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    currentUser = user;
+                    document.getElementById('currentUser').textContent = user.email;
+                    
+                    // 檢查是否為編輯模式
+                    checkEditMode();
+                    
+                    // 設定預設值
+                    setupForm();
+                    
+                } else {
+                    window.location.href = '../../login_page.html';
                 }
-                
-                const project = doc.data();
-                console.log('載入的專案資料:', project);
-                
-                // 填入表單
-                fillFormWithProject(project);
-                
-            } catch (error) {
-                console.error('載入專案資料失敗:', error);
-                alert('載入專案資料失敗: ' + error.message);
+            });
+
+        } catch (error) {
+            console.error('Firebase 初始化失敗:', error);
+            showError('系統初始化失敗，請重新整理頁面');
+        }
+    }
+
+    // 導航功能
+    function goToDashboard() {
+        // 使用相對路徑返回上層目錄
+        window.location.href = '../dashboard.html';
+    }
+
+    // 檢查編輯模式
+    function checkEditMode() {
+        const urlParams = new URLSearchParams(window.location.search);
+        editProjectId = urlParams.get('edit');
+        
+        if (editProjectId) {
+            isEditMode = true;
+            document.getElementById('pageTitle').textContent = '✏️ 編輯專案';
+            document.getElementById('pageSubtitle').textContent = '修改專案資訊';
+            document.getElementById('pageMode').textContent = '編輯專案';
+            document.getElementById('submitText').innerHTML = '<span>💾</span><span>更新專案</span>';
+            
+            // 載入專案資料
+            loadProjectForEdit(editProjectId);
+        }
+    }
+
+    // 載入專案資料用於編輯
+    async function loadProjectForEdit(projectId) {
+        try {
+            console.log('載入專案資料用於編輯:', projectId);
+            
+            const doc = await db.collection('projects').doc(projectId).get();
+            
+            if (!doc.exists) {
+                alert('找不到指定的專案');
                 window.location.href = 'list.html';
+                return;
             }
-        }
-
-        // 填入專案資料到表單
-        function fillFormWithProject(project) {
-            document.getElementById('projectName').value = project.name || '';
-            document.getElementById('projectCode').value = project.code || '';
-            document.getElementById('projectDescription').value = project.description || '';
-            document.getElementById('projectBudget').value = project.budget || '';
-            document.getElementById('projectStatus').value = project.status || 'planning';
             
-            // 更新字元計數
-            updateDescriptionCount();
-        }
+            const project = doc.data();
+            console.log('載入的專案資料:', project);
 
-        // 設定表單
-        function setupForm() {
-            if (!isEditMode) {
-                // 設定自動產生專案編號
-                generateProjectCode();
-            }
-
-            // 綁定事件
-            bindEvents();
-        }
-
-        // 自動產生專案編號
-        function generateProjectCode() {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const time = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+            // 【權限檢查】這部分會在下個階段加入，我們先確保資料能載入
+            // 未來會在這裡檢查 project.members 中是否包含當前使用者
             
-            const code = `PROJ-${year}${month}${day}-${time}`;
-            document.getElementById('projectCode').value = code;
+            // 填入表單
+            fillFormWithProject(project);
+            
+        } catch (error) {
+            console.error('載入專案資料失敗:', error);
+            alert('載入專案資料失敗: ' + error.message);
+            window.location.href = 'list.html';
+        }
+    }
+
+    // 填入專案資料到表單
+    function fillFormWithProject(project) {
+        // 在新的結構中，專案名稱為 projectName
+        document.getElementById('projectName').value = project.projectName || ''; 
+        // 專案編號為 projectCode
+        document.getElementById('projectCode').value = project.projectCode || ''; 
+        document.getElementById('projectDescription').value = project.description || '';
+        document.getElementById('projectBudget').value = project.budget || '';
+        document.getElementById('projectStatus').value = project.status || 'planning';
+        
+        // 更新字元計數
+        updateDescriptionCount();
+    }
+
+    // 設定表單
+    function setupForm() {
+        if (!isEditMode) {
+            // 設定自動產生專案編號
+            generateProjectCode();
         }
 
         // 綁定事件
-        function bindEvents() {
-            // 表單提交
-            document.getElementById('projectForm').addEventListener('submit', handleSubmit);
+        bindEvents();
+    }
 
-            // 即時驗證
-            document.getElementById('projectName').addEventListener('blur', validateProjectName);
-            document.getElementById('projectCode').addEventListener('blur', validateProjectCode);
-            document.getElementById('projectBudget').addEventListener('blur', validateProjectBudget);
+    // 自動產生專案編號
+    function generateProjectCode() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const time = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+        
+        const code = `PROJ-${year}${month}${day}-${time}`;
+        document.getElementById('projectCode').value = code;
+    }
 
-            // 字元計數
-            document.getElementById('projectDescription').addEventListener('input', updateDescriptionCount);
+    // 綁定事件
+    function bindEvents() {
+        // 表單提交
+        document.getElementById('projectForm').addEventListener('submit', handleSubmit);
+
+        // 即時驗證
+        document.getElementById('projectName').addEventListener('blur', validateProjectName);
+        document.getElementById('projectCode').addEventListener('blur', validateProjectCode);
+        document.getElementById('projectBudget').addEventListener('blur', validateProjectBudget);
+
+        // 字元計數
+        document.getElementById('projectDescription').addEventListener('input', updateDescriptionCount);
+    }
+
+    // 表單提交處理
+    async function handleSubmit(e) {
+        e.preventDefault();
+        
+        if (!validateForm()) {
+            showError('請檢查表單資料');
+            return;
         }
 
-        // 表單提交處理
-        async function handleSubmit(e) {
-            e.preventDefault();
-            
-            if (!validateForm()) {
-                showError('請檢查表單資料');
-                return;
-            }
+        const submitBtn = document.getElementById('submitBtn');
+        const spinner = document.getElementById('loadingSpinner');
+        const submitText = document.getElementById('submitText');
+        
+        // 顯示載入狀態
+        submitBtn.disabled = true;
+        spinner.style.display = 'block';
+        
+        if (isEditMode) {
+            submitText.innerHTML = '<span>⏳</span><span>更新中...</span>';
+        } else {
+            submitText.innerHTML = '<span>⏳</span><span>建立中...</span>';
+        }
 
-            const submitBtn = document.getElementById('submitBtn');
-            const spinner = document.getElementById('loadingSpinner');
-            const submitText = document.getElementById('submitText');
-            
-            // 顯示載入狀態
-            submitBtn.disabled = true;
-            spinner.style.display = 'block';
-            
+        try {
+            // 收集表單資料
+            const projectData = collectFormData();
+
             if (isEditMode) {
-                submitText.innerHTML = '<span>⏳</span><span>更新中...</span>';
+                // 更新邏輯會在下個階段實作
+                await updateProject(editProjectId, projectData);
             } else {
-                submitText.innerHTML = '<span>⏳</span><span>建立中...</span>';
+                await saveProject(projectData);
             }
 
-            try {
-                // 收集表單資料
-                const projectData = collectFormData();
+        } catch (error) {
+            console.error('操作失敗:', error);
+            showError('操作失敗: ' + error.message);
+            resetSubmitButton();
+        }
+    }
 
-                if (isEditMode) {
-                    await updateProject(editProjectId, projectData);
-                } else {
-                    await saveProject(projectData);
-                }
+    // ==========================================================
+    // == 步驟 1.1 修改：更新 collectFormData 函式 ==
+    // ==========================================================
+    // 收集表單資料
+    function collectFormData() {
+        const currentUserEmail = currentUser.email;
 
-            } catch (error) {
-                console.error('操作失敗:', error);
-                showError('操作失敗: ' + error.message);
-                resetSubmitButton();
-            }
+        // 【修改點 A】: 我們將直接建立符合新結構的資料物件
+        const baseData = {
+            projectName: document.getElementById('projectName').value.trim(),
+            projectCode: document.getElementById('projectCode').value.trim(),
+            description: document.getElementById('projectDescription').value.trim(),
+            budget: parseFloat(document.getElementById('projectBudget').value) || 0,
+            status: document.getElementById('projectStatus').value,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (!isEditMode) {
+            // 【修改點 B】: 在建立模式下，加入新的 members 和 memberEmails 欄位
+            baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            baseData.members = [
+                { email: currentUserEmail, role: 'owner' } // 建立者即為擁有者
+            ];
+            baseData.memberEmails = [currentUserEmail]; // 用於快速查詢的陣列
         }
 
-        // 收集表單資料
-        function collectFormData() {
-            const baseData = {
-                name: document.getElementById('projectName').value.trim(),
-                code: document.getElementById('projectCode').value.trim(),
-                description: document.getElementById('projectDescription').value.trim(),
-                budget: parseFloat(document.getElementById('projectBudget').value) || 0,
-                status: document.getElementById('projectStatus').value,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
+        // 注意：這裡我們不再使用 createdBy 欄位
 
-            if (!isEditMode) {
-                // 新建專案的額外欄位
-                baseData.createdBy = currentUser.email;
-                baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        return baseData;
+    }
+
+    // ==========================================================
+    // == 步驟 1.2 修改：更新 saveProject 函式 ==
+    // ==========================================================
+    // 儲存新專案
+    async function saveProject(projectData) {
+        try {
+            console.log('開始儲存專案:', projectData);
+            
+            // 檢查專案編號是否重複
+            // 【修改點 C】: 我們不再需要複雜的複合索引檢查，因為專案編號在整個系統中理論上應唯一
+            const codeQuery = await db.collection('projects')
+                .where('projectCode', '==', projectData.projectCode)
+                .get();
+            
+            if (!codeQuery.empty) {
+                // 為了更精確，可以檢查找到的文件是否真的屬於一個我們有權限的專案
+                // 但初步先假設編號全局唯一
+                throw new Error('專案編號已存在，請使用其他編號');
             }
 
-            return baseData;
+            // 新增到 Firestore
+            const docRef = await db.collection('projects').add(projectData);
+            
+            console.log('專案建立成功，ID:', docRef.id);
+            
+            // 顯示成功訊息
+            showSuccess('專案建立成功！');
+            
+            // 2秒後跳轉到專案列表
+            setTimeout(() => {
+                window.location.href = 'list.html';
+            }, 2000);
+            
+        } catch (error) {
+            console.error('儲存專案失敗:', error);
+            throw error;
         }
+    }
 
-        // 儲存新專案
-        async function saveProject(projectData) {
-            try {
-                console.log('開始儲存專案:', projectData);
-                
-                // 檢查專案編號是否重複
-                // 使用簡單查詢避免索引問題
-                let codeQuery;
-                try {
-                    codeQuery = await db.collection('projects')
-                        .where('code', '==', projectData.code)
-                        .where('createdBy', '==', currentUser.email)
-                        .get();
-                } catch (indexError) {
-                    console.warn('複合索引問題，使用替代方法檢查重複:', indexError.message);
-                    // 替代方法：先查詢該用戶的所有專案，再檢查編號
-                    const userProjects = await db.collection('projects')
-                        .where('createdBy', '==', currentUser.email)
-                        .get();
-                    
-                    const duplicateFound = userProjects.docs.some(doc => doc.data().code === projectData.code);
-                    if (duplicateFound) {
-                        throw new Error('專案編號已存在，請使用其他編號');
-                    }
-                    codeQuery = { empty: true }; // 模擬空結果
-                }
-                
-                if (!codeQuery.empty) {
-                    throw new Error('專案編號已存在，請使用其他編號');
-                }
-
-                // 新增到 Firestore
-                const docRef = await db.collection('projects').add(projectData);
-                
-                console.log('專案建立成功，ID:', docRef.id);
-                
-                // 顯示成功訊息
-                showSuccess('專案建立成功！');
-                
-                // 3秒後跳轉到專案列表
-                setTimeout(() => {
-                    window.location.href = 'list.html';
-                }, 2000);
-                
-            } catch (error) {
-                console.error('儲存專案失敗:', error);
-                throw error;
-            }
+    // 更新專案 (此函式將在下一階段修改)
+    async function updateProject(projectId, projectData) {
+        try {
+            // 暫時保留舊的更新邏輯，但提醒使用者
+            console.log('開始更新專案:', projectId, projectData);
+            
+            // 更新 Firestore
+            // 注意：這裡的 projectData 沒有包含 members 資訊，這是下一階段要做的
+            await db.collection('projects').doc(projectId).update(projectData);
+            
+            console.log('專案更新成功');
+            
+            showSuccess('專案更新成功！');
+            
+            setTimeout(() => {
+                window.location.href = 'list.html';
+            }, 2000);
+            
+        } catch (error) {
+            console.error('更新專案失敗:', error);
+            throw error;
         }
+    }
 
-        // 更新專案
-        async function updateProject(projectId, projectData) {
-            try {
-                console.log('開始更新專案:', projectId, projectData);
-                
-                // 如果編號有變更，檢查是否重複
-                const currentDoc = await db.collection('projects').doc(projectId).get();
-                const currentData = currentDoc.data();
-                
-                if (currentData.code !== projectData.code) {
-                    // 使用替代方法檢查重複編號
-                    try {
-                        const codeQuery = await db.collection('projects')
-                            .where('code', '==', projectData.code)
-                            .where('createdBy', '==', currentUser.email)
-                            .get();
-                        
-                        // 排除當前專案
-                        const duplicates = codeQuery.docs.filter(doc => doc.id !== projectId);
-                        if (duplicates.length > 0) {
-                            throw new Error('專案編號已存在，請使用其他編號');
-                        }
-                    } catch (indexError) {
-                        console.warn('複合索引問題，使用替代方法:', indexError.message);
-                        // 替代方法：載入該用戶所有專案檢查
-                        const userProjects = await db.collection('projects')
-                            .where('createdBy', '==', currentUser.email)
-                            .get();
-                        
-                        const duplicateFound = userProjects.docs.some(doc => 
-                            doc.id !== projectId && doc.data().code === projectData.code
-                        );
-                        if (duplicateFound) {
-                            throw new Error('專案編號已存在，請使用其他編號');
-                        }
-                    }
-                }
-
-                // 更新 Firestore
-                await db.collection('projects').doc(projectId).update(projectData);
-                
-                console.log('專案更新成功');
-                
-                // 顯示成功訊息
-                showSuccess('專案更新成功！');
-                
-                // 2秒後跳轉到專案列表
-                setTimeout(() => {
-                    window.location.href = 'list.html';
-                }, 2000);
-                
-            } catch (error) {
-                console.error('更新專案失敗:', error);
-                throw error;
-            }
+    // 重設提交按鈕
+    function resetSubmitButton() {
+        const submitBtn = document.getElementById('submitBtn');
+        const spinner = document.getElementById('loadingSpinner');
+        const submitText = document.getElementById('submitText');
+        
+        submitBtn.disabled = false;
+        spinner.style.display = 'none';
+        
+        if (isEditMode) {
+            submitText.innerHTML = '<span>💾</span><span>更新專案</span>';
+        } else {
+            submitText.innerHTML = '<span>💾</span><span>建立專案</span>';
         }
+    }
 
-        // 重設提交按鈕
-        function resetSubmitButton() {
-            const submitBtn = document.getElementById('submitBtn');
-            const spinner = document.getElementById('loadingSpinner');
-            const submitText = document.getElementById('submitText');
-            
-            submitBtn.disabled = false;
-            spinner.style.display = 'none';
-            
-            if (isEditMode) {
-                submitText.innerHTML = '<span>💾</span><span>更新專案</span>';
-            } else {
-                submitText.innerHTML = '<span>💾</span><span>建立專案</span>';
-            }
+    // 顯示成功訊息
+    function showSuccess(message) {
+        const successMsg = document.getElementById('successMessage');
+        const errorMsg = document.getElementById('errorMessage');
+        const successText = document.getElementById('successText');
+        
+        errorMsg.style.display = 'none';
+        successText.textContent = message;
+        successMsg.style.display = 'flex';
+        
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        const submitText = document.getElementById('submitText');
+        if (isEditMode) {
+            submitText.innerHTML = '<span>✅</span><span>更新成功</span>';
+        } else {
+            submitText.innerHTML = '<span>✅</span><span>建立成功</span>';
         }
+    }
 
-        // 顯示成功訊息
-        function showSuccess(message) {
-            const successMsg = document.getElementById('successMessage');
-            const errorMsg = document.getElementById('errorMessage');
-            const successText = document.getElementById('successText');
-            
-            errorMsg.style.display = 'none';
-            successText.textContent = message;
-            successMsg.style.display = 'flex';
-            
-            // 滾動到頂部
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            
-            // 更新按鈕狀態
-            const submitText = document.getElementById('submitText');
-            if (isEditMode) {
-                submitText.innerHTML = '<span>✅</span><span>更新成功</span>';
-            } else {
-                submitText.innerHTML = '<span>✅</span><span>建立成功</span>';
-            }
-        }
+    // 顯示錯誤訊息
+    function showError(message) {
+        const errorMsg = document.getElementById('errorMessage');
+        const successMsg = document.getElementById('successMessage');
+        const errorText = document.getElementById('errorText');
+        
+        successMsg.style.display = 'none';
+        errorText.textContent = message;
+        errorMsg.style.display = 'flex';
+        
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 
-        // 顯示錯誤訊息
-        function showError(message) {
-            const errorMsg = document.getElementById('errorMessage');
-            const successMsg = document.getElementById('successMessage');
-            const errorText = document.getElementById('errorText');
-            
-            successMsg.style.display = 'none';
-            errorText.textContent = message;
-            errorMsg.style.display = 'flex';
-            
-            // 滾動到頂部
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        // 表單驗證
-        function validateForm() {
-            let isValid = true;
-            
-            // 重設所有錯誤狀態
-            document.querySelectorAll('.form-input').forEach(input => {
-                input.classList.remove('invalid', 'valid');
-            });
-            
-            document.querySelectorAll('.form-error').forEach(error => {
-                error.style.display = 'none';
-            });
-
-            // 驗證專案名稱
-            if (!validateProjectName()) isValid = false;
-            
-            // 驗證專案編號
-            if (!validateProjectCode()) isValid = false;
-            
-            // 驗證專案預算
-            if (!validateProjectBudget()) isValid = false;
-
-            return isValid;
-        }
-
-        // 驗證專案名稱
-        function validateProjectName() {
-            const input = document.getElementById('projectName');
-            const error = document.getElementById('projectNameError');
-            const value = input.value.trim();
-            
-            if (!value) {
-                input.classList.add('invalid');
-                error.style.display = 'block';
-                return false;
-            }
-            
-            if (value.length < 2) {
-                input.classList.add('invalid');
-                error.textContent = '專案名稱至少需要2個字元';
-                error.style.display = 'block';
-                return false;
-            }
-            
-            input.classList.add('valid');
-            return true;
-        }
-
-        // 驗證專案編號
-        function validateProjectCode() {
-            const input = document.getElementById('projectCode');
-            const error = document.getElementById('projectCodeError');
-            const value = input.value.trim();
-            
-            if (!value) {
-                input.classList.add('invalid');
-                error.style.display = 'block';
-                return false;
-            }
-            
-            // 檢查格式（可以自定義規則）
-            const codePattern = /^[A-Z0-9\-_]+$/i;
-            if (!codePattern.test(value)) {
-                input.classList.add('invalid');
-                error.textContent = '專案編號只能包含英文、數字、連字號和底線';
-                error.style.display = 'block';
-                return false;
-            }
-            
-            input.classList.add('valid');
-            return true;
-        }
-
-        // 驗證專案預算
-        function validateProjectBudget() {
-            const input = document.getElementById('projectBudget');
-            const error = document.getElementById('projectBudgetError');
-            const value = parseFloat(input.value);
-            
-            if (!value || value <= 0) {
-                input.classList.add('invalid');
-                error.textContent = '請輸入有效的專案預算';
-                error.style.display = 'block';
-                return false;
-            }
-            
-            if (value > 999999999999) {
-                input.classList.add('invalid');
-                error.textContent = '金額過大，請確認輸入正確';
-                error.style.display = 'block';
-                return false;
-            }
-            
-            input.classList.add('valid');
-            return true;
-        }
-
-        // 更新描述字元計數
-        function updateDescriptionCount() {
-            const textarea = document.getElementById('projectDescription');
-            const counter = document.getElementById('descriptionCount');
-            counter.textContent = textarea.value.length;
-        }
-
-        // 頁面載入完成
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('專案建立/編輯頁面開始初始化...');
-            initApp();
+    // 表單驗證
+    function validateForm() {
+        let isValid = true;
+        
+        document.querySelectorAll('.form-input').forEach(input => {
+            input.classList.remove('invalid', 'valid');
+        });
+        
+        document.querySelectorAll('.form-error').forEach(error => {
+            error.style.display = 'none';
         });
 
-        console.log('專案建立/編輯頁面腳本已載入');
-    </script>
+        if (!validateProjectName()) isValid = false;
+        if (!validateProjectCode()) isValid = false;
+        if (!validateProjectBudget()) isValid = false;
+
+        return isValid;
+    }
+
+    // 驗證專案名稱
+    function validateProjectName() {
+        const input = document.getElementById('projectName');
+        const error = document.getElementById('projectNameError');
+        const value = input.value.trim();
+        
+        if (!value) {
+            input.classList.add('invalid');
+            error.style.display = 'block';
+            return false;
+        }
+        
+        if (value.length < 2) {
+            input.classList.add('invalid');
+            error.textContent = '專案名稱至少需要2個字元';
+            error.style.display = 'block';
+            return false;
+        }
+        
+        input.classList.remove('invalid');
+        input.classList.add('valid');
+        error.style.display = 'none';
+        return true;
+    }
+
+    // 驗證專案編號
+    function validateProjectCode() {
+        const input = document.getElementById('projectCode');
+        const error = document.getElementById('projectCodeError');
+        const value = input.value.trim();
+        
+        if (!value) {
+            input.classList.add('invalid');
+            error.style.display = 'block';
+            return false;
+        }
+        
+        const codePattern = /^[A-Z0-9\-_]+$/i;
+        if (!codePattern.test(value)) {
+            input.classList.add('invalid');
+            error.textContent = '專案編號只能包含英文、數字、連字號和底線';
+            error.style.display = 'block';
+            return false;
+        }
+        
+        input.classList.remove('invalid');
+        input.classList.add('valid');
+        error.style.display = 'none';
+        return true;
+    }
+
+    // 驗證專案預算
+    function validateProjectBudget() {
+        const input = document.getElementById('projectBudget');
+        const error = document.getElementById('projectBudgetError');
+        const value = parseFloat(input.value);
+        
+        if (isNaN(value) || value <= 0) {
+            input.classList.add('invalid');
+            error.textContent = '請輸入有效的專案預算';
+            error.style.display = 'block';
+            return false;
+        }
+        
+        if (value > 999999999999) {
+            input.classList.add('invalid');
+            error.textContent = '金額過大，請確認輸入正確';
+            error.style.display = 'block';
+            return false;
+        }
+        
+        input.classList.remove('invalid');
+        input.classList.add('valid');
+        error.style.display = 'none';
+        return true;
+    }
+
+    // 更新描述字元計數
+    function updateDescriptionCount() {
+        const textarea = document.getElementById('projectDescription');
+        const counter = document.getElementById('descriptionCount');
+        counter.textContent = textarea.value.length;
+    }
+
+    // 頁面載入完成
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('專案建立/編輯頁面開始初始化...');
+        initApp();
+    });
+
+    console.log('專案建立/編輯頁面腳本已載入');
+</script>
 </body>
 </html>
