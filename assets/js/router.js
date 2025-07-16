@@ -1,6 +1,6 @@
 /**
- * 簡易前端路由器 (SPA Router) - v9.0 (最終穩定版)
- * 修正了主內容容器的 ID，並整合所有已知修復
+ * 簡易前端路由器 (SPA Router) - v10.0 (最終生產版)
+ * 增加動態資源路徑重寫功能，以解決相對路徑在 SPA 中的 404 問題
  */
 
 const routes = {
@@ -29,12 +29,8 @@ function navigateTo(url) {
 }
 
 async function handleLocation() {
-    // 【關鍵修正】使用正確的 ID 'app-content'
     const appContainer = document.getElementById('app-content');
-    if (!appContainer) {
-        console.error("handleLocation() was called on a page without an #app-content element.");
-        return;
-    }
+    if (!appContainer) { return; } // 在獨立頁面，直接退出
 
     const path = window.location.pathname;
     const basePath = getBasePath();
@@ -53,16 +49,58 @@ async function handleLocation() {
     try {
         const fetchPath = `${basePath}/${route.html}`;
         const response = await fetch(fetchPath);
-        if (!response.ok) throw new Error(`無法載入頁面`);
-        
-        appContainer.innerHTML = await response.text();
+        if (!response.ok) throw new Error(`無法載入頁面: ${fetchPath}`);
 
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const fetchUrlBase = new URL(fetchPath, window.location.origin);
+
+        // --- 【關鍵修正】動態處理 CSS ---
+        // 1. 移除上一個頁面的動態樣式
+        document.querySelectorAll('link[data-dynamic-style]').forEach(el => el.remove());
+
+        // 2. 找到新頁面的樣式，修正路徑，然後加入到主文檔的 <head>
+        doc.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
+            const originalHref = link.getAttribute('href');
+            if (originalHref) {
+                const correctCssUrl = new URL(originalHref, fetchUrlBase);
+                const newLink = document.createElement('link');
+                newLink.rel = 'stylesheet';
+                newLink.href = correctCssUrl.pathname;
+                newLink.setAttribute('data-dynamic-style', 'true'); // 標記為動態樣式
+                document.head.appendChild(newLink);
+            }
+        });
+
+        // --- 處理內容和腳本 ---
+        // 3. 將 HTML 的 <body> 內容注入到畫框中
+        appContainer.innerHTML = doc.body.innerHTML;
+
+        // 4. 重新建立 <script> 標籤以確保它們被執行
+        appContainer.querySelectorAll('script').forEach(oldScript => {
+            const newScript = document.createElement('script');
+            Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+            
+            if (oldScript.src) { // 如果是外部腳本，修正其路徑
+                const correctScriptUrl = new URL(oldScript.getAttribute('src'), fetchUrlBase);
+                newScript.src = correctScriptUrl.pathname;
+            } else { // 如果是內聯腳本，直接複製內容
+                newScript.textContent = oldScript.textContent;
+            }
+            oldScript.parentNode.replaceChild(newScript, oldScript);
+        });
+
+        // 5. 執行頁面對應的初始化函式
         if (route.init && typeof window[route.init] === 'function') {
             window[route.init]();
         }
+
         updateSidebarActiveState();
+
     } catch (error) {
-        appContainer.innerHTML = `<h1>頁面載入失敗</h1>`;
+        console.error('Routing error:', error);
+        appContainer.innerHTML = `<h1>頁面載入失敗</h1><p>${error.message}</p>`;
     }
 }
 
@@ -86,25 +124,19 @@ function setupRouter() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 呼叫由 firebase-config.js 提供的全域初始化函式
     initFirebase(
-        (user) => { // 登入成功
+        (user) => {
             const currentUserEl = document.getElementById('currentUser');
             if (currentUserEl) {
                 currentUserEl.textContent = user ? `👤 ${user.email}` : '未登入';
             }
 
-            // *** 環境偵測 ***
-            // 【關鍵修正】使用正確的 ID 'app-content' 來判斷
             if (document.getElementById('app-content')) {
-                console.log("SPA environment detected (#app-content). Setting up router.");
                 setupRouter();
                 handleLocation();
-            } else {
-                console.log("Standalone page detected. Skipping router setup.");
             }
         },
-        () => { // 未登入
+        () => {
             const loginUrl = `${getBasePath()}/login_page.html`;
             if (!window.location.pathname.endsWith('login_page.html')) {
                 window.location.href = loginUrl;
