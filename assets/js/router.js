@@ -15,6 +15,8 @@ const routes = {
     '/tenders/import': { html: 'pages/tenders/import.html', init: 'initImportPage', title: '匯入標單' },
     '/projects/create': { html: 'pages/projects/create.html', init: 'initProjectCreatePage', title: '新增專案' },
     '/projects/edit': { html: 'pages/projects/edit.html', init: 'initProjectEditPage', title: '編輯專案' },
+    // 【新增】專案列表頁面的路由
+    '/projects/list': { html: 'pages/projects/list.html', init: 'initProjectsListPage', title: '專案管理' },
     '/tenders/edit': { html: 'pages/tenders/edit.html', init: 'initTenderEditPage', title: '編輯標單' },
     '404': { html: 'pages/404.html', title: '找不到頁面' }
 };
@@ -80,18 +82,14 @@ async function handleLocation() {
             script.parentNode.replaceChild(newScript, script);
         }
 
-        // --- ✨ 核心修正：解決競爭條件 ---
-        // 將初始化函數的呼叫延遲到下一個事件循環，確保腳本已執行
         setTimeout(() => {
             if (route.init && typeof window[route.init] === 'function') {
                 console.log(`✅ Router: 找到並成功執行初始化函數: ${route.init}`);
                 window[route.init]();
             } else if (route.init) {
-                // 這個警告現在理論上不應該再出現了
                 console.error(`❌ Router: 路由需要函數 ${route.init}，但它在延遲後仍未被定義。請檢查 ${route.html} 中的腳本是否有誤。`);
             }
-        }, 0); // 使用 0 毫秒延遲即可
-        // --- 修正結束 ---
+        }, 0);
 
         updateSidebarActiveState();
 
