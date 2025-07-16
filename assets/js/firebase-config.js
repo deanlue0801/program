@@ -1,6 +1,6 @@
 /**
- * ✅ Firebase 統一配置與核心功能模組 (版本 2.0 - SPA)
- * 職責：初始化 Firebase、提供通用工具函數 (資料庫查詢、格式化、用戶登出等)
+ * ✅ Firebase 統一配置與核心功能模組 (版本 3.0 - 權限管理第一階段)
+ * 職責：初始化 Firebase、提供具備權限檢查的通用資料庫查詢、格式化、用戶登出等
  */
 
 // --- Firebase 配置 ---
@@ -24,7 +24,7 @@ let app, auth, db, currentUser;
  */
 function initFirebase(onAuthSuccess, onAuthFail) {
     try {
-        console.log('🚀 初始化 Firebase 核心模組...');
+        console.log('🚀 初始化 Firebase 核心模組 (v3.0)...');
         
         if (!firebase.apps.length) {
             app = firebase.initializeApp(firebaseConfig);
@@ -37,7 +37,7 @@ function initFirebase(onAuthSuccess, onAuthFail) {
 
         auth.onAuthStateChanged(async (user) => {
             if (user) {
-                currentUser = user; // 這裡仍然可以設定，供其他地方非同步使用
+                currentUser = user;
                 console.log('✅ Firebase 核心：用戶已登入', user.email);
                 if (onAuthSuccess) await onAuthSuccess(user);
             } else {
@@ -117,26 +117,73 @@ async function deleteTenderAndRelatedData(tenderId) {
     }
 }
 
-// --- 標準化資料載入函數 ---
-// 【修正處】將 currentUser.email 改為 auth.currentUser.email
+// --- 標準化資料載入函數 (具備權限管理) ---
+
+/**
+ * 【第一階段權限修改】
+ * 載入當前使用者有權限存取的專案。
+ * 舊邏輯：只載入 createdBy 是自己的專案。
+ * 新邏輯：載入 memberEmails 陣列中包含自己的專案。
+ */
 async function loadProjects() {
     if (!auth.currentUser) {
-        console.error("loadProjects: 用戶未登入，無法載入專案");
+        console.error("loadProjects: 用戶未登入，無法載入專案。");
         return [];
     }
-    return (await safeFirestoreQuery('projects', [{ field: 'createdBy', operator: '==', value: auth.currentUser.email }], { field: 'name', direction: 'asc' })).docs;
+    console.log(`[權限] 正在為 ${auth.currentUser.email} 載入專案...`);
+    
+    // 核心修改：從 'createdBy' 查詢改為 'memberEmails' 的 'array-contains' 查詢
+    const whereCondition = {
+        field: 'memberEmails',
+        operator: 'array-contains',
+        value: auth.currentUser.email
+    };
+    
+    const result = await safeFirestoreQuery('projects', [whereCondition], { field: 'name', direction: 'asc' });
+    console.log(`[權限] 成功載入 ${result.docs.length} 個專案。`);
+    return result.docs;
 }
 
-// 【修正處】將 currentUser.email 改為 auth.currentUser.email
+/**
+ * 【第一階段權限修改】
+ * 載入隸屬於使用者有權限專案的所有標單。
+ * 舊邏輯：只載入 createdBy 是自己的標單。
+ * 新邏輯：先取得有權限的專案列表，再根據專案ID載入對應的標單。
+ */
 async function loadTenders() {
     if (!auth.currentUser) {
-        console.error("loadTenders: 用戶未登入，無法載入標單");
+        console.error("loadTenders: 用戶未登入，無法載入標單。");
         return [];
     }
-    return (await safeFirestoreQuery('tenders', [{ field: 'createdBy', operator: '==', value: auth.currentUser.email }], { field: 'createdAt', direction: 'desc' })).docs;
+    console.log(`[權限] 正在為 ${auth.currentUser.email} 載入標單...`);
+
+    // 步驟 1: 取得使用者有權限的所有專案
+    const authorizedProjects = await loadProjects();
+
+    // 步驟 2: 如果沒有任何專案權限，直接返回空陣列
+    if (authorizedProjects.length === 0) {
+        console.log("[權限] 使用者沒有任何專案的權限，無需載入標單。");
+        return [];
+    }
+
+    // 步驟 3: 提取所有專案的 ID
+    const authorizedProjectIds = authorizedProjects.map(p => p.id);
+    
+    // 步驟 4: 使用 'in' 查詢來取得所有相關標單
+    // 注意：Firestore 的 'in' 查詢一次最多支援 30 個 ID。如果未來專案數超過此限制，需要分批查詢。
+    const whereCondition = {
+        field: 'projectId',
+        operator: 'in',
+        value: authorizedProjectIds
+    };
+
+    const result = await safeFirestoreQuery('tenders', [whereCondition], { field: 'createdAt', direction: 'desc' });
+    console.log(`[權限] 成功載入 ${result.docs.length} 個標單。`);
+    return result.docs;
 }
 
-// --- 通用工具函數 ---
+
+// --- 通用工具函數 (維持不變) ---
 function formatCurrency(amount) {
     if (amount === null || amount === undefined || isNaN(amount)) return 'NT$ 0';
     return 'NT$ ' + parseInt(amount, 10).toLocaleString();
@@ -157,17 +204,13 @@ function formatDateTime(timestamp) {
 }
 
 function showAlert(message, type = 'info') {
-    // 這裡可以使用您專案中更美觀的提示框，但 alert 是最簡單可靠的
     console.log(`[${type.toUpperCase()}] ${message}`);
-    // 暫時不使用 alert 以免打斷流程
-    // alert(message); 
 }
 
 async function logout() {
     if (confirm('確定要登出嗎？')) {
         try {
             await auth.signOut();
-            // 登出後，onAuthStateChanged 會自動觸發頁面跳轉邏輯
         } catch (error) {
             console.error('登出失敗:', error);
             showAlert('登出失敗', 'error');
