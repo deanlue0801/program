@@ -1,6 +1,6 @@
 /**
- * 簡易前端路由器 (SPA Router) - v13.0 (最終生產架構版)
- * 實現了動態樣式載入、路徑修正與自動清理，並與淨化的子頁面協同工作。
+ * 簡易前端路由器 (SPA Router) - v14.0 (腳本執行修正版)
+ * 實現了動態樣式載入、路徑修正與自動清理，並能正確執行子頁面的腳本。
  */
 
 const routes = {
@@ -54,7 +54,7 @@ async function handleLocation() {
         const doc = parser.parseFromString(html, 'text/html');
         const fetchUrlBase = new URL(fetchPath, window.location.origin);
 
-        // --- 動態樣式處理 ---
+        // --- 動態樣式處理 (維持不變) ---
         document.querySelectorAll('[data-dynamic-style]').forEach(el => el.remove());
         doc.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
             const originalHref = link.getAttribute('href');
@@ -68,10 +68,29 @@ async function handleLocation() {
             }
         });
 
-        appContainer.innerHTML = doc.body.innerHTML;
+        // --- ✨ 核心修正：替換內容並手動執行腳本 ---
+        appContainer.innerHTML = doc.body.innerHTML; // 1. 先載入 HTML 結構
 
+        // 2. 找到所有腳本並重新建立以執行它們
+        const scripts = appContainer.querySelectorAll('script');
+        for (const script of scripts) {
+            const newScript = document.createElement('script');
+            // 複製所有屬性 (例如 type, async)
+            for (const attr of script.attributes) {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+            newScript.textContent = script.textContent; // 複製腳本內容
+            // 替換舊的、未執行的腳本節點
+            script.parentNode.replaceChild(newScript, script);
+        }
+        // --- 修正結束 ---
+
+        // 3. 現在，初始化函數應該已經被定義了，可以安全呼叫
         if (route.init && typeof window[route.init] === 'function') {
+            console.log(`✅ Router: 找到並準備執行初始化函數: ${route.init}`);
             window[route.init]();
+        } else if (route.init) {
+            console.warn(`⚠️ Router: 路由需要函數 ${route.init}，但它未被定義。請檢查 ${route.html} 中的腳本。`);
         }
         updateSidebarActiveState();
 
