@@ -58,79 +58,73 @@
     </div>
 
     <script>
-        // 不再定義函數，而是立即執行程式碼
-        (function() {
-            console.log("🚀 新增專案頁面 Script 已自我啟動！");
+    // 定義一個全域的初始化函數，供 router.js 呼叫
+    function initProjectCreatePage() {
+        console.log("✅ Create Page: initProjectCreatePage() 已被 router 正確呼叫！");
 
-            // 等待一小段時間，確保 DOM 元素都已由 router 載入完成
-            setTimeout(() => {
-                const form = document.getElementById('projectForm');
-                const submitBtn = document.getElementById('submitBtn');
+        const form = document.getElementById('projectForm');
+        const submitBtn = document.getElementById('submitBtn');
 
-                if (!form || !submitBtn) {
-                    console.error("嚴重錯誤：在延遲後仍然找不到 #projectForm 或 #submitBtn。");
-                    return;
+        if (!form || !submitBtn) {
+            console.error("Create Page: 嚴重錯誤，找不到表單或提交按鈕。");
+            return;
+        }
+        
+        // 防止重複綁定事件
+        if (form.dataset.initialized === 'true') {
+            console.log("Create Page: 事件已綁定，跳過。");
+            return;
+        }
+        form.dataset.initialized = 'true';
+
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const currentUser = auth.currentUser;
+            if (!currentUser) {
+                alert("錯誤：使用者未登入，無法執行操作。");
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = '建立中...';
+
+            try {
+                const projectData = {
+                    name: document.getElementById('projectName').value.trim(),
+                    code: document.getElementById('projectCode').value.trim(),
+                    status: document.getElementById('projectStatus').value,
+                    budget: parseFloat(document.getElementById('projectBudget').value) || 0,
+                    description: document.getElementById('projectDescription').value.trim(),
+                    createdBy: currentUser.email,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    memberEmails: [currentUser.email] // 預設將建立者加入成員列表
+                };
+
+                if (!projectData.name || !projectData.code) {
+                    throw new Error("專案名稱和編號為必填項。");
                 }
 
-                // 檢查是否已經綁定過事件，防止重複綁定
-                if (form.dataset.initialized) {
-                    console.log("事件已綁定，跳過。");
-                    return;
-                }
-                form.dataset.initialized = 'true';
+                console.log("Create Page: 準備寫入資料庫...", projectData);
+                await db.collection('projects').add(projectData);
 
-                const auth = firebase.auth();
-                const db = firebase.firestore();
+                alert('專案建立成功！');
+                navigateTo('/program/tenders/list');
 
-                form.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    const currentUser = auth.currentUser;
-                    if (!currentUser) {
-                        alert("錯誤：使用者未登入，無法執行操作。");
-                        return;
-                    }
+            } catch (error) {
+                console.error("Create Page: 建立專案時捕獲到錯誤:", error);
+                alert(`建立失敗: ${error.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '建立專案';
+            }
+        });
 
-                    submitBtn.disabled = true;
-                    submitBtn.textContent = '建立中...';
-
-                    try {
-                        const projectData = {
-                            name: document.getElementById('projectName').value.trim(),
-                            code: document.getElementById('projectCode').value.trim(),
-                            status: document.getElementById('projectStatus').value,
-                            budget: parseFloat(document.getElementById('projectBudget').value) || 0,
-                            description: document.getElementById('projectDescription').value.trim(),
-                            createdBy: currentUser.email,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            // 新增一個欄位來關聯使用者
-                            memberEmails: [currentUser.email]
-                        };
-
-                        if (!projectData.name || !projectData.code) {
-                            throw new Error("專案名稱和編號為必填項。");
-                        }
-
-                        console.log("準備寫入資料庫：", projectData);
-                        await db.collection('projects').add(projectData);
-
-                        alert('專案建立成功！');
-                        navigateTo('/program/tenders/list');
-
-                    } catch (error) {
-                        console.error("建立專案時捕獲到錯誤:", error);
-                        alert(`建立失敗: ${error.message}`);
-                    } finally {
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = '建立專案';
-                    }
-                });
-
-                console.log("✅ 新增專案頁面的表單提交事件已成功綁定！");
-
-            }, 100); // 延遲 100 毫秒確保穩定
-
-        })();
+        console.log("✅ Create Page: 表單提交事件已成功綁定！");
+    }
     </script>
 </body>
 </html>
