@@ -220,6 +220,8 @@
             if (editProjectId) {
                 isEditMode = true;
                 document.getElementById('pageTitle').textContent = '✏️ 編輯專案';
+                document.getElementById('pageSubtitle').textContent = '修改專案資訊';
+                document.getElementById('pageMode').textContent = '編輯專案';
                 document.getElementById('submitText').innerHTML = '<span>💾</span><span>更新專案</span>';
                 loadProjectForEdit(editProjectId);
             } else {
@@ -263,11 +265,16 @@
 
         function bindEvents() {
             document.getElementById('projectForm').addEventListener('submit', handleSubmit);
+            // 您可以在這裡重新綁定其他的即時驗證事件
+            // document.getElementById('projectName').addEventListener('blur', validateProjectName);
         }
 
         async function handleSubmit(e) {
             e.preventDefault();
             
+            // 可以在這裡加入完整的表單驗證
+            // if (!validateForm()) { return; }
+
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
             document.getElementById('loadingSpinner').style.display = 'block';
