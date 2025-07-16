@@ -1,5 +1,6 @@
 /**
- * 簡易前端路由器 (SPA Router) - v8.0 (偵錯專用版)
+ * 簡易前端路由器 (SPA Router) - v9.0 (最終穩定版)
+ * 修正了主內容容器的 ID，並整合所有已知修復
  */
 
 const routes = {
@@ -28,8 +29,12 @@ function navigateTo(url) {
 }
 
 async function handleLocation() {
-    const app = document.getElementById('app');
-    if (!app) return;
+    // 【關鍵修正】使用正確的 ID 'app-content'
+    const appContainer = document.getElementById('app-content');
+    if (!appContainer) {
+        console.error("handleLocation() was called on a page without an #app-content element.");
+        return;
+    }
 
     const path = window.location.pathname;
     const basePath = getBasePath();
@@ -39,7 +44,7 @@ async function handleLocation() {
     const route = routes[routeKey] || routes['404'];
 
     if (!route) {
-        app.innerHTML = `<h1>路由錯誤</h1>`;
+        appContainer.innerHTML = `<h1>路由錯誤</h1>`;
         return;
     }
 
@@ -50,21 +55,22 @@ async function handleLocation() {
         const response = await fetch(fetchPath);
         if (!response.ok) throw new Error(`無法載入頁面`);
         
-        app.innerHTML = await response.text();
+        appContainer.innerHTML = await response.text();
 
         if (route.init && typeof window[route.init] === 'function') {
             window[route.init]();
         }
         updateSidebarActiveState();
     } catch (error) {
-        app.innerHTML = `<h1>頁面載入失敗</h1>`;
+        appContainer.innerHTML = `<h1>頁面載入失敗</h1>`;
     }
 }
 
 function updateSidebarActiveState() {
     const currentPath = window.location.pathname;
     document.querySelectorAll('#sidebar a[data-route]').forEach(link => {
-        link.classList.toggle('active', new URL(link.href).pathname === currentPath);
+        const linkPath = new URL(link.href).pathname;
+        link.classList.toggle('active', linkPath === currentPath);
     });
 }
 
@@ -79,47 +85,30 @@ function setupRouter() {
     });
 }
 
-// ==========================================================
-// == 【偵錯關鍵】全新的初始化流程，帶有詳細日誌 ==
-// ==========================================================
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("偵錯模式：DOMContentLoaded 事件觸發。");
-
-    // 假設 initFirebase 函式存在於 firebase-config.js 中
-    if (typeof initFirebase === 'function') {
-        initFirebase(
-            (user) => {
-                // 登入成功
-                console.log("偵錯模式：Firebase 回呼 - 登入成功。使用者:", user.email);
-                
-                // 在執行任何操作前，先印出當前的 DOM 結構
-                console.log("偵錯模式：準備檢查 #app 元素，當前的 document.body.innerHTML 如下：");
-                console.log(document.body.innerHTML); // 這會印出非常長的 HTML 字串
-
-                const appElement = document.getElementById('app');
-                const currentUserEl = document.getElementById('currentUser');
-                
-                if (currentUserEl) {
-                    currentUserEl.textContent = `👤 ${user.email}`;
-                }
-
-                if (appElement) {
-                    console.log("偵錯模式：成功找到 #app 元素！準備初始化 SPA 路由...");
-                    setupRouter();
-                    handleLocation();
-                } else {
-                    console.log("偵錯模式：在獨立頁面，跳過路由設定。");
-                }
-            },
-            () => {
-                // 未登入
-                const loginUrl = `${getBasePath()}/login_page.html`;
-                if (!window.location.pathname.endsWith('login_page.html')) {
-                    window.location.href = loginUrl;
-                }
+    // 呼叫由 firebase-config.js 提供的全域初始化函式
+    initFirebase(
+        (user) => { // 登入成功
+            const currentUserEl = document.getElementById('currentUser');
+            if (currentUserEl) {
+                currentUserEl.textContent = user ? `👤 ${user.email}` : '未登入';
             }
-        );
-    } else {
-        console.error("偵錯模式：initFirebase() 函式不存在，請檢查 firebase-config.js 是否已正確載入。");
-    }
+
+            // *** 環境偵測 ***
+            // 【關鍵修正】使用正確的 ID 'app-content' 來判斷
+            if (document.getElementById('app-content')) {
+                console.log("SPA environment detected (#app-content). Setting up router.");
+                setupRouter();
+                handleLocation();
+            } else {
+                console.log("Standalone page detected. Skipping router setup.");
+            }
+        },
+        () => { // 未登入
+            const loginUrl = `${getBasePath()}/login_page.html`;
+            if (!window.location.pathname.endsWith('login_page.html')) {
+                window.location.href = loginUrl;
+            }
+        }
+    );
 });
