@@ -1,29 +1,29 @@
 /**
- * 簡易前端路由器 (SPA Router) - v6.0 (最終穩定版)
- * 增加頁面環境檢查，使其能與獨立頁面共存
+ * 簡易前端路由器 (SPA Router) - v7.0 (最終穩定版)
+ * 修正了初始化流程，使其能安全地在 SPA 主頁和獨立頁面之間共存
  */
 
 // 【無需修改】保留您完整的路由表
 const routes = {
-    '/': { html: `pages/dashboard.html`, init: 'initDashboardPage' },
-    '/dashboard': { html: `pages/dashboard.html`, init: 'initDashboardPage' },
-    '/tenders/list': { html: `pages/tenders/list.html`, init: 'initTendersListPage' },
-    '/tenders/detail': { html: `pages/tenders/detail.html`, init: 'initTenderDetailPage' },
-    '/tenders/distribution': { html: `pages/tenders/distribution.html`, init: 'initDistributionPage' },
-    '/tenders/space-distribution': { html: `pages/tenders/space-distribution.html`, init: 'initSpaceDistributionPage' },
-    '/tenders/progress-management': { html: `pages/tenders/progress-management.html`, init: 'initProgressManagementPage' },
-    '/tenders/tracking-setup': { html: `pages/tenders/tracking-setup.html`, init: 'initTenderTrackingSetupPage' },
-    '/tenders/import': { html: `pages/tenders/import.html`, init: 'initImportPage' },
-    '/projects/create': { html: `pages/projects/create.html` },
-    '/projects/edit': { html: `pages/projects/edit.html`, init: 'initProjectEditPage' },
-    '/tenders/edit': { html: `pages/tenders/edit.html`, init: 'initTenderEditPage' },
-    '404': { html: 'pages/404.html' }
+    '/': { html: 'pages/dashboard.html', init: 'initDashboardPage', title: '首頁' },
+    '/dashboard': { html: 'pages/dashboard.html', init: 'initDashboardPage', title: '儀表板' },
+    '/tenders/list': { html: 'pages/tenders/list.html', init: 'initTendersListPage', title: '標單列表' },
+    '/tenders/detail': { html: 'pages/tenders/detail.html', init: 'initTenderDetailPage', title: '標單詳情' },
+    '/tenders/distribution': { html: 'pages/tenders/distribution.html', init: 'initDistributionPage', title: '樓層分配' },
+    '/tenders/space-distribution': { html: 'pages/tenders/space-distribution.html', init: 'initSpaceDistributionPage', title: '空間分配' },
+    '/tenders/progress-management': { html: 'pages/tenders/progress-management.html', init: 'initProgressManagementPage', title: '進度管理' },
+    '/tenders/tracking-setup': { html: 'pages/tenders/tracking-setup.html', init: 'initTenderTrackingSetupPage', title: '追蹤設定' },
+    '/tenders/import': { html: 'pages/tenders/import.html', init: 'initImportPage', title: '匯入標單' },
+    '/projects/create': { html: 'pages/projects/create.html', title: '新增專案' },
+    '/projects/edit': { html: 'pages/projects/edit.html', init: 'initProjectEditPage', title: '編輯專案' },
+    '/tenders/edit': { html: 'pages/tenders/edit.html', init: 'initTenderEditPage', title: '編輯標單' },
+    '404': { html: 'pages/404.html', title: '找不到頁面' }
 };
 
 // 輔助函式：取得 GitHub Pages 的基礎路徑
 function getBasePath() {
     const isGitHubPages = window.location.hostname.includes('github.io');
-    return isGitHubPages ? `/program` : '';
+    return isGitHubPages ? '/program' : '';
 }
 
 // 導航函式
@@ -34,18 +34,16 @@ const navigateTo = url => {
 
 const handleLocation = async () => {
     const app = document.getElementById('app');
-    // 這個檢查仍然保留，作為雙重保險
+    // 雙重保險：如果此函式被意外呼叫，提前退出
     if (!app) {
-        console.error("handleLocation called on a page without #app element.");
+        console.error("handleLocation() was called on a page without an #app element. This should not happen.");
         return;
     }
 
     const path = window.location.pathname;
     const basePath = getBasePath();
     let routeKey = path.startsWith(basePath) ? path.substring(basePath.length) : path;
-    if (routeKey === "" || routeKey === "/") {
-        routeKey = "/";
-    }
+    if (routeKey === "") routeKey = "/";
     
     const route = routes[routeKey] || routes['404'];
 
@@ -78,7 +76,8 @@ const handleLocation = async () => {
 function updateSidebarActiveState() {
     const currentPath = window.location.pathname;
     document.querySelectorAll('#sidebar a[data-route]').forEach(link => {
-        if (link.pathname === currentPath) {
+        const linkPath = new URL(link.href).pathname;
+        if (linkPath === currentPath) {
             link.classList.add('active');
         } else {
             link.classList.remove('active');
@@ -97,51 +96,68 @@ function setupRouter() {
     window.addEventListener('popstate', handleLocation);
 }
 
-
 // ==========================================================
-// == 【關鍵修正】初始化時，先檢查自己在哪種類型的頁面 ==
+// == 【最終關鍵修正】初始化時，先偵查環境 ==
 // ==========================================================
 document.addEventListener('DOMContentLoaded', () => {
-    // 檢查頁面上是否存在 #app "畫框"
-    const appElement = document.getElementById('app');
+    // 由於 firebase-config.js 會先執行並呼叫 initFirebase，
+    // 我們需要確保 initFirebase 本身是安全的。
+    // 這個檔案現在只提供路由相關的函式，並等待被呼叫。
+    console.log("router.js loaded and ready.");
+});
 
-    if (appElement) {
-        // --- 情況一：這是在 SPA 主頁 (index.html) ---
-        console.log("Router: #app element found. Initializing SPA mode.");
-        initFirebase(
-            (user) => {
-                const currentUserEl = document.getElementById('currentUser');
-                if(currentUserEl) currentUserEl.textContent = `👤 ${user.email}`;
-                setupRouter();    // 設定路由點擊事件
-                handleLocation(); // 載入初始頁面內容
-            },
-            () => {
-                const loginUrl = `${getBasePath()}/login_page.html`;
-                if (!window.location.pathname.endsWith('login_page.html')) {
-                    window.location.href = loginUrl;
-                }
+// 假設 firebase-config.js 的 initFirebase 是這樣
+/*
+function initFirebase(onUser, onNoUser) {
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            onUser(user);
+        } else {
+            onNoUser();
+        }
+    });
+}
+*/
+
+// 我們需要修改的是 index.html 和其他頁面呼叫 initFirebase 的方式，
+// 但最簡單的方法是直接修正 router.js 的初始化部分，讓它自己處理。
+
+// 為了確保萬無一失，請用這段取代您 router.js 最下方的 DOMContentLoaded
+// (舊的程式碼已完全移除，替換成這個)
+document.addEventListener('DOMContentLoaded', () => {
+    // 這個函式只會在 initFirebase.js 載入並驗證使用者後被呼叫
+    const initializePage = (user) => {
+        // 更新所有頁面都會有的使用者資訊
+        const currentUserEl = document.getElementById('currentUser');
+        if (currentUserEl) {
+            currentUserEl.textContent = user ? `👤 ${user.email}` : '未登入';
+        }
+
+        // *** 環境偵測 ***
+        // 只有在主應用程式頁面 (有 #app 的頁面) 才設定和執行路由
+        if (document.getElementById('app')) {
+            console.log("SPA environment detected. Setting up router.");
+            setupRouter();
+            handleLocation();
+        } else {
+            console.log("Standalone page detected. Skipping router setup.");
+            // 在獨立頁面，我們什麼都不用做，因為帳號已經在上面更新了
+        }
+    };
+
+    // 呼叫由 firebase-config.js 提供的全域初始化函式
+    initFirebase(
+        (user) => {
+            // 登入成功
+            initializePage(user);
+        },
+        () => {
+            // 未登入
+            const baseUrl = getBasePath();
+            const loginUrl = `${baseUrl}/login_page.html`;
+            if (!window.location.pathname.endsWith('login_page.html')) {
+                window.location.href = loginUrl;
             }
-        );
-    } else {
-        // --- 情況二：這是在一個獨立頁面 (如 create.html) ---
-        console.log("Router: #app element not found. Initializing in standalone page mode.");
-        // 在獨立頁面，我們只需要初始化 Firebase 來驗證使用者身份，但【不執行】路由功能
-        initFirebase(
-            (user) => {
-                // 獨立頁面也可能有顯示使用者資訊的地方
-                const currentUserEl = document.getElementById('currentUser');
-                if(currentUserEl) {
-                     // 這裡就是解決您「帳號載入中」問題的關鍵！
-                    currentUserEl.textContent = user.email;
-                }
-            },
-            () => {
-                const loginUrl = `${getBasePath()}/login_page.html`;
-                // 獨立頁面也需要被保護
-                if (!window.location.pathname.endsWith('login_page.html')) {
-                    window.location.href = loginUrl;
-                }
-            }
-        );
-    }
+        }
+    );
 });
