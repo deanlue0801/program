@@ -5,6 +5,7 @@
     <title>新增專案</title>
     <link rel="stylesheet" href="../../assets/css/components/forms.css">
     <link rel="stylesheet" href="../../assets/css/components/buttons.css">
+    <link rel="stylesheet" href="../../assets/css/components/alerts.css">
 </head>
 <body>
     <div class="page-header">
@@ -28,10 +29,6 @@
                         <input type="text" id="projectCode" class="form-input" required>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">專案描述</label>
-                    <textarea id="projectDescription" class="form-input form-textarea"></textarea>
-                </div>
             </div>
 
             <div class="form-actions">
@@ -43,42 +40,49 @@
 
     <script>
     function initProjectCreatePage() {
-        const auth = firebase.auth();
-        const currentUser = auth.currentUser; 
-        
-        if (!currentUser) {
-            console.error("Create Page: User not found!");
-            return;
-        }
+        // ================= 偵錯點 1 =================
+        console.log("偵錯日誌：initProjectCreatePage() 函式已開始執行。");
 
         const form = document.getElementById('projectForm');
         const submitBtn = document.getElementById('submitBtn');
-        const messageArea = document.getElementById('project-message-area');
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const currentUser = auth.currentUser; 
 
-        // 自動產生專案編號
-        const projectCodeInput = document.getElementById('projectCode');
-        if (!projectCodeInput.value) {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            projectCodeInput.value = `PROJ-${year}${month}`;
+        if (!form || !submitBtn) {
+            console.error("偵錯日誌：嚴重錯誤！找不到 #projectForm 或 #submitBtn 元素。");
+            return;
         }
+        
+        if (!currentUser) {
+            console.error("偵錯日誌：嚴重錯誤！無法獲取 currentUser。");
+            alert("錯誤：無法獲取使用者資訊，請重新整理頁面。");
+            return;
+        }
+
+        // ================= 偵錯點 2 =================
+        console.log("偵錯日誌：成功獲取所有必要元素與使用者資訊。準備綁定表單提交事件。");
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+
+            // ================= 偵錯點 3 =================
+            console.log("偵錯日誌：表單提交事件已被觸發！");
+
             submitBtn.disabled = true;
             submitBtn.textContent = '建立中...';
-            messageArea.innerHTML = '';
 
             try {
                 const projectData = {
                     projectName: document.getElementById('projectName').value.trim(),
                     projectCode: document.getElementById('projectCode').value.trim(),
-                    description: document.getElementById('projectDescription').value.trim(),
                     members: [{ email: currentUser.email, role: 'owner' }],
                     memberEmails: [currentUser.email],
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
+
+                // ================= 偵錯點 4 =================
+                console.log("偵錯日誌：已收集表單資料，準備寫入資料庫:", projectData);
 
                 if (!projectData.projectName || !projectData.projectCode) {
                     throw new Error("專案名稱和編號為必填項。");
@@ -91,16 +95,21 @@
 
                 await db.collection('projects').add(projectData);
                 
+                // ================= 偵錯點 5 =================
+                console.log("偵錯日誌：專案建立成功！");
+                
                 alert('專案建立成功！');
                 navigateTo('/program/tenders/list');
 
             } catch (error) {
-                console.error("Failed to create project:", error);
-                messageArea.innerHTML = `<div class="error-message">${error.message}</div>`;
+                console.error("偵錯日誌：在建立過程中發生錯誤:", error);
+                alert(`建立失敗: ${error.message}`);
                 submitBtn.disabled = false;
                 submitBtn.textContent = '建立專案';
             }
         });
+
+        console.log("偵錯日誌：表單提交事件已成功綁定。");
     }
     </script>
 </body>
