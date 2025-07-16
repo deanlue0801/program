@@ -1,5 +1,5 @@
 /**
- * 標單列表頁面 (tenders/list.js) (SPA 版本) - v2.0 SPA 標準化
+ * 標單列表頁面 (tenders/list.js) (SPA 版本) - v3.0 SPA 標準化
  * 由 router.js 呼叫 initTendersListPage() 函數來啟動
  */
 function initTendersListPage() {
@@ -9,25 +9,32 @@ function initTendersListPage() {
     let allProjects = [];
     let filteredAndGroupedData = [];
 
+    // --- Firebase 資料庫相關函式 ---
+    // (此處假設您在 firebase-config.js 或其他地方定義了 loadTenders, loadProjects, deleteTenderAndRelatedData 等函式)
+    // 如果沒有，您需要確保這些函式可用
+    // 範例:
+    // async function loadProjects() { ... }
+    // async function loadTenders() { ... }
+    // async function deleteTenderAndRelatedData(tenderId) { ... }
+
+
     // --- 資料載入 ---
     async function loadAllData() {
         showLoading(true);
         try {
-            // 使用 Promise.all 同時載入標單和專案資料，提升效率
             const [tenders, projects] = await Promise.all([
                 loadTenders(),
                 loadProjects()
             ]);
 
             allProjects = projects;
-            // 將專案名稱直接附加到標單物件上，方便後續使用
             allTenders = tenders.map(tender => ({
                 ...tender,
                 projectName: projects.find(p => p.id === tender.projectId)?.name || '未歸屬專案'
             }));
 
             updateProjectFilter();
-            applyFiltersAndGroup(); // 初始載入時先應用一次預設篩選
+            applyFiltersAndGroup();
             updateSummary();
 
         } catch (error) {
@@ -129,7 +136,7 @@ function initTendersListPage() {
         const mainContent = document.getElementById('mainContent');
         if (!mainContent) return;
 
-        // 使用事件委派來處理所有點擊事件
+        // 使用事件委派來處理所有按鈕點擊事件
         mainContent.addEventListener('click', (event) => {
             const target = event.target.closest('button[data-action]');
             if (!target) return;
@@ -155,11 +162,12 @@ function initTendersListPage() {
             }
         });
 
-        // 處理篩選器的變動
+        // 為篩選器和搜尋框單獨綁定事件
         document.getElementById('projectFilter')?.addEventListener('change', applyFiltersAndGroup);
         document.getElementById('statusFilter')?.addEventListener('change', applyFiltersAndGroup);
         document.getElementById('searchInput')?.addEventListener('input', applyFiltersAndGroup);
-        document.querySelector('button[onclick*="clearFilters"]')?.setAttribute('data-action', 'clear-filters');
+        
+        // 【修正】移除 document.querySelector('button[onclick... 這行，因為已不再需要
     }
 
     function applyFiltersAndGroup() {
