@@ -1,221 +1,120 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>新增專案 - 專案管理系統</title>
-    <link rel="stylesheet" href="/program/assets/css/layout.css">
-    <link rel="stylesheet" href="/program/assets/css/components/forms.css">
-    <link rel="stylesheet" href="/program/assets/css/components/buttons.css">
-    <link rel="stylesheet" href="/program/assets/css/components/alerts.css">
-    <link rel="stylesheet" href="/program/assets/css/components/loading.css">
-</head>
-<body>
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="nav-left">
-                <a href="javascript:void(0)" onclick="goToDashboard()" class="logo">
-                    <span>🏗️</span>
-                    <span>專案管理系統</span>
-                </a>
-                <div class="breadcrumb">
-                    <a href="javascript:void(0)" onclick="goToDashboard()">首頁</a>
-                    <span>›</span>
-                    <a href="list.html">專案管理</a>
-                    <span>›</span>
-                    <span id="pageMode">新增專案</span>
+<div class="page-header">
+    <h1 class="page-title" id="pageTitle">🚀 新增專案</h1>
+    <p class="page-subtitle" id="pageSubtitle">建立新的建築工程專案</p>
+</div>
+
+<div class="form-container">
+    <div id="successMessage" class="success-message" style="display: none;"></div>
+    <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+    <form id="projectForm" action="javascript:void(0);">
+        <div class="form-section">
+            <h3 class="section-title"><span>📋</span>基本資訊</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">專案名稱<span class="required">*</span></label>
+                    <input type="text" id="projectName" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">專案編號<span class="required">*</span></label>
+                    <input type="text" id="projectCode" class="form-input" required>
                 </div>
             </div>
-            <div class="nav-right">
-                <div class="user-info">
-                    <span>👤</span>
-                    <span id="currentUser">載入中...</span>
-                </div>
-                <a href="list.html" class="back-btn">
-                    <span>←</span>
-                    <span>返回列表</span>
-                </a>
+            <div class="form-group">
+                <label class="form-label">專案描述</label>
+                <textarea id="projectDescription" class="form-input form-textarea"></textarea>
             </div>
         </div>
-    </nav>
 
-    <div class="main-container">
-        <div class="page-header">
-            <h1 class="page-title" id="pageTitle">🚀 新增專案</h1>
-            <p class="page-subtitle" id="pageSubtitle">建立新的建築工程專案</p>
+        <div class="form-section">
+            <h3 class="section-title"><span>💰</span>專案規模</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">專案預算<span class="required">*</span></label>
+                    <input type="number" id="projectBudget" class="form-input" required min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">專案狀態</label>
+                    <select id="projectStatus" class="form-input form-select">
+                        <option value="planning">規劃中</option>
+                        <option value="active">進行中</option>
+                        <option value="completed">已完成</option>
+                    </select>
+                </div>
+            </div>
         </div>
 
-        <div class="form-container">
-            <div id="successMessage" class="success-message" style="display: none;">
-                <span>✅</span>
-                <span id="successText"></span>
-            </div>
-            <div id="errorMessage" class="error-message" style="display: none;">
-                <span>❌</span>
-                <span id="errorText"></span>
-            </div>
-
-            <form id="projectForm" action="javascript:void(0);">
-                <div class="form-section">
-                    <h3 class="section-title"><span>📋</span>基本資訊</h3>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label class="form-label">專案名稱<span class="required">*</span></label>
-                            <input type="text" id="projectName" class="form-input" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">專案編號<span class="required">*</span></label>
-                            <input type="text" id="projectCode" class="form-input" required>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-actions">
-                    <a href="list.html" class="btn btn-secondary"><span>❌</span>取消</a>
-                    <button type="submit" class="btn btn-primary" id="submitBtn">
-                        <span class="loading-spinner" id="loadingSpinner"></span>
-                        <span id="submitText"><span>💾</span>建立專案</span>
-                    </button>
-                </div>
-            </form>
+        <div class="form-actions">
+            <button type="button" class="btn btn-secondary" onclick="navigateTo('/program/tenders/list')">取消</button>
+            <button type="submit" class="btn btn-primary" id="submitBtn">建立專案</button>
         </div>
-    </div>
+    </form>
+</div>
 
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script>
+function initProjectCreatePage() {
+    // 獲取當前使用者，因為 router.js 不再傳遞，我們從全域獲取
+    // 假設 firebase-config.js 會將 user 存在 window.currentUser 中
+    const auth = firebase.auth();
+    const currentUser = auth.currentUser; 
     
-    <script src="../../assets/js/firebase-config.js"></script>
+    if (!currentUser) {
+        console.error("Create Page: User not found!");
+        return;
+    }
 
-    <script>
-        // 全域變數
-        let currentUser;
-        let isEditMode = false;
-        let editProjectId = null;
+    const form = document.getElementById('projectForm');
+    const submitBtn = document.getElementById('submitBtn');
 
-        // 頁面載入完成後執行
-        document.addEventListener('DOMContentLoaded', () => {
-            // initApp 現在由 firebase-config.js 呼叫，我們只需監聽認證狀態
-            if (typeof auth !== 'undefined') {
-                auth.onAuthStateChanged(user => {
-                    if (user) {
-                        currentUser = user;
-                        console.log('使用者已登入:', currentUser.email);
-                        setupPage();
-                    } else {
-                        console.log('使用者未登入，將跳轉...');
-                        window.location.href = '../../login_page.html';
-                    }
-                });
-            } else {
-                console.error('Firebase Auth 物件未定義，請檢查 firebase-config.js 的載入順序。');
-                showError('系統設定檔載入失敗。');
+    // 自動產生專案編號
+    const projectCodeInput = document.getElementById('projectCode');
+    if (!projectCodeInput.value) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        projectCodeInput.value = `PROJ-${year}${month}`;
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        submitBtn.disabled = true;
+        submitBtn.textContent = '建立中...';
+
+        try {
+            const projectData = {
+                projectName: document.getElementById('projectName').value.trim(),
+                projectCode: document.getElementById('projectCode').value.trim(),
+                description: document.getElementById('projectDescription').value.trim(),
+                budget: parseFloat(document.getElementById('projectBudget').value) || 0,
+                status: document.getElementById('projectStatus').value,
+                
+                // 新的權限結構
+                members: [{ email: currentUser.email, role: 'owner' }],
+                memberEmails: [currentUser.email],
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            if (!projectData.projectName || !projectData.projectCode) {
+                throw new Error("專案名稱和編號為必填項。");
             }
-        });
 
-        function setupPage() {
-            updateUserInfo(currentUser);
-            checkEditModeAndLoadData();
-            bindEvents();
-        }
-        
-        function updateUserInfo(user) {
-            document.getElementById('currentUser').textContent = user.email;
-        }
+            // 檢查編號是否重複
+            const codeQuery = await db.collection('projects').where('projectCode', '==', projectData.projectCode).get();
+            if (!codeQuery.empty) {
+                throw new Error('專案編號已存在，請使用其他編號。');
+            }
 
-        function checkEditModeAndLoadData() {
-            const urlParams = new URLSearchParams(window.location.search);
-            editProjectId = urlParams.get('edit');
+            await db.collection('projects').add(projectData);
             
-            if (editProjectId) {
-                isEditMode = true;
-                document.getElementById('pageTitle').textContent = '✏️ 編輯專案';
-                document.getElementById('submitText').innerHTML = '<span>💾</span><span>更新專案</span>';
-                loadProjectForEdit(editProjectId);
-            } else {
-                isEditMode = false;
-                generateProjectCode();
-            }
+            alert('專案建立成功！');
+            navigateTo('/program/tenders/list');
+
+        } catch (error) {
+            console.error("Failed to create project:", error);
+            alert(`建立失敗: ${error.message}`);
+            submitBtn.disabled = false;
+            submitBtn.textContent = '建立專案';
         }
-
-        async function loadProjectForEdit(projectId) {
-            try {
-                const doc = await db.collection('projects').doc(projectId).get();
-                if (!doc.exists) {
-                    showError('找不到指定的專案');
-                    setTimeout(() => window.location.href = 'list.html', 2000);
-                    return;
-                }
-                fillFormWithProject(doc.data());
-            } catch (error) {
-                showError('載入專案資料失敗: ' + error.message);
-            }
-        }
-
-        function fillFormWithProject(project) {
-            document.getElementById('projectName').value = project.projectName || ''; 
-            document.getElementById('projectCode').value = project.projectCode || '';
-        }
-
-        function generateProjectCode() {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            document.getElementById('projectCode').value = `PROJ-${year}${month}${day}`;
-        }
-
-        function bindEvents() {
-            document.getElementById('projectForm').addEventListener('submit', handleSubmit);
-        }
-
-        async function handleSubmit(e) {
-            e.preventDefault();
-            const submitBtn = document.getElementById('submitBtn');
-            submitBtn.disabled = true;
-
-            try {
-                const projectData = {
-                    projectName: document.getElementById('projectName').value.trim(),
-                    projectCode: document.getElementById('projectCode').value.trim(),
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                };
-
-                if (isEditMode) {
-                    await db.collection('projects').doc(editProjectId).update(projectData);
-                    showSuccess('專案更新成功！');
-                } else {
-                    const codeQuery = await db.collection('projects').where('projectCode', '==', projectData.projectCode).get();
-                    if (!codeQuery.empty) throw new Error('專案編號已存在');
-                    
-                    projectData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                    projectData.members = [{ email: currentUser.email, role: 'owner' }];
-                    projectData.memberEmails = [currentUser.email];
-                    await db.collection('projects').add(projectData);
-                    showSuccess('專案建立成功！');
-                }
-                setTimeout(() => window.location.href = 'list.html', 1500);
-            } catch (error) {
-                showError('操作失敗: ' + error.message);
-                submitBtn.disabled = false;
-            }
-        }
-
-        function goToDashboard() {
-            window.location.href = '../dashboard.html';
-        }
-
-        function showSuccess(message) {
-            document.getElementById('successText').textContent = message;
-            document.getElementById('successMessage').style.display = 'flex';
-            document.getElementById('errorMessage').style.display = 'none';
-        }
-
-        function showError(message) {
-            document.getElementById('errorText').textContent = message;
-            document.getElementById('errorMessage').style.display = 'flex';
-            document.getElementById('successMessage').style.display = 'none';
-        }
-    </script>
-</body>
-</html>
+    });
+}
+</script>
