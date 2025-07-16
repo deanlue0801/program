@@ -1,9 +1,9 @@
 /**
- * 簡易前端路由器 (SPA Router) - v4.0 (GitHub Pages SPA 最終解決方案)
+ * 簡易前端路由器 (SPA Router) - v5.0 (最終修正版)
+ * 結合了使用者原始架構與修正後的路由引擎
  */
 
-const GHP_BASE_PATH = 'program';
-
+// 【無需修改】保留您完整的路由表
 const routes = {
     '/': { html: `pages/dashboard.html`, init: 'initDashboardPage' },
     '/dashboard': { html: `pages/dashboard.html`, init: 'initDashboardPage' },
@@ -14,86 +14,81 @@ const routes = {
     '/tenders/progress-management': { html: `pages/tenders/progress-management.html`, init: 'initProgressManagementPage' },
     '/tenders/tracking-setup': { html: `pages/tenders/tracking-setup.html`, init: 'initTenderTrackingSetupPage' },
     '/tenders/import': { html: `pages/tenders/import.html`, init: 'initImportPage' },
-    '/projects/create': { html: `pages/projects/create.html` },
-    // 【新增規則】編輯專案的路由
+    '/projects/create': { html: `pages/projects/create.html` }, // 這頁沒有 init 函式，是正常的
     '/projects/edit': { html: `pages/projects/edit.html`, init: 'initProjectEditPage' },
     '/tenders/edit': { html: `pages/tenders/edit.html`, init: 'initTenderEditPage' },
     '404': { html: 'pages/404.html' }
 };
 
+// 輔助函式：取得 GitHub Pages 的基礎路徑
 function getBasePath() {
+    // 您的 GHP_BASE_PATH 是 'program'
     const isGitHubPages = window.location.hostname.includes('github.io');
-    return isGitHubPages ? `/${GHP_BASE_PATH}` : '';
+    return isGitHubPages ? `/program` : ''; // 回傳的路徑不應有結尾斜線
 }
 
+// 導航函式
 const navigateTo = url => {
     history.pushState(null, null, url);
     handleLocation();
 };
 
+// ==========================================================
+// == 【關鍵修正】修正後的 handleLocation 函式 ==
+// ==========================================================
 const handleLocation = async () => {
-    const path = window.location.pathname;
-    const basePath = '/program/'; // 定義您的 GitHub Pages 基礎路徑
-    
-    // 調整路徑以匹配路由表，移除基礎路徑
-    let adjustedPath = path;
-    if (path.startsWith(basePath)) {
-        adjustedPath = path.substring(basePath.length - 1); // 結果會是 / 或 /projects/list
+    const app = document.getElementById('app');
+    if (!app) {
+        console.error("Fatal Error: #app element not found in the main document.");
+        return;
     }
 
-    const route = routes[adjustedPath] || routes['404'];
-    document.title = route.title;
+    const path = window.location.pathname;
+    const basePath = getBasePath();
+    
+    // 修正1：從完整路徑中正確提取出路由鍵
+    let routeKey = path;
+    if (path.startsWith(basePath)) {
+        routeKey = path.substring(basePath.length); // 例如，從 "/program/projects/list" 得到 "/projects/list"
+    }
+    if (routeKey === "") {
+        routeKey = "/"; // 確保根路徑是 "/"
+    }
+    
+    // 根據路由鍵尋找對應的路由設定，如果找不到，就使用 '404'
+    const route = routes[routeKey] || routes['404'];
+
+    if (!route) {
+        document.title = "錯誤";
+        app.innerHTML = `<h1>路由設定錯誤</h1><p>找不到路徑 "${routeKey}" 的設定，且未指定 404 頁面。</p>`;
+        return;
+    }
+
+    // 更新網頁標題（安全地檢查 title 屬性是否存在）
+    document.title = route.title || '專案管理系統';
 
     try {
-        // 建立要抓取的 HTML 檔案的完整路徑
-        const fetchPath = basePath + route.path.substring(1); // 結果會是 /program/pages/dashboard.html
+        // 修正2：使用 route.html 而不是 route.path
+        const fetchPath = `${basePath}/${route.html}`; 
+        
         const response = await fetch(fetchPath);
-        if (!response.ok) throw new Error(`Failed to fetch page: ${fetchPath}`);
+        if (!response.ok) {
+            throw new Error(`無法載入頁面 (${response.status}): ${fetchPath}`);
+        }
         
         const html = await response.text();
         app.innerHTML = html;
 
-        // --- 以下是關鍵修正 ---
-        
-        // 從載入的 HTML 中提取並載入 CSS
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const links = doc.querySelectorAll('link[rel="stylesheet"]');
-        
-        // 清除舊的動態載入樣式
-        document.querySelectorAll('link[data-dynamic-style]').forEach(el => el.remove());
+        // 修正3：在載入 HTML 後，呼叫您定義的 init 函式
+        if (route.init && typeof window[route.init] === 'function') {
+            console.log(`Executing init function: ${route.init}`);
+            window[route.init]();
+        } else if (route.init) {
+            console.warn(`Init function "${route.init}" was defined in routes but not found on window object.`);
+        }
 
-        links.forEach(link => {
-            const originalHref = link.getAttribute('href');
-            if (!originalHref) return;
-
-            // 使用 URL 物件來正確解析相對路徑
-            // new URL(fetchPath, window.location.origin) 會得到 HTML 檔案的絕對 URL
-            // 例如：https://deanlue0801.github.io/program/pages/dashboard.html
-            const resolvedCssUrl = new URL(originalHref, new URL(fetchPath, window.location.origin));
-
-            const newLink = document.createElement('link');
-            newLink.rel = 'stylesheet';
-            newLink.href = resolvedCssUrl.pathname; // 我們只取路徑部分，例如 /program/assets/css/layout.css
-            newLink.setAttribute('data-dynamic-style', 'true');
-            document.head.appendChild(newLink);
-        });
-
-        // 從載入的 HTML 中提取並執行 scripts (這部分邏輯不變)
-        const scripts = doc.querySelectorAll('script');
-        scripts.forEach(script => {
-            const newScript = document.createElement('script');
-            if (script.src) {
-                // 處理外部腳本
-                const resolvedScriptUrl = new URL(script.src, new URL(fetchPath, window.location.origin));
-                newScript.src = resolvedScriptUrl.pathname;
-            } else {
-                // 處理內聯腳本
-                newScript.textContent = script.textContent;
-            }
-            // 確保腳本被執行
-            document.body.appendChild(newScript);
-        });
+        // 更新側邊欄的 활성화 狀態
+        updateSidebarActiveState();
 
     } catch (error) {
         console.error('Routing error:', error);
@@ -101,10 +96,12 @@ const handleLocation = async () => {
     }
 };
 
+// 【無需修改】保留您原本的輔助函式
 function updateSidebarActiveState() {
-    const currentCleanPath = window.location.pathname.split('?')[0];
+    const currentPath = window.location.pathname;
     document.querySelectorAll('#sidebar a[data-route]').forEach(link => {
-        if (link.pathname === currentCleanPath) {
+        // 確保比較時都使用絕對路徑
+        if (link.pathname === currentPath) {
             link.classList.add('active');
         } else {
             link.classList.remove('active');
@@ -123,6 +120,7 @@ function setupRouter() {
     window.addEventListener('popstate', handleLocation);
 }
 
+// 【無需修改】保留您原本的初始化流程
 document.addEventListener('DOMContentLoaded', () => {
     initFirebase(
         (user) => {
