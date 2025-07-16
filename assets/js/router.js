@@ -1,6 +1,6 @@
 /**
- * 簡易前端路由器 (SPA Router) - v5.0 (最終修正版)
- * 結合了使用者原始架構與修正後的路由引擎
+ * 簡易前端路由器 (SPA Router) - v6.0 (最終穩定版)
+ * 增加頁面環境檢查，使其能與獨立頁面共存
  */
 
 // 【無需修改】保留您完整的路由表
@@ -14,7 +14,7 @@ const routes = {
     '/tenders/progress-management': { html: `pages/tenders/progress-management.html`, init: 'initProgressManagementPage' },
     '/tenders/tracking-setup': { html: `pages/tenders/tracking-setup.html`, init: 'initTenderTrackingSetupPage' },
     '/tenders/import': { html: `pages/tenders/import.html`, init: 'initImportPage' },
-    '/projects/create': { html: `pages/projects/create.html` }, // 這頁沒有 init 函式，是正常的
+    '/projects/create': { html: `pages/projects/create.html` },
     '/projects/edit': { html: `pages/projects/edit.html`, init: 'initProjectEditPage' },
     '/tenders/edit': { html: `pages/tenders/edit.html`, init: 'initTenderEditPage' },
     '404': { html: 'pages/404.html' }
@@ -22,9 +22,8 @@ const routes = {
 
 // 輔助函式：取得 GitHub Pages 的基礎路徑
 function getBasePath() {
-    // 您的 GHP_BASE_PATH 是 'program'
     const isGitHubPages = window.location.hostname.includes('github.io');
-    return isGitHubPages ? `/program` : ''; // 回傳的路徑不應有結尾斜線
+    return isGitHubPages ? `/program` : '';
 }
 
 // 導航函式
@@ -33,61 +32,41 @@ const navigateTo = url => {
     handleLocation();
 };
 
-// ==========================================================
-// == 【關鍵修正】修正後的 handleLocation 函式 ==
-// ==========================================================
 const handleLocation = async () => {
     const app = document.getElementById('app');
+    // 這個檢查仍然保留，作為雙重保險
     if (!app) {
-        console.error("Fatal Error: #app element not found in the main document.");
+        console.error("handleLocation called on a page without #app element.");
         return;
     }
 
     const path = window.location.pathname;
     const basePath = getBasePath();
-    
-    // 修正1：從完整路徑中正確提取出路由鍵
-    let routeKey = path;
-    if (path.startsWith(basePath)) {
-        routeKey = path.substring(basePath.length); // 例如，從 "/program/projects/list" 得到 "/projects/list"
-    }
-    if (routeKey === "") {
-        routeKey = "/"; // 確保根路徑是 "/"
+    let routeKey = path.startsWith(basePath) ? path.substring(basePath.length) : path;
+    if (routeKey === "" || routeKey === "/") {
+        routeKey = "/";
     }
     
-    // 根據路由鍵尋找對應的路由設定，如果找不到，就使用 '404'
     const route = routes[routeKey] || routes['404'];
 
     if (!route) {
-        document.title = "錯誤";
-        app.innerHTML = `<h1>路由設定錯誤</h1><p>找不到路徑 "${routeKey}" 的設定，且未指定 404 頁面。</p>`;
+        app.innerHTML = `<h1>路由錯誤</h1><p>找不到路徑 "${routeKey}" 的設定。</p>`;
         return;
     }
 
-    // 更新網頁標題（安全地檢查 title 屬性是否存在）
     document.title = route.title || '專案管理系統';
 
     try {
-        // 修正2：使用 route.html 而不是 route.path
-        const fetchPath = `${basePath}/${route.html}`; 
-        
+        const fetchPath = `${basePath}/${route.html}`;
         const response = await fetch(fetchPath);
-        if (!response.ok) {
-            throw new Error(`無法載入頁面 (${response.status}): ${fetchPath}`);
-        }
+        if (!response.ok) throw new Error(`無法載入頁面 (${response.status})`);
         
-        const html = await response.text();
-        app.innerHTML = html;
+        app.innerHTML = await response.text();
 
-        // 修正3：在載入 HTML 後，呼叫您定義的 init 函式
         if (route.init && typeof window[route.init] === 'function') {
-            console.log(`Executing init function: ${route.init}`);
             window[route.init]();
-        } else if (route.init) {
-            console.warn(`Init function "${route.init}" was defined in routes but not found on window object.`);
         }
 
-        // 更新側邊欄的 활성화 狀態
         updateSidebarActiveState();
 
     } catch (error) {
@@ -96,11 +75,9 @@ const handleLocation = async () => {
     }
 };
 
-// 【無需修改】保留您原本的輔助函式
 function updateSidebarActiveState() {
     const currentPath = window.location.pathname;
     document.querySelectorAll('#sidebar a[data-route]').forEach(link => {
-        // 確保比較時都使用絕對路徑
         if (link.pathname === currentPath) {
             link.classList.add('active');
         } else {
@@ -120,21 +97,51 @@ function setupRouter() {
     window.addEventListener('popstate', handleLocation);
 }
 
-// 【無需修改】保留您原本的初始化流程
+
+// ==========================================================
+// == 【關鍵修正】初始化時，先檢查自己在哪種類型的頁面 ==
+// ==========================================================
 document.addEventListener('DOMContentLoaded', () => {
-    initFirebase(
-        (user) => {
-            const currentUserEl = document.getElementById('currentUser');
-            if(currentUserEl) currentUserEl.textContent = `👤 ${user.email}`;
-            setupRouter();
-            handleLocation();
-        },
-        () => {
-            const baseUrl = getBasePath();
-            const loginUrl = `${baseUrl}/login_page.html`;
-            if (!window.location.pathname.endsWith('login_page.html')) {
-                window.location.href = loginUrl;
+    // 檢查頁面上是否存在 #app "畫框"
+    const appElement = document.getElementById('app');
+
+    if (appElement) {
+        // --- 情況一：這是在 SPA 主頁 (index.html) ---
+        console.log("Router: #app element found. Initializing SPA mode.");
+        initFirebase(
+            (user) => {
+                const currentUserEl = document.getElementById('currentUser');
+                if(currentUserEl) currentUserEl.textContent = `👤 ${user.email}`;
+                setupRouter();    // 設定路由點擊事件
+                handleLocation(); // 載入初始頁面內容
+            },
+            () => {
+                const loginUrl = `${getBasePath()}/login_page.html`;
+                if (!window.location.pathname.endsWith('login_page.html')) {
+                    window.location.href = loginUrl;
+                }
             }
-        }
-    );
+        );
+    } else {
+        // --- 情況二：這是在一個獨立頁面 (如 create.html) ---
+        console.log("Router: #app element not found. Initializing in standalone page mode.");
+        // 在獨立頁面，我們只需要初始化 Firebase 來驗證使用者身份，但【不執行】路由功能
+        initFirebase(
+            (user) => {
+                // 獨立頁面也可能有顯示使用者資訊的地方
+                const currentUserEl = document.getElementById('currentUser');
+                if(currentUserEl) {
+                     // 這裡就是解決您「帳號載入中」問題的關鍵！
+                    currentUserEl.textContent = user.email;
+                }
+            },
+            () => {
+                const loginUrl = `${getBasePath()}/login_page.html`;
+                // 獨立頁面也需要被保護
+                if (!window.location.pathname.endsWith('login_page.html')) {
+                    window.location.href = loginUrl;
+                }
+            }
+        );
+    }
 });
