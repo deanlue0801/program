@@ -31,31 +31,75 @@ const navigateTo = url => {
     handleLocation();
 };
 
-async function handleLocation() {
-    const basePath = getBasePath();
-    let path = window.location.pathname.replace(basePath, '');
-    if (path === '' || path === '/') path = '/dashboard';
+const handleLocation = async () => {
+    const path = window.location.pathname;
+    const basePath = '/program/'; // 定義您的 GitHub Pages 基礎路徑
     
-    const cleanPath = path.split('?')[0];
-    const route = routes[cleanPath] || routes['404'];
-    
-    try {
-        const fetchPath = `${basePath}/${route.html}`;
-        const response = await fetch(fetchPath);
-        if (!response.ok) throw new Error(`頁面載入失敗: ${fetchPath}`);
-        
-        document.getElementById('app-content').innerHTML = await response.text();
-        
-        if (route.init && typeof window[route.init] === 'function') {
-            window[route.init]();
-        }
-        updateSidebarActiveState();
-        
-    } catch (error) {
-        console.error('路由載入錯誤:', error);
-        document.getElementById('app-content').innerHTML = `<h1>無法載入頁面</h1>`;
+    // 調整路徑以匹配路由表，移除基礎路徑
+    let adjustedPath = path;
+    if (path.startsWith(basePath)) {
+        adjustedPath = path.substring(basePath.length - 1); // 結果會是 / 或 /projects/list
     }
-}
+
+    const route = routes[adjustedPath] || routes['404'];
+    document.title = route.title;
+
+    try {
+        // 建立要抓取的 HTML 檔案的完整路徑
+        const fetchPath = basePath + route.path.substring(1); // 結果會是 /program/pages/dashboard.html
+        const response = await fetch(fetchPath);
+        if (!response.ok) throw new Error(`Failed to fetch page: ${fetchPath}`);
+        
+        const html = await response.text();
+        app.innerHTML = html;
+
+        // --- 以下是關鍵修正 ---
+        
+        // 從載入的 HTML 中提取並載入 CSS
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const links = doc.querySelectorAll('link[rel="stylesheet"]');
+        
+        // 清除舊的動態載入樣式
+        document.querySelectorAll('link[data-dynamic-style]').forEach(el => el.remove());
+
+        links.forEach(link => {
+            const originalHref = link.getAttribute('href');
+            if (!originalHref) return;
+
+            // 使用 URL 物件來正確解析相對路徑
+            // new URL(fetchPath, window.location.origin) 會得到 HTML 檔案的絕對 URL
+            // 例如：https://deanlue0801.github.io/program/pages/dashboard.html
+            const resolvedCssUrl = new URL(originalHref, new URL(fetchPath, window.location.origin));
+
+            const newLink = document.createElement('link');
+            newLink.rel = 'stylesheet';
+            newLink.href = resolvedCssUrl.pathname; // 我們只取路徑部分，例如 /program/assets/css/layout.css
+            newLink.setAttribute('data-dynamic-style', 'true');
+            document.head.appendChild(newLink);
+        });
+
+        // 從載入的 HTML 中提取並執行 scripts (這部分邏輯不變)
+        const scripts = doc.querySelectorAll('script');
+        scripts.forEach(script => {
+            const newScript = document.createElement('script');
+            if (script.src) {
+                // 處理外部腳本
+                const resolvedScriptUrl = new URL(script.src, new URL(fetchPath, window.location.origin));
+                newScript.src = resolvedScriptUrl.pathname;
+            } else {
+                // 處理內聯腳本
+                newScript.textContent = script.textContent;
+            }
+            // 確保腳本被執行
+            document.body.appendChild(newScript);
+        });
+
+    } catch (error) {
+        console.error('Routing error:', error);
+        app.innerHTML = `<h1>頁面載入失敗</h1><p>${error.message}</p>`;
+    }
+};
 
 function updateSidebarActiveState() {
     const currentCleanPath = window.location.pathname.split('?')[0];
