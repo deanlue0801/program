@@ -1,6 +1,6 @@
 /**
- * 簡易前端路由器 (SPA Router) - v11.0 (最終生產架構版)
- * 採用標準 SPA 模式，不再處理子頁面腳本，只負責載入內容並呼叫 init 函式。
+ * 簡易前端路由器 (SPA Router) - v13.0 (最終生產架構版)
+ * 實現了動態樣式載入、路徑修正與自動清理，並與淨化的子頁面協同工作。
  */
 
 const routes = {
@@ -13,7 +13,6 @@ const routes = {
     '/tenders/progress-management': { html: 'pages/tenders/progress-management.html', init: 'initProgressManagementPage', title: '進度管理' },
     '/tenders/tracking-setup': { html: 'pages/tenders/tracking-setup.html', init: 'initTenderTrackingSetupPage', title: '追蹤設定' },
     '/tenders/import': { html: 'pages/tenders/import.html', init: 'initImportPage', title: '匯入標單' },
-    // 【關鍵修正】為 create 頁面也加上 init 函式
     '/projects/create': { html: 'pages/projects/create.html', init: 'initProjectCreatePage', title: '新增專案' },
     '/projects/edit': { html: 'pages/projects/edit.html', init: 'initProjectEditPage', title: '編輯專案' },
     '/tenders/edit': { html: 'pages/tenders/edit.html', init: 'initTenderEditPage', title: '編輯標單' },
@@ -35,8 +34,7 @@ async function handleLocation() {
 
     const path = window.location.pathname;
     const basePath = getBasePath();
-    let routeKey = path.startsWith(basePath) ? path.substring(basePath.length) : path;
-    if (routeKey === "") routeKey = "/";
+    let routeKey = path.startsWith(basePath) ? path.substring(basePath.length) || '/' : path;
     
     const route = routes[routeKey] || routes['404'];
     if (!route) {
@@ -51,12 +49,28 @@ async function handleLocation() {
         const response = await fetch(fetchPath);
         if (!response.ok) throw new Error(`無法載入頁面: ${fetchPath}`);
         
-        // 【關鍵修正】只注入 HTML，不再處理 script 和 link
-        appContainer.innerHTML = await response.text();
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const fetchUrlBase = new URL(fetchPath, window.location.origin);
 
-        // 執行頁面對應的初始化函式 (這是現在唯一的腳本執行方式)
+        // --- 動態樣式處理 ---
+        document.querySelectorAll('[data-dynamic-style]').forEach(el => el.remove());
+        doc.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
+            const originalHref = link.getAttribute('href');
+            if (originalHref) {
+                const correctCssUrl = new URL(originalHref, fetchUrlBase);
+                const newLink = document.createElement('link');
+                newLink.rel = 'stylesheet';
+                newLink.href = correctCssUrl.pathname;
+                newLink.setAttribute('data-dynamic-style', 'true');
+                document.head.appendChild(newLink);
+            }
+        });
+
+        appContainer.innerHTML = doc.body.innerHTML;
+
         if (route.init && typeof window[route.init] === 'function') {
-            console.log(`Router: Executing init function -> ${route.init}()`);
             window[route.init]();
         }
         updateSidebarActiveState();
@@ -93,7 +107,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentUserEl) {
                 currentUserEl.textContent = user ? `👤 ${user.email}` : '未登入';
             }
-
             if (document.getElementById('app-content')) {
                 setupRouter();
                 handleLocation();
