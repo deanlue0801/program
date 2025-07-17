@@ -1,7 +1,7 @@
 /**
  * 專案管理系統 - 主控台 (Dashboard) 邏輯 (SPA 版本)
+ * v2.0 - 權限系統修正版
  * 由 router.js 呼叫 initDashboardPage() 函數來啟動
- * 版本：高相容性版 (移除 ES2020 Optional Chaining)
  */
 function initDashboardPage() {
     
@@ -10,12 +10,17 @@ function initDashboardPage() {
     async function loadDashboardData() {
         console.log('📊 載入主控台資料...');
         try {
-            const [stats, activities] = await Promise.all([
-                loadStats(),
-                loadRecentActivities()
-            ]);
+            // 【核心修改】一次性載入所有具備權限的資料
+            const projects = await loadProjects(); // 這個函式來自 firebase-config.js，已經有權限控制
+            const tenders = await loadTenders();   // 這個函式來自 firebase-config.js，已經有權限控制
+
+            // 將載入的資料傳遞給計算與渲染函式
+            const stats = calculateStats(projects, tenders);
+            const activities = getRecentActivities(tenders);
+            
             updateStatsDisplay(stats);
             updateActivitiesDisplay(activities);
+            
             console.log('✅ 主控台資料載入完成');
         } catch(error) {
             console.error("❌ 主控台資料載入失敗", error);
@@ -25,10 +30,14 @@ function initDashboardPage() {
         }
     }
 
-    async function loadStats() {
+    /**
+     * 【核心修改】此函式現在只負責計算，不再讀取資料庫
+     * @param {Array} projects - 已載入的專案列表
+     * @param {Array} tenders - 已載入的標單列表
+     * @returns {Object} 統計物件
+     */
+    function calculateStats(projects, tenders) {
         try {
-            const projects = await loadProjects();
-            const tenders = await loadTenders();
             let totalAmount = 0;
             let lastUpdate = null;
 
@@ -47,28 +56,30 @@ function initDashboardPage() {
                 lastUpdate: lastUpdate || new Date()
             };
         } catch (error) {
-            console.error('❌ 載入統計資料失敗:', error);
+            console.error('❌ 計算統計資料失敗:', error);
             return { projectCount: 0, tenderCount: 0, totalAmount: 0, lastUpdate: new Date() };
         }
     }
 
-    async function loadRecentActivities() {
+    /**
+     * 【核心修改】此函式現在只處理已傳入的資料，不再讀取資料庫
+     * @param {Array} tenders - 已載入的標單列表
+     * @returns {Array} 最近活動的陣列
+     */
+    function getRecentActivities(tenders) {
         try {
-            const tendersResult = await safeFirestoreQuery(
-                'tenders',
-                [{ field: 'createdBy', operator: '==', value: currentUser.email }],
-                { field: 'createdAt', direction: 'desc' },
-                5
-            );
-
-            return tendersResult.docs.map(tender => ({
-                type: 'tender',
-                title: `新增標單：${tender.name}`,
-                time: tender.createdAt,
-                icon: '📋'
-            }));
+            // 直接對已載入的標單進行排序和篩選
+            return tenders
+                .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+                .slice(0, 5) // 取最近的 5 筆
+                .map(tender => ({
+                    type: 'tender',
+                    title: `新增標單：${tender.name}`,
+                    time: tender.createdAt,
+                    icon: '📋'
+                }));
         } catch (error) {
-            console.error('❌ 載入活動記錄失敗:', error);
+            console.error('❌ 處理活動記錄失敗:', error);
             return [];
         }
     }
@@ -76,9 +87,12 @@ function initDashboardPage() {
     function startAutoRefresh() {
         console.log('🔄 啟動每 5 分鐘自動刷新機制');
         setInterval(async () => {
-            if (currentUser) {
+            if (auth.currentUser) { // 使用全域的 auth
                 try {
-                    const stats = await loadStats();
+                    // 自動刷新時也使用新的流程
+                    const projects = await loadProjects();
+                    const tenders = await loadTenders();
+                    const stats = calculateStats(projects, tenders);
                     updateStatsDisplay(stats);
                     console.log('🔄 資料已自動刷新');
                 } catch (error) {
@@ -88,10 +102,9 @@ function initDashboardPage() {
         }, 300000);
     }
 
-    // --- UI 更新與顯示 ---
+    // --- UI 更新與顯示 (維持不變) ---
 
     function updateStatsDisplay(stats) {
-        // 【修正處】移除 ?. 語法，改用傳統 if 判斷
         const projectCountEl = document.getElementById('projectCount');
         if (projectCountEl) projectCountEl.textContent = stats.projectCount;
 
@@ -160,7 +173,6 @@ function initDashboardPage() {
     }
 
     function showMainContent() {
-        // 【修正處】移除 ?. 語法，改用傳統 if 判斷
         const loadingEl = document.getElementById('loading');
         if (loadingEl) loadingEl.style.display = 'none';
         
@@ -171,15 +183,14 @@ function initDashboardPage() {
     // --- 頁面啟動點 ---
     function startPage() {
         console.log("🚀 初始化儀表板頁面...");
-        if (!currentUser) {
+        if (!auth.currentUser) { // 使用全域的 auth
             showAlert("無法獲取用戶資訊，請重新登入", "error");
             return;
         }
-        console.log(`主控台：歡迎 ${currentUser.email}！`);
+        console.log(`主控台：歡迎 ${auth.currentUser.email}！`);
         loadDashboardData();
         startAutoRefresh();
     }
 
-    // 立即執行啟動點
     startPage();
 }
