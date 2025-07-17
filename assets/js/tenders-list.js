@@ -1,33 +1,18 @@
 /**
- * 標單列表頁面 (tenders/list.js) (SPA 版本) - v3.0 (權限守衛)
- * 由 router.js 呼叫 initTendersListPage() 函數來啟動
+ * 標單列表頁面 (tenders/list.js) - v4.0 (權限 Map 結構)
  */
 function initTendersListPage() {
+    let allTenders = [], allProjects = [], filteredAndGroupedData = [];
 
-    // --- 頁面狀態管理 ---
-    let allTenders = [];
-    let allProjects = [];
-    let filteredAndGroupedData = [];
-
-    // --- 資料載入 ---
     async function loadAllData() {
         showLoading(true);
         try {
-            const [tenders, projects] = await Promise.all([
-                loadTenders(),
-                loadProjects()
-            ]);
-
+            const [tenders, projects] = await Promise.all([loadTenders(), loadProjects()]);
             allProjects = projects;
-            allTenders = tenders.map(tender => ({
-                ...tender,
-                projectName: projects.find(p => p.id === tender.projectId)?.name || '未歸屬專案'
-            }));
-
+            allTenders = tenders.map(tender => ({ ...tender, projectName: projects.find(p => p.id === tender.projectId)?.name || '未歸屬專案' }));
             updateProjectFilter();
             applyFiltersAndGroup();
             updateSummary();
-
         } catch (error) {
             console.error('❌ 載入列表資料失敗:', error);
             showAlert('載入資料失敗，請稍後再試', 'error');
@@ -36,7 +21,6 @@ function initTendersListPage() {
         }
     }
 
-    // --- UI 更新與渲染 ---
     function updateProjectFilter() {
         const projectFilter = document.getElementById('projectFilter');
         if (!projectFilter) return;
@@ -68,67 +52,28 @@ function initTendersListPage() {
         const tbody = document.getElementById('tendersTableBody');
         const emptyState = document.getElementById('emptyState');
         const tableContainer = document.querySelector('.table-container');
-
         if (!tbody || !emptyState || !tableContainer) return;
-
         if (filteredAndGroupedData.length === 0) {
             tbody.innerHTML = '';
             tableContainer.style.display = 'none';
             emptyState.style.display = 'block';
             return;
         }
-
         tableContainer.style.display = 'block';
         emptyState.style.display = 'none';
-
         let html = '';
         const currentUserEmail = auth.currentUser.email;
-
         filteredAndGroupedData.forEach(group => {
-            // 取得使用者在此專案的角色與權限
-            const memberInfo = group.project.members.find(m => m.email === currentUserEmail);
+            const memberInfo = group.project.members[currentUserEmail];
             const userRole = memberInfo ? memberInfo.role : null;
             const userPermissions = (memberInfo && memberInfo.permissions) ? memberInfo.permissions : {};
-            
-            // 【權限守衛】判斷是否有編輯專案的權限 (owner 或 admin)
-            const canEditProject = userRole === 'owner'; // 未來可加入 admin
+            const canEditProject = userRole === 'owner';
+            const canEditTenders = userRole === 'owner' || (userRole === 'editor' && userPermissions.canAccessTenders);
 
-            html += `
-                <tr class="project-group-header">
-                    <td colspan="6">
-                        <strong>📁 專案：${escapeHtml(group.project.name)}</strong>
-                        <span class="project-code">(${escapeHtml(group.project.code || 'N/A')})</span>
-                    </td>
-                    <td class="project-actions">
-                        ${canEditProject ? `<button class="btn btn-sm btn-edit-project" data-action="edit-project" data-project-id="${group.project.id}">編輯專案</button>` : ''}
-                    </td>
-                </tr>
-            `;
-
+            html += `<tr class="project-group-header"><td colspan="6"><strong>📁 專案：${escapeHtml(group.project.name)}</strong><span class="project-code">(${escapeHtml(group.project.code || 'N/A')})</span></td><td class="project-actions">${canEditProject ? `<button class="btn btn-sm btn-edit-project" data-action="edit-project" data-project-id="${group.project.id}">編輯專案</button>` : ''}</td></tr>`;
             if (group.tenders && group.tenders.length > 0) {
-                // 【權限守衛】判斷是否有編輯標單的權限
-                const canEditTenders = userRole === 'owner' || (userRole === 'editor' && userPermissions.canAccessTenders);
-
                 group.tenders.forEach(tender => {
-                    html += `
-                        <tr class="tender-row">
-                            <td><a href="/program/tenders/detail?id=${tender.id}" data-route>${escapeHtml(tender.name || '未命名標單')}</a></td>
-                            <td><code>${escapeHtml(tender.code || 'N/A')}</code></td>
-                            <td>${escapeHtml(tender.projectName)}</td>
-                            <td><strong>${formatCurrency(tender.totalAmount || 0)}</strong></td>
-                            <td><span class="status-badge ${tender.status || 'planning'}">${getStatusText(tender.status)}</span></td>
-                            <td>${formatDate(tender.createdAt)}</td>
-                            <td>
-                                <div class="action-buttons">
-                                    <button class="btn btn-sm btn-view" data-action="view-tender" data-tender-id="${tender.id}">查看</button>
-                                    ${canEditTenders ? `
-                                    <button class="btn btn-sm btn-edit" data-action="edit-tender" data-tender-id="${tender.id}">編輯標單</button>
-                                    <button class="btn btn-sm btn-delete" data-action="delete-tender" data-tender-id="${tender.id}" data-tender-name="${escapeHtml(tender.name)}">刪除</button>
-                                    ` : ''}
-                                </div>
-                            </td>
-                        </tr>
-                    `;
+                    html += `<tr class="tender-row"><td><a href="/program/tenders/detail?id=${tender.id}" data-route>${escapeHtml(tender.name || '未命名標單')}</a></td><td><code>${escapeHtml(tender.code || 'N/A')}</code></td><td>${escapeHtml(tender.projectName)}</td><td><strong>${formatCurrency(tender.totalAmount || 0)}</strong></td><td><span class="status-badge ${tender.status || 'planning'}">${getStatusText(tender.status)}</span></td><td>${formatDate(tender.createdAt)}</td><td><div class="action-buttons"><button class="btn btn-sm btn-view" data-action="view-tender" data-tender-id="${tender.id}">查看</button>${canEditTenders ? `<button class="btn btn-sm btn-edit" data-action="edit-tender" data-tender-id="${tender.id}">編輯標單</button><button class="btn btn-sm btn-delete" data-action="delete-tender" data-tender-id="${tender.id}" data-tender-name="${escapeHtml(tender.name)}">刪除</button>` : ''}</div></td></tr>`;
                 });
             } else {
                  html += `<tr><td colspan="7" class="no-tenders-in-group">此專案下沒有符合篩選條件的標單。</td></tr>`;
@@ -137,7 +82,6 @@ function initTendersListPage() {
         tbody.innerHTML = html;
     }
 
-    // --- 事件處理與操作 ---
     function setupEventListeners() {
         const mainContent = document.getElementById('mainContent');
         if (!mainContent) return;
@@ -224,7 +168,6 @@ function initTendersListPage() {
         }
     }
 
-    // --- 輔助函數 ---
     function getStatusText(status) {
         const statusMap = { 'planning': '規劃中', 'bidding': '招標中', 'awarded': '得標', 'active': '進行中', 'completed': '已完成', 'paused': '暫停' };
         return statusMap[status] || '未設定';
@@ -246,7 +189,6 @@ function initTendersListPage() {
         if (mainContentEl) mainContentEl.style.display = isLoading ? 'none' : 'block';
     }
 
-    // --- 頁面啟動點 ---
     console.log("🚀 初始化標單列表頁面...");
     loadAllData();
     setupEventListeners();
