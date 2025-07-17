@@ -1,173 +1,192 @@
 /**
- * 專案管理系統 - 主控台 (Dashboard) 邏輯 (SPA 版本)
- * v3.0 - 權限系統最終修正版
- * 由 router.js 呼叫 initDashboardPage() 函數來啟動
+ * ✅ Firebase 統一配置與核心功能模組 (版本 4.0 - 權限最終修正版)
+ * 職責：初始化 Firebase、提供具備權限檢查的通用資料庫查詢、格式化、用戶登出等
  */
-function initDashboardPage() {
-    
-    // --- 主要資料處理與載入 ---
 
-    async function loadDashboardData() {
-        console.log('📊 載入主控台資料 (v3.0)...');
-        try {
-            // 【核心修正】一次性載入所有具備權限的資料
-            // 這兩個函式來自 firebase-config.js，已經包含了權限檢查，是安全的。
-            const projects = await loadProjects(); 
-            const tenders = await loadTenders();
+// --- Firebase 配置 ---
+const firebaseConfig = {
+    apiKey: "AIzaSyDV26PsFl_nH9SkfQAYgbCPjbanDluFrvo",
+    authDomain: "project-management-syste-4c9ce.firebaseapp.com",
+    projectId: "project-management-syste-4c9ce",
+    storageBucket: "project-management-syste-4c9ce.firebasestorage.app",
+    messagingSenderId: "153223609209",
+    appId: "1:153223609209:web:f4504f7ac52fc76b910da8",
+    measurementId: "G-P57N5Y5BE2"
+};
 
-            // 將已安全載入的資料傳遞給後續函式進行計算與渲染
-            const stats = calculateStats(projects, tenders);
-            const activities = getRecentActivities(tenders);
-            
-            updateStatsDisplay(stats);
-            updateActivitiesDisplay(activities);
-            
-            console.log('✅ 主控台資料載入完成');
-        } catch(error) {
-            // 這個 catch 現在主要處理網路問題或 firebase-config.js 中的錯誤
-            console.error("❌ 主控台資料載入失敗", error);
-            showAlert("無法載入您的主控台資料，請檢查網路連線或稍後再試。", "error");
-        } finally {
-            showMainContent();
+// --- 全域變數 ---
+let app, auth, db, currentUser;
+
+function initFirebase(onAuthSuccess, onAuthFail) {
+    try {
+        console.log('🚀 初始化 Firebase 核心模組 (v4.0)...');
+        if (!firebase.apps.length) {
+            app = firebase.initializeApp(firebaseConfig);
+        } else {
+            app = firebase.app();
         }
-    }
-
-    /**
-     * 【核心修正】此函式現在只負責計算，不再進行任何資料庫讀取
-     * @param {Array} projects - 已安全載入的專案列表
-     * @param {Array} tenders - 已安全載入的標單列表
-     * @returns {Object} 統計物件
-     */
-    function calculateStats(projects, tenders) {
-        try {
-            let totalAmount = 0;
-            let lastUpdate = null;
-
-            tenders.forEach(tender => {
-                totalAmount += tender.totalAmount || 0;
-                const updateTime = tender.updatedAt || tender.createdAt;
-                if (updateTime && (!lastUpdate || updateTime.toDate() > lastUpdate)) {
-                    lastUpdate = updateTime.toDate();
-                }
-            });
-
-            return {
-                projectCount: projects.length,
-                tenderCount: tenders.length,
-                totalAmount: totalAmount,
-                lastUpdate: lastUpdate || new Date()
-            };
-        } catch (error) {
-            console.error('❌ 計算統計資料失敗:', error);
-            return { projectCount: 0, tenderCount: 0, totalAmount: 0, lastUpdate: new Date() };
-        }
-    }
-
-    /**
-     * 【核心修正】此函式現在只處理已傳入的資料，不再進行任何資料庫讀取
-     * @param {Array} tenders - 已安全載入的標單列表
-     * @returns {Array} 最近活動的陣列
-     */
-    function getRecentActivities(tenders) {
-        try {
-            // 直接對已載入的標單進行排序和篩選
-            return tenders
-                .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
-                .slice(0, 5) // 取最近的 5 筆
-                .map(tender => ({
-                    type: 'tender',
-                    title: `新增標單：${tender.name || '未命名'}`,
-                    time: tender.createdAt,
-                    icon: '📋'
-                }));
-        } catch (error) {
-            console.error('❌ 處理活動記錄失敗:', error);
-            return [];
-        }
-    }
-
-    function startAutoRefresh() {
-        console.log('🔄 啟動每 5 分鐘自動刷新機制');
-        setInterval(async () => {
-            if (auth.currentUser) {
-                try {
-                    // 自動刷新時也使用新的安全流程
-                    const projects = await loadProjects();
-                    const tenders = await loadTenders();
-                    const stats = calculateStats(projects, tenders);
-                    updateStatsDisplay(stats);
-                    console.log('🔄 資料已自動刷新');
-                } catch (error) {
-                    console.error('❌ 自動刷新失敗:', error);
-                }
+        auth = firebase.auth();
+        db = firebase.firestore();
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                currentUser = user;
+                console.log('✅ Firebase 核心：用戶已登入', user.email);
+                if (onAuthSuccess) await onAuthSuccess(user);
+            } else {
+                currentUser = null;
+                console.log('❌ Firebase 核心：用戶未登入');
+                if (onAuthFail) onAuthFail();
             }
-        }, 300000);
+        });
+    } catch (error) {
+        console.error('❌ Firebase 初始化失敗:', error);
+        showAlert('系統初始化失敗，請重新整理頁面', 'error');
     }
+}
 
-    // --- UI 更新與顯示 (此區塊維持不變) ---
-
-    function updateStatsDisplay(stats) {
-        const projectCountEl = document.getElementById('projectCount');
-        if (projectCountEl) projectCountEl.textContent = stats.projectCount;
-        const tenderCountEl = document.getElementById('tenderCount');
-        if (tenderCountEl) tenderCountEl.textContent = stats.tenderCount;
-        const totalAmountEl = document.getElementById('totalAmount');
-        if (totalAmountEl) totalAmountEl.textContent = formatCurrency(stats.totalAmount);
-        const lastUpdateEl = document.getElementById('lastUpdate');
-        if (lastUpdateEl) lastUpdateEl.textContent = stats.lastUpdate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
-        const projectChangeEl = document.getElementById('projectChange');
-        if(projectChangeEl) projectChangeEl.textContent = `共 ${stats.projectCount} 個專案`;
-        const tenderChangeEl = document.getElementById('tenderChange');
-        if(tenderChangeEl) tenderChangeEl.textContent = `共 ${stats.tenderCount} 個標單`;
-        const amountChangeEl = document.getElementById('amountChange');
-        if(amountChangeEl) amountChangeEl.textContent = `總計 ${formatCurrency(stats.totalAmount)}`;
-        const updateTimeEl = document.getElementById('updateTime');
-        if(updateTimeEl) updateTimeEl.textContent = `於 ${formatDateTime(stats.lastUpdate)} 更新`;
-    }
-
-    function updateActivitiesDisplay(activities) {
-        const activityList = document.getElementById('activityList');
-        if (!activityList) return;
-        if (activities.length === 0) {
-            activityList.innerHTML = `<li class="activity-item"><div class="activity-icon project">ℹ️</div><div class="activity-content"><div class="activity-title">暫無活動記錄</div><div class="activity-time">開始使用系統後將會顯示您的活動</div></div></li>`;
-            return;
+async function safeFirestoreQuery(collection, whereConditions = [], orderBy = null, limit = null) {
+    try {
+        let query = db.collection(collection);
+        whereConditions.forEach(condition => {
+            query = query.where(condition.field, condition.operator, condition.value);
+        });
+        if (orderBy) {
+            query = query.orderBy(orderBy.field, orderBy.direction || 'asc');
         }
-        activityList.innerHTML = activities.map(activity => `<li class="activity-item"><div class="activity-icon ${activity.type}">${activity.icon}</div><div class="activity-content"><div class="activity-title">${activity.title}</div><div class="activity-time">${formatRelativeTime(activity.time)}</div></div></li>`).join('');
-    }
-
-    function formatRelativeTime(timestamp) {
-        if (!timestamp) return '未知時間';
-        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.round(diffMs / 60000);
-        if (diffMins < 1) return '剛剛';
-        if (diffMins < 60) return `${diffMins} 分鐘前`;
-        const diffHours = Math.round(diffMs / 3600000);
-        if (diffHours < 24) return `${diffHours} 小時前`;
-        const diffDays = Math.round(diffMs / 86400000);
-        if (diffDays < 7) return `${diffDays} 天前`;
-        return date.toLocaleDateString('zh-TW');
-    }
-
-    function showMainContent() {
-        const loadingEl = document.getElementById('loading');
-        if (loadingEl) loadingEl.style.display = 'none';
-        const mainContentEl = document.getElementById('mainContent');
-        if (mainContentEl) mainContentEl.style.display = 'block';
-    }
-
-    // --- 頁面啟動點 ---
-    function startPage() {
-        console.log("🚀 初始化儀表板頁面 (v3.0)...");
-        if (!auth.currentUser) {
-            showAlert("無法獲取用戶資訊，請重新登入", "error");
-            return;
+        if (limit) {
+            query = query.limit(limit);
         }
-        console.log(`主控台：歡迎 ${auth.currentUser.email}！`);
-        loadDashboardData();
-        startAutoRefresh();
+        const snapshot = await query.get();
+        return {
+            docs: snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+            serverSorted: true
+        };
+    } catch (indexError) {
+        if (indexError.message.includes('index')) {
+            console.warn('⚠️ 索引問題，切換到客戶端排序:', indexError.message);
+            let fallbackQuery = db.collection(collection);
+            whereConditions.forEach(condition => {
+                fallbackQuery = fallbackQuery.where(condition.field, condition.operator, condition.value);
+            });
+            const snapshot = await fallbackQuery.get();
+            let docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            return { docs, serverSorted: false };
+        } else {
+            throw indexError;
+        }
+    }
+}
+
+async function deleteTenderAndRelatedData(tenderId) {
+    try {
+        console.log(`🗑️ 開始批次刪除標單 ${tenderId} 及相關資料...`);
+        const batch = db.batch();
+        const collectionsToDelete = ['majorItems', 'detailItems', 'distributionTable', 'floorSettings'];
+        batch.delete(db.collection('tenders').doc(tenderId));
+        const promises = collectionsToDelete.map(coll => 
+            db.collection(coll).where('tenderId', '==', tenderId).get()
+        );
+        const snapshots = await Promise.all(promises);
+        snapshots.forEach(snapshot => {
+            snapshot.forEach(doc => batch.delete(doc.ref));
+        });
+        await batch.commit();
+        console.log('✅ 批次刪除成功');
+        return true;
+    } catch (error) {
+        console.error('❌ 批次刪除失敗:', error);
+        throw error;
+    }
+}
+
+// --- 標準化資料載入函數 (具備權限管理) ---
+
+async function loadProjects() {
+    if (!auth.currentUser) {
+        console.error("loadProjects: 用戶未登入，無法載入專案。");
+        return [];
+    }
+    console.log(`[權限] 正在為 ${auth.currentUser.email} 載入專案...`);
+    const whereCondition = {
+        field: 'memberEmails',
+        operator: 'array-contains',
+        value: auth.currentUser.email
+    };
+    const result = await safeFirestoreQuery('projects', [whereCondition], { field: 'createdAt', direction: 'desc' });
+    console.log(`[權限] 成功載入 ${result.docs.length} 個專案。`);
+    return result.docs;
+}
+
+/**
+ * 【權限最終修正】
+ * 載入隸屬於使用者有權限專案的所有標單。
+ * 放棄使用 'in' 查詢，改為對每個專案單獨查詢，以符合安全規則。
+ */
+async function loadTenders() {
+    if (!auth.currentUser) {
+        console.error("loadTenders: 用戶未登入，無法載入標單。");
+        return [];
+    }
+    console.log(`[權限] 正在為 ${auth.currentUser.email} 載入標單 (v4.0 查詢模式)...`);
+
+    // 步驟 1: 取得使用者有權限的所有專案
+    const authorizedProjects = await loadProjects();
+
+    // 步驟 2: 如果沒有任何專案權限，直接返回空陣列
+    if (authorizedProjects.length === 0) {
+        console.log("[權限] 使用者沒有任何專案的權限，無需載入標單。");
+        return [];
     }
 
-    startPage();
+    // 步驟 3: 為每個專案建立一個查詢 promise
+    const tenderPromises = authorizedProjects.map(project => 
+        db.collection('tenders').where('projectId', '==', project.id).get()
+    );
+
+    // 步驟 4: 等待所有查詢完成
+    const tenderSnapshots = await Promise.all(tenderPromises);
+
+    // 步驟 5: 將所有查詢結果合併成一個陣列
+    let allTenders = [];
+    tenderSnapshots.forEach(snapshot => {
+        snapshot.forEach(doc => {
+            allTenders.push({ id: doc.id, ...doc.data() });
+        });
+    });
+    
+    console.log(`[權限] 成功載入 ${allTenders.length} 個標單。`);
+    // 在客戶端進行排序
+    allTenders.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+    return allTenders;
+}
+
+// --- 通用工具函數 (維持不變) ---
+function formatCurrency(amount) {
+    if (amount === null || amount === undefined || isNaN(amount)) return 'NT$ 0';
+    return 'NT$ ' + parseInt(amount, 10).toLocaleString();
+}
+function formatDate(timestamp) {
+    if (!timestamp) return '未設定';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    if (isNaN(date.getTime())) return '無效日期';
+    return date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+function formatDateTime(timestamp) {
+    if (!timestamp) return '未設定';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    if (isNaN(date.getTime())) return '無效日期';
+    return date.toLocaleString('zh-TW');
+}
+function showAlert(message, type = 'info') {
+    console.log(`[${type.toUpperCase()}] ${message}`);
+}
+async function logout() {
+    if (confirm('確定要登出嗎？')) {
+        try {
+            await auth.signOut();
+        } catch (error) {
+            console.error('登出失敗:', error);
+            showAlert('登出失敗', 'error');
+        }
+    }
 }
