@@ -2,9 +2,11 @@
  * 編輯標單頁面 (tenders-edit.js) - v7.1 (權限最終修正)
  */
 function initTenderEditPage() {
+    // --- 頁面級別變數 ---
     let tenderId, currentTender, currentProject, majorItems = [], detailItems = [], additionItems = [];
     let allExpanded = true, currentUserRole = null, currentUserPermissions = {};
 
+    // --- 頁面啟動點 ---
     async function init() {
         showLoading(true);
         tenderId = new URLSearchParams(window.location.search).get('id');
@@ -13,10 +15,12 @@ function initTenderEditPage() {
             return navigateTo('/program/tenders/list');
         }
         try {
+            // 【權限守衛】載入資料並執行權限檢查
             if (!await loadDataAndCheckPermissions()) {
                 showAlert('您沒有權限編輯此標單', 'error');
                 return navigateTo('/program/tenders/list');
             }
+            
             renderPage();
             setupEventListeners();
         } catch (error) {
@@ -27,32 +31,40 @@ function initTenderEditPage() {
         }
     }
 
+    // --- 資料載入與權限檢查 ---
     async function loadDataAndCheckPermissions() {
         const tenderDoc = await db.collection('tenders').doc(tenderId).get();
         if (!tenderDoc.exists) throw new Error('找不到指定的標單');
         currentTender = { id: tenderDoc.id, ...tenderDoc.data() };
 
-        if (!currentTender.projectId) return false;
+        if (!currentTender.projectId) return false; // 無專案關聯，無法檢查權限
 
         const projectDoc = await db.collection('projects').doc(currentTender.projectId).get();
-        if (!projectDoc.exists) return false;
+        if (!projectDoc.exists) return false; // 專案不存在
         
         currentProject = { id: projectDoc.id, ...projectDoc.data() };
         
         const userEmail = auth.currentUser.email;
         const memberInfo = currentProject.members[userEmail];
 
-        if (!memberInfo) return false;
+        if (!memberInfo) return false; // 不是成員
 
         currentUserRole = memberInfo.role;
         currentUserPermissions = memberInfo.permissions || {};
 
+        // 只有 owner 或 有 canAccessTenders 權限的 editor 才能進入
         if (currentUserRole === 'owner' || (currentUserRole === 'editor' && currentUserPermissions.canAccessTenders)) {
-            // 【核心修正】在批次讀取前，先將 projectId 加入到查詢條件中
-            // 由於安全規則現在檢查每個子集合的 projectId，我們需要確保查詢是合法的
+            
+            // 【核心修正】在查詢子集合時，必須同時傳入 projectId，以符合安全規則
             const [majorItemsData, allDetailItemsData] = await Promise.all([
-                safeFirestoreQuery('majorItems', [{ field: 'tenderId', operator: '==', value: tenderId }]),
-                safeFirestoreQuery('detailItems', [{ field: 'tenderId', operator: '==', value: tenderId }])
+                safeFirestoreQuery('majorItems', [
+                    { field: 'tenderId', operator: '==', value: tenderId },
+                    { field: 'projectId', operator: '==', value: currentProject.id }
+                ]),
+                safeFirestoreQuery('detailItems', [
+                    { field: 'tenderId', operator: '==', value: tenderId },
+                    { field: 'projectId', operator: '==', value: currentProject.id }
+                ])
             ]);
             majorItems = majorItemsData.docs.sort(naturalSequenceSort);
             detailItems = allDetailItemsData.docs.filter(item => !item.isAddition).sort(naturalSequenceSort);
@@ -60,9 +72,10 @@ function initTenderEditPage() {
             return true;
         }
 
-        return false;
+        return false; // 權限不足
     }
     
+    // --- 操作處理函式 ---
     async function handleAdditionSubmit(event) {
         event.preventDefault();
         const editId = document.getElementById('editAdditionId').value;
@@ -74,7 +87,7 @@ function initTenderEditPage() {
         if (isNaN(unitPrice) || unitPrice < 0) { showAlert('請輸入有效的單價', 'error'); return; }
         
         const data = {
-            // 【核心修正】寫入時也帶上 projectId
+            // 【核心修正】寫入時也帶上 projectId，以符合安全規則
             projectId: currentProject.id,
             tenderId, 
             relatedItemId, 
@@ -109,25 +122,8 @@ function initTenderEditPage() {
         } 
         finally { showLoading(false); }
     }
-    
-    // --- 其他所有函式維持不變 ---
-    function renderTenderHeader() { /* ... */ }
-    function renderDetailTable(details) { /* ... */ }
-    function renderMajorItemsList() { /* ... */ }
-    function renderAdditionItemsTable() { /* ... */ }
-    function renderSummaryCards() { /* ... */ }
-    function renderPage() { /* ... */ }
-    function updatePageAfterAction(relatedItemIdToUpdate) { /* ... */ }
-    function updateSingleDetailItemRow(detailItemId) { /* ... */ }
-    function populateRelatedItemsDropdown(selectedId) { /* ... */ }
-    function showAdditionModal(relatedItemId) { /* ... */ }
-    function editAddition(additionId) { /* ... */ }
-    async function deleteAddition(additionId) { /* ... */ }
-    function setupEventListeners() { /* ... */ }
-    function showLoading(isLoading) { /* ... */ }
-    function naturalSequenceSort(a, b) { /* ... */ }
 
-    // 為了讓上面的省略語法能運作，這裡補上完整的函式定義
+    // --- 其他所有函式維持不變 ---
     function renderTenderHeader(){const container=document.getElementById('tender-header-container');if(!container)return;const originalAmount=detailItems.reduce((sum,item)=>sum+(item.totalPrice||0),0);const additionAmount=additionItems.reduce((sum,item)=>sum+(item.totalPrice||0),0);const totalAmount=originalAmount+additionAmount;const increasePercentage=originalAmount>0?((additionAmount/originalAmount)*100).toFixed(2):0;container.innerHTML=`<div class="tender-header-card"><div class="tender-info-item"><div class="label">標單名稱</div><div class="value large">${currentTender.name}</div></div><div class="tender-info-item"><div class="label">原始合約金額</div><div class="value">${formatCurrency(originalAmount)}</div></div><div class="tender-info-item"><div class="label">追加總金額</div><div class="value warning">${formatCurrency(additionAmount)}</div></div><div class="tender-info-item"><div class="label">目前總金額</div><div class="value success">${formatCurrency(totalAmount)}</div></div><div class="tender-info-item"><div class="label">增幅百分比</div><div class="value">${increasePercentage}%</div></div></div>`;}
     function renderDetailTable(details){if(details.length===0)return'<div style="padding: 20px; text-align: center; color: #888;">此主項目下無細項資料。</div>';const rows=details.map(item=>{const originalQuantity=item.totalQuantity||0;const additions=additionItems.filter(add=>add.relatedItemId===item.id);const additionalQuantity=additions.reduce((s,a)=>s+(a.totalQuantity||0),0);let quantityDisplay;if(additionalQuantity>0){quantityDisplay=`${originalQuantity+additionalQuantity} <span style="color:var(--success-color); font-size:12px;">(+${additionalQuantity})</span>`;}else if(additionalQuantity<0){quantityDisplay=`${originalQuantity+additionalQuantity} <span style="color:var(--danger-color); font-size:12px;">(${additionalQuantity})</span>`;}else{quantityDisplay=originalQuantity;}let statusBarClass='';if(additions.length>0)statusBarClass='has-change';else if(originalQuantity===0)statusBarClass='is-zero';return`<tr data-detail-item-id="${item.id}"><td><div class="item-status-bar ${statusBarClass}"></div></td><td>${item.sequence||''}</td><td>${item.name}</td><td>${item.unit}</td><td class="number-cell">${originalQuantity}</td><td class="number-cell">${formatCurrency(item.unitPrice)}</td><td class="number-cell">${formatCurrency(item.totalPrice)}</td><td class="number-cell current-quantity-cell">${quantityDisplay}</td><td class="action-cell"><button class="btn btn-sm btn-primary" data-action="add-addition" data-item-id="${item.id}">變更</button></td></tr>`;}).join('');return`<table class="detail-items-table"><thead><tr><th></th><th>項次</th><th>項目名稱</th><th>單位</th><th class="number-cell">數量</th><th class="number-cell">單價</th><th class="number-cell">小計</th><th class="number-cell">目前總數</th><th class="action-cell">操作</th></tr></thead><tbody>${rows}</tbody></table>`;}
     function renderMajorItemsList(){const container=document.getElementById('items-list-container');if(!container)return;let html=`<div class="list-actions"><h3>原始項目 (不可修改)</h3><button id="expand-all-btn" class="btn btn-secondary">${allExpanded?'全部收合':'全部展開'}</button></div>`;majorItems.forEach((majorItem)=>{const detailsInMajor=detailItems.filter(d=>d.majorItemId===majorItem.id);const itemNumber=majorItem.sequence||'N/A';html+=`<div class="major-item-wrapper"><div class="major-item-row ${allExpanded?'expanded':''}" data-major-id="${majorItem.id}"><div class="item-number-circle">${itemNumber}</div><div class="item-name">${majorItem.name}</div><div class="item-analysis"><span>${detailsInMajor.length} 項</span><span class="amount">${formatCurrency(detailsInMajor.reduce((s,i)=>s+(i.totalPrice||0),0))}</span></div><div class="item-expand-icon">▶</div></div><div class="detail-items-container ${allExpanded?'expanded':''}" id="details-for-${majorItem.id}">${renderDetailTable(detailsInMajor)}</div></div>`;});container.innerHTML=html;}
