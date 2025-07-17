@@ -4,6 +4,7 @@
 function initProjectEditPage() {
     let projectId = null, currentProjectData = {}, currentUserRole = null;
     const form = document.getElementById('projectEditForm');
+    const pageTitleEl = document.querySelector('.page-title');
     const memberManagementSection = document.getElementById('memberManagementSection');
     const membersTableBody = document.getElementById('membersTableBody');
     const newMemberEmailInput = document.getElementById('newMemberEmail');
@@ -11,6 +12,7 @@ function initProjectEditPage() {
     const permissionsContainer = document.getElementById('permissionsContainer');
     const addMemberBtn = document.getElementById('addMemberBtn');
     const saveChangesBtn = document.getElementById('saveChangesBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
     const permissionAlert = document.getElementById('permissionAlert');
 
     async function loadPageData() {
@@ -124,7 +126,7 @@ function initProjectEditPage() {
         if (form.dataset.initialized) return;
         form.dataset.initialized = 'true';
         form.addEventListener('submit', handleFormSubmit);
-        document.getElementById('cancelBtn').addEventListener('click', () => navigateTo('/program/projects/list'));
+        cancelBtn.addEventListener('click', () => navigateTo('/program/projects/list'));
         addMemberBtn.addEventListener('click', handleAddMember);
         newMemberRoleSelect.addEventListener('change', () => { permissionsContainer.style.display = newMemberRoleSelect.value === 'editor' ? 'block' : 'none'; });
         membersTableBody.addEventListener('click', e => { if (e.target.dataset.action === 'remove-member') handleRemoveMember(e.target.dataset.email); });
@@ -152,7 +154,43 @@ function initProjectEditPage() {
         }
     }
 
-    function populateForm(project) { /* ... (內容不變) ... */ }
-    function showLoading(isLoading, message = '處理中...') { /* ... (內容不變) ... */ }
+    function populateForm(project) {
+        if (pageTitleEl) pageTitleEl.textContent = `✏️ 編輯專案：${project.name || ''}`;
+        document.getElementById('projectName').value = project.name || '';
+        document.getElementById('projectCode').value = project.code || '';
+        document.getElementById('statusSelect').value = project.status || 'planning';
+        const startDateEl = document.getElementById('startDate');
+        if(startDateEl) startDateEl.value = safeFormatDateForInput(project.startDate);
+        const endDateEl = document.getElementById('endDate');
+        if(endDateEl) endDateEl.value = safeFormatDateForInput(project.endDate);
+        const contractorNameEl = document.getElementById('contractorName');
+        if(contractorNameEl) contractorNameEl.value = project.contractorName || '';
+        const contractorContactEl = document.getElementById('contractorContact');
+        if(contractorContactEl) contractorContactEl.value = project.contractorContact || '';
+        const descriptionEl = document.getElementById('description');
+        if(descriptionEl) descriptionEl.value = project.description || '';
+        const notesEl = document.getElementById('notes');
+        if(notesEl) notesEl.value = project.notes || '';
+    }
+
+    function showLoading(isLoading, message = '處理中...') {
+        const loadingEl = document.getElementById('loading');
+        const formEl = document.getElementById('projectEditForm');
+        if (loadingEl) {
+            loadingEl.style.display = isLoading ? 'flex' : 'none';
+            if (loadingEl.querySelector('p')) loadingEl.querySelector('p').textContent = message;
+        }
+        if (formEl) {
+            formEl.style.display = isLoading ? 'none' : 'block';
+        }
+    }
+
+    function safeFormatDateForInput(dateField) {
+        if (!dateField) return '';
+        const date = dateField.toDate ? dateField.toDate() : new Date(dateField);
+        if (isNaN(date.getTime())) return '';
+        return date.toISOString().split('T')[0];
+    }
+    
     loadPageData();
 }
