@@ -1,70 +1,212 @@
-<div class="loading" id="loading" style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 4rem;">
-    <div class="spinner"></div>
-    <p style="margin-top: 1rem; font-size: 1rem; color: #666;">載入主控台資料中...</p>
-</div>
-
-<div id="mainContent" style="display: none;">
-    <div class="welcome-section">
-        <h1>歡迎回來！</h1>
-        <p>這裡是您的專案管理主控台，可以快速查看專案狀態和執行各種操作。</p>
-    </div>
-
-    <div class="stats-grid">
-        <div class="stats-card">
-            <div class="stats-icon">📂</div>
-            <div class="stats-value" id="projectCount">-</div>
-            <div class="stats-label">進行中專案</div>
-            <div class="stats-change positive" id="projectChange">載入中...</div>
+<!-- pages/dashboard.html -->
+<div class="dashboard-container">
+    <!-- 頂部歡迎與統計卡片 -->
+    <div class="dashboard-header">
+        <div id="welcomeMessage">
+            <h1 class="page-title">歡迎回來！</h1>
+            <p class="page-subtitle">這是您所有專案的即時總覽。</p>
         </div>
-        <div class="stats-card">
-            <div class="stats-icon">📋</div>
-            <div class="stats-value" id="tenderCount">-</div>
-            <div class="stats-label">標單總數</div>
-            <div class="stats-change positive" id="tenderChange">載入中...</div>
-        </div>
-        <div class="stats-card">
-            <div class="stats-icon">💰</div>
-            <div class="stats-value" id="totalAmount">-</div>
-            <div class="stats-label">總金額</div>
-            <div class="stats-change positive" id="amountChange">載入中...</div>
-        </div>
-        <div class="stats-card">
-            <div class="stats-icon">⏱️</div>
-            <div class="stats-value" id="lastUpdate">-</div>
-            <div class="stats-label">最後更新</div>
-            <div class="stats-change" id="updateTime">載入中...</div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon project">📁</div>
+                <div class="stat-value" id="projectCount">0</div>
+                <div class="stat-label">進行中專案</div>
+                <div class="stat-change" id="projectChange">共 0 個專案</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon tender">📋</div>
+                <div class="stat-value" id="tenderCount">0</div>
+                <div class="stat-label">標單總數</div>
+                <div class="stat-change" id="tenderChange">共 0 個標單</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon amount">💰</div>
+                <div class="stat-value" id="totalAmount">NT$ 0</div>
+                <div class="stat-label">合約總金額</div>
+                <div class="stat-change" id="amountChange">總計 NT$ 0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon time">⏰</div>
+                <div class="stat-value" id="lastUpdate">--:--</div>
+                <div class="stat-label">最後更新</div>
+                <div class="stat-change" id="updateTime">等待資料...</div>
+            </div>
         </div>
     </div>
 
-    <div class="quick-actions">
-        <h2>🚀 快速操作</h2>
-        <div class="actions-grid">
-            <a href="/projects/create" data-route class="action-card">
-                <span class="action-icon">➕</span>
-                <div class="action-title">建立專案</div>
-                <div class="action-desc">建立新的建設專案</div>
-            </a>
-            <a href="/tenders/import" data-route class="action-card">
-                <span class="action-icon">📊</span>
-                <div class="action-title">匯入標單</div>
-                <div class="action-desc">從EXCEL匯入標單資料</div>
-            </a>
-            <a href="/tenders/list" data-route class="action-card">
-                <span class="action-icon">📋</span>
-                <div class="action-title">標單管理</div>
-                <div class="action-desc">查看和管理所有標單</div>
-            </a>
-            <a href="/reports/summary.html" data-route class="action-card">
-                <span class="action-icon">📈</span>
-                <div class="action-title">產生報表</div>
-                <div class="action-desc">查看專案統計報表</div>
-            </a>
-        </div>
-    </div>
-
-    <div class="recent-activity">
-        <h2>📝 最近活動</h2>
-        <ul class="activity-list" id="activityList">
+    <!-- 主內容區塊 -->
+    <div class="dashboard-main-content">
+        <!-- 最近活動 -->
+        <div class="content-card recent-activity">
+            <h3 class="card-title">最近活動</h3>
+            <ul class="activity-list" id="activityList">
+                <!-- 活動項目將由 JS 動態生成 -->
             </ul>
+        </div>
+        <!-- 其他圖表或資訊卡片可以放在這裡 -->
     </div>
 </div>
+
+<!-- 載入動畫 -->
+<div id="loading" class="loading" style="display: flex; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.8); z-index: 10;">
+    <div class="spinner"></div>
+    <p>載入儀表板資料中...</p>
+</div>
+
+<!-- 【核心修改】將 dashboard.js 的所有邏輯內嵌到這裡 -->
+<script>
+/**
+ * 專案管理系統 - 主控台 (Dashboard) 邏輯 (內嵌版本)
+ * v4.0 - 權限系統最終修正版
+ * 由 router.js 呼叫 initDashboardPage() 函數來啟動
+ */
+function initDashboardPage() {
+    
+    // DOM 元素快取
+    const loadingEl = document.getElementById('loading');
+    const mainContentEl = document.querySelector('.dashboard-container');
+
+    // --- 主要資料處理與載入 ---
+    async function loadDashboardData() {
+        console.log('📊 載入主控台資料 (v4.0)...');
+        showLoading(true);
+        try {
+            const projects = await loadProjects();
+            const tenders = await loadTenders();
+            const stats = calculateStats(projects, tenders);
+            const activities = getRecentActivities(tenders);
+            
+            updateStatsDisplay(stats);
+            updateActivitiesDisplay(activities);
+            
+            console.log('✅ 主控台資料載入完成');
+        } catch(error) {
+            console.error("❌ 主控台資料載入失敗", error);
+            showAlert("無法載入您的主控台資料，請檢查網路連線或稍後再試。", "error");
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function calculateStats(projects, tenders) {
+        try {
+            let totalAmount = 0;
+            let lastUpdate = null;
+            tenders.forEach(tender => {
+                totalAmount += tender.totalAmount || 0;
+                const updateTime = tender.updatedAt || tender.createdAt;
+                if (updateTime && (!lastUpdate || updateTime.toDate() > lastUpdate)) {
+                    lastUpdate = updateTime.toDate();
+                }
+            });
+            return {
+                projectCount: projects.length,
+                tenderCount: tenders.length,
+                totalAmount: totalAmount,
+                lastUpdate: lastUpdate || new Date()
+            };
+        } catch (error) {
+            console.error('❌ 計算統計資料失敗:', error);
+            return { projectCount: 0, tenderCount: 0, totalAmount: 0, lastUpdate: new Date() };
+        }
+    }
+
+    function getRecentActivities(tenders) {
+        try {
+            return tenders
+                .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+                .slice(0, 5)
+                .map(tender => ({
+                    type: 'tender',
+                    title: `新增標單：${tender.name || '未命名'}`,
+                    time: tender.createdAt,
+                    icon: '📋'
+                }));
+        } catch (error) {
+            console.error('❌ 處理活動記錄失敗:', error);
+            return [];
+        }
+    }
+
+    function startAutoRefresh() {
+        console.log('🔄 啟動每 5 分鐘自動刷新機制');
+        setInterval(async () => {
+            if (auth.currentUser) {
+                try {
+                    const projects = await loadProjects();
+                    const tenders = await loadTenders();
+                    const stats = calculateStats(projects, tenders);
+                    updateStatsDisplay(stats);
+                    console.log('🔄 資料已自動刷新');
+                } catch (error) {
+                    console.error('❌ 自動刷新失敗:', error);
+                }
+            }
+        }, 300000);
+    }
+
+    // --- UI 更新與顯示 ---
+    function updateStatsDisplay(stats) {
+        const projectCountEl = document.getElementById('projectCount');
+        if (projectCountEl) projectCountEl.textContent = stats.projectCount;
+        const tenderCountEl = document.getElementById('tenderCount');
+        if (tenderCountEl) tenderCountEl.textContent = stats.tenderCount;
+        const totalAmountEl = document.getElementById('totalAmount');
+        if (totalAmountEl) totalAmountEl.textContent = formatCurrency(stats.totalAmount);
+        const lastUpdateEl = document.getElementById('lastUpdate');
+        if (lastUpdateEl) lastUpdateEl.textContent = stats.lastUpdate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+        const projectChangeEl = document.getElementById('projectChange');
+        if(projectChangeEl) projectChangeEl.textContent = `共 ${stats.projectCount} 個專案`;
+        const tenderChangeEl = document.getElementById('tenderChange');
+        if(tenderChangeEl) tenderChangeEl.textContent = `共 ${stats.tenderCount} 個標單`;
+        const amountChangeEl = document.getElementById('amountChange');
+        if(amountChangeEl) amountChangeEl.textContent = `總計 ${formatCurrency(stats.totalAmount)}`;
+        const updateTimeEl = document.getElementById('updateTime');
+        if(updateTimeEl) updateTimeEl.textContent = `於 ${formatDateTime(stats.lastUpdate)} 更新`;
+    }
+
+    function updateActivitiesDisplay(activities) {
+        const activityList = document.getElementById('activityList');
+        if (!activityList) return;
+        if (activities.length === 0) {
+            activityList.innerHTML = `<li class="activity-item"><div class="activity-icon project">ℹ️</div><div class="activity-content"><div class="activity-title">暫無活動記錄</div><div class="activity-time">開始使用系統後將會顯示您的活動</div></div></li>`;
+            return;
+        }
+        activityList.innerHTML = activities.map(activity => `<li class="activity-item"><div class="activity-icon ${activity.type}">${activity.icon}</div><div class="activity-content"><div class="activity-title">${activity.title}</div><div class="activity-time">${formatRelativeTime(activity.time)}</div></div></li>`).join('');
+    }
+
+    function formatRelativeTime(timestamp) {
+        if (!timestamp) return '未知時間';
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.round(diffMs / 60000);
+        if (diffMins < 1) return '剛剛';
+        if (diffMins < 60) return `${diffMins} 分鐘前`;
+        const diffHours = Math.round(diffMs / 3600000);
+        if (diffHours < 24) return `${diffHours} 小時前`;
+        const diffDays = Math.round(diffMs / 86400000);
+        if (diffDays < 7) return `${diffDays} 天前`;
+        return date.toLocaleDateString('zh-TW');
+    }
+
+    function showLoading(isLoading) {
+        if (loadingEl) loadingEl.style.display = isLoading ? 'flex' : 'none';
+        if (mainContentEl) mainContentEl.style.visibility = isLoading ? 'hidden' : 'visible';
+    }
+
+    // --- 頁面啟動點 ---
+    function startPage() {
+        console.log("🚀 初始化儀表板頁面 (v4.0)...");
+        if (!auth.currentUser) {
+            showAlert("無法獲取用戶資訊，請重新登入", "error");
+            return;
+        }
+        console.log(`主控台：歡迎 ${auth.currentUser.email}！`);
+        loadDashboardData();
+        startAutoRefresh();
+    }
+
+    startPage();
+}
+</script>
