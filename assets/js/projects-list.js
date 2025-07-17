@@ -1,22 +1,20 @@
 /**
- * 專案列表頁面 (projects-list.js) - v1.0
+ * 專案列表頁面 (projects-list.js) - v2.0 (權限最終修正)
  * 負責載入並顯示使用者有權限的專案列表。
  */
 function initProjectsListPage() {
-    console.log("🚀 初始化專案列表頁面...");
+    console.log("🚀 初始化專案列表頁面 (v2.0)...");
 
     const loadingEl = document.getElementById('loading');
     const container = document.getElementById('projectsListContainer');
     const emptyStateEl = document.getElementById('emptyState');
     const cardTemplate = document.getElementById('projectCardTemplate');
 
-    // 載入並渲染專案
     async function loadAndRenderProjects() {
         showLoading(true);
-        container.innerHTML = ''; // 清空舊內容
+        container.innerHTML = '';
         
         try {
-            // loadProjects() 已經具備權限檢查功能
             const projects = await loadProjects();
 
             if (projects.length === 0) {
@@ -24,8 +22,8 @@ function initProjectsListPage() {
                 container.style.display = 'none';
             } else {
                 emptyStateEl.style.display = 'none';
-                container.style.display = 'grid'; // 使用 grid 佈局
-                container.className = 'projects-grid'; // 應用卡片網格樣式
+                container.style.display = 'grid';
+                container.className = 'projects-grid';
 
                 projects.forEach(project => {
                     const card = createProjectCard(project);
@@ -42,13 +40,12 @@ function initProjectsListPage() {
         }
     }
 
-    // 根據專案資料建立卡片元素
     function createProjectCard(project) {
         const card = cardTemplate.content.cloneNode(true).firstElementChild;
-        
-        // 找到當前使用者的角色
         const userEmail = auth.currentUser.email;
-        const memberInfo = project.members.find(m => m.email === userEmail);
+
+        // 【核心修正】從 Map 物件中直接讀取成員資訊，而不是用 find()
+        const memberInfo = (project.members && project.members[userEmail]) ? project.members[userEmail] : null;
         const userRole = memberInfo ? memberInfo.role : '未知';
         const roleText = { owner: '擁有者', editor: '編輯者', viewer: '檢視者' }[userRole] || '未知';
 
@@ -63,13 +60,11 @@ function initProjectsListPage() {
         card.querySelector('.created-date').textContent = formatDate(project.createdAt);
         card.querySelector('.user-role').textContent = roleText;
         
-        // 綁定按鈕事件
         const editBtn = card.querySelector('[data-action="edit"]');
         const deleteBtn = card.querySelector('[data-action="delete"]');
         
         editBtn.addEventListener('click', () => navigateTo(`/program/projects/edit?id=${project.id}`));
         
-        // 只有 owner 才能看到刪除按鈕
         if (userRole === 'owner') {
             deleteBtn.addEventListener('click', () => handleDeleteProject(project.id, project.name));
         } else {
@@ -79,7 +74,6 @@ function initProjectsListPage() {
         return card;
     }
 
-    // 處理刪除專案的邏輯
     async function handleDeleteProject(projectId, projectName) {
         if (!confirm(`您確定要刪除專案「${projectName}」嗎？\n警告：此操作將會刪除專案本身，但不會自動刪除其下的標單資料，請謹慎操作！`)) {
             return;
@@ -89,7 +83,6 @@ function initProjectsListPage() {
             showLoading(true, '刪除專案中...');
             await db.collection('projects').doc(projectId).delete();
             showAlert('專案刪除成功！', 'success');
-            // 重新載入列表
             loadAndRenderProjects();
         } catch (error) {
             console.error("❌ 刪除專案失敗:", error);
@@ -98,11 +91,9 @@ function initProjectsListPage() {
         }
     }
 
-    // 輔助函數
     function showLoading(isLoading) {
         if (loadingEl) loadingEl.style.display = isLoading ? 'flex' : 'none';
         if (!isLoading) {
-             // 只有在載入完成後才決定要顯示 container 還是 emptyState
         } else {
             if(container) container.style.display = 'none';
             if(emptyStateEl) emptyStateEl.style.display = 'none';
@@ -114,6 +105,5 @@ function initProjectsListPage() {
         return statusMap[status] || '未設定';
     }
 
-    // --- 啟動頁面 ---
     loadAndRenderProjects();
 }
