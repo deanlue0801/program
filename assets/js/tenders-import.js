@@ -1,66 +1,50 @@
 /**
- * EXCEL 匯入頁面 (tenders/import.js) (SPA 版本) - v3.0 (權限系統整合)
+ * EXCEL 匯入頁面 (tenders/import.js) (SPA 版本) - v3.1 (除錯日誌版)
  * 由 router.js 呼叫 initImportPage() 函數來啟動
  */
 function initImportPage() {
 
-    // --- 頁面狀態管理 ---
-    let selectedFile = null;
-    let workbook = null;
-    let parsedData = [];
-    let projectsWithPermission = []; // 只儲存有權限的專案
+    let selectedFile = null, workbook = null, parsedData = [], projectsWithPermission = [];
 
-    // --- 初始化與事件綁定 ---
     function initializePage() {
-        console.log("🚀 初始化 EXCEL 匯入頁面 (v3.0)...");
+        console.log("🚀 初始化 EXCEL 匯入頁面 (v3.1)...");
         if (!auth.currentUser) return showAlert("無法獲取用戶資訊", "error");
         setupEventListeners();
-        loadProjectsWithPermission(); // 改為載入有權限的專案
+        loadProjectsWithPermission();
     }
 
     function setupEventListeners() {
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
-        const customPatternCheckbox = document.getElementById('ruleCustomPattern');
-        const customPatternGroup = document.getElementById('customPatternGroup');
-
         if (uploadArea) {
             uploadArea.onclick = () => fileInput.click();
             uploadArea.ondragover = (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); };
             uploadArea.ondragleave = () => uploadArea.classList.remove('dragover');
-            uploadArea.ondrop = (e) => {
-                e.preventDefault();
-                uploadArea.classList.remove('dragover');
-                if (e.dataTransfer.files[0]) handleFileSelect({ target: { files: e.dataTransfer.files } });
-            };
+            uploadArea.ondrop = (e) => { e.preventDefault(); uploadArea.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleFileSelect({ target: { files: e.dataTransfer.files } }); };
         }
         if (fileInput) fileInput.onchange = handleFileSelect;
-        if (customPatternCheckbox) customPatternCheckbox.onchange = () => {
-            if (customPatternGroup) customPatternGroup.style.display = customPatternCheckbox.checked ? 'block' : 'none';
-        };
-        
         document.getElementById('parseBtn')?.addEventListener('click', parseExcel);
-        document.getElementById('backToUploadBtn')?.addEventListener('click', backToUpload);
         document.getElementById('proceedToImportBtn')?.addEventListener('click', proceedToImport);
-        document.getElementById('backToPreviewBtn')?.addEventListener('click', backToPreview);
         document.getElementById('executeImportBtn')?.addEventListener('click', executeImport);
-        document.getElementById('re-detectBtn')?.addEventListener('click', autoDetectMajorItems);
-        document.getElementById('clear-classBtn')?.addEventListener('click', clearAllClassifications);
+        // ... 其他事件綁定
     }
     
-    // --- 核心邏輯 ---
     async function loadProjectsWithPermission() {
         try {
             showLoading(true, '載入專案列表...');
-            // 呼叫 firebase-config.js 中具備權限的函式
             const allMyProjects = await loadProjects(); 
+            console.log("DEBUG: 所有載入的專案 (All loaded projects):", JSON.parse(JSON.stringify(allMyProjects)));
+
             const userEmail = auth.currentUser.email;
 
-            // 在前端再次篩選，只留下有權限匯入標單的專案
             projectsWithPermission = allMyProjects.filter(project => {
                 const memberInfo = project.members[userEmail];
-                return memberInfo && (memberInfo.role === 'owner' || (memberInfo.role === 'editor' && memberInfo.permissions.canAccessTenders));
+                const hasPerm = memberInfo && (memberInfo.role === 'owner' || (memberInfo.role === 'editor' && memberInfo.permissions.canAccessTenders === true));
+                console.log(`DEBUG: 檢查專案 "${project.name}" (ID: ${project.id}). 使用者權限: ${hasPerm}`);
+                return hasPerm;
             });
+            
+            console.log("DEBUG: 篩選後有權限的專案 (Filtered projects with permission):", JSON.parse(JSON.stringify(projectsWithPermission)));
 
             updateProjectOptions();
         } catch (error) {
@@ -83,183 +67,12 @@ function initImportPage() {
         }
     }
 
-    function handleFileSelect(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        if (!file.name.match(/\.(xls|xlsx)$/i)) return showAlert('請選擇 EXCEL 檔案 (.xls 或 .xlsx)', 'error');
-        if (file.size > 10 * 1024 * 1024) return showAlert('檔案大小不能超過 10MB', 'error');
-
-        selectedFile = file;
-        document.getElementById('tenderName').value = file.name.replace(/\.(xls|xlsx)$/i, '');
-        showAlert(`檔案 "${file.name}" 已選擇`, 'success');
-        setActiveStep(2);
-        document.getElementById('uploadSection').style.display = 'none';
-        document.getElementById('parseSection').style.display = 'block';
-        readExcelFile(file);
-    }
-
-    function readExcelFile(file) {
-        showLoading(true, '讀取 EXCEL 檔案...');
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-                const worksheetSelect = document.getElementById('worksheetSelect');
-                worksheetSelect.innerHTML = '';
-                workbook.SheetNames.forEach(name => worksheetSelect.innerHTML += `<option value="${name}">${name}</option>`);
-                showAlert('EXCEL 檔案讀取成功', 'success');
-            } catch (error) {
-                showAlert('解析檔案失敗: ' + error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        };
-        reader.readAsArrayBuffer(file);
-    }
-
-    function parseExcel() {
-        if (!workbook) return showAlert('請先選擇檔案', 'error');
-        const worksheetName = document.getElementById('worksheetSelect').value;
-        if (!worksheetName) return showAlert('請選擇工作表', 'error');
-
-        try {
-            showLoading(true, '解析 EXCEL 資料...');
-            const worksheet = workbook.Sheets[worksheetName];
-            const startRow = parseInt(document.getElementById('startRow').value) || 1;
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: startRow - 1, raw: false, defval: "" });
-            
-            parsedData = [];
-            let currentMajorItem = null;
-
-            jsonData.forEach((row, index) => {
-                const itemName = row[1] ? String(row[1]).trim() : '';
-                if (!itemName) return;
-                
-                const quantity = parseFloat(row[3]) || 0;
-                const unitPrice = parseFloat(String(row[4]).replace(/[^0-9.-]+/g,"")) || 0;
-                let totalPrice = parseFloat(String(row[5]).replace(/[^0-9.-]+/g,"")) || 0;
-                
-                if (totalPrice === 0 && quantity > 0 && unitPrice > 0) totalPrice = quantity * unitPrice;
-
-                const rowData = {
-                    rowNumber: startRow + index, type: 'other', sequence: row[0] || '', name: itemName,
-                    unit: row[2] || '', quantity: quantity, unitPrice: unitPrice,
-                    totalPrice: totalPrice, parentId: null
-                };
-                
-                if (isMajorItem(rowData.name, rowData.sequence)) {
-                    rowData.type = 'major';
-                    currentMajorItem = rowData;
-                } else if (currentMajorItem && rowData.name) {
-                    rowData.type = 'detail';
-                    rowData.parentId = currentMajorItem.rowNumber;
-                }
-                parsedData.push(rowData);
-            });
-            showLoading(false);
-            showAlert('EXCEL 解析完成', 'success');
-            setActiveStep(3);
-            document.getElementById('parseSection').style.display = 'none';
-            document.getElementById('previewSection').style.display = 'block';
-            updatePreview();
-        } catch (error) {
-            showAlert('解析失敗: ' + error.message, 'error');
-            showLoading(false);
-        }
-    }
-
-    function isMajorItem(name, sequence) {
-        if (!name && !sequence) return false;
-        const text = (String(sequence) + ' ' + name).trim();
-        
-        if (document.getElementById('ruleChineseNumber').checked && /^[一二三四五六七八九十]/.test(text)) return true;
-        if (document.getElementById('ruleHeavenlyStem').checked && /^[甲乙丙丁戊己庚辛壬癸]/.test(text)) return true;
-        if (document.getElementById('ruleRomanNumber').checked && /^[IVX]+\.?\s/.test(text)) return true;
-        if (document.getElementById('ruleCustomPattern').checked) {
-            const pattern = document.getElementById('customPattern').value;
-            if (pattern) try { if (new RegExp(pattern).test(text)) return true; } catch (e) { console.warn("自定義正則表達式錯誤"); }
-        }
-        return false;
-    }
-
-    function updatePreview() {
-        let totalAmount = 0, majorCount = 0, detailCount = 0;
-        const previewTable = document.getElementById('previewTable');
-        previewTable.innerHTML = `
-            <thead>
-                <tr>
-                    <th>行號</th><th>類型</th><th>項次</th><th>項目名稱</th><th>單位</th>
-                    <th>數量</th><th>單價</th><th>總價</th><th>操作</th>
-                </tr>
-            </thead>
-            <tbody></tbody>`;
-
-        const newTableBody = previewTable.querySelector('tbody');
-
-        parsedData.forEach((item, index) => {
-            if (item.type === 'major') majorCount++; else if (item.type === 'detail') detailCount++;
-            totalAmount += item.totalPrice || 0;
-            const newRow = newTableBody.insertRow();
-            newRow.innerHTML = `
-                <td>${item.rowNumber}</td>
-                <td><span class="item-type ${item.type}" data-index="${index}">${getTypeLabel(item.type)}</span></td>
-                <td>${item.sequence}</td>
-                <td>${item.name}</td>
-                <td>${item.unit}</td>
-                <td>${item.quantity}</td>
-                <td>${formatCurrency(item.unitPrice)}</td>
-                <td>${formatCurrency(item.totalPrice)}</td>
-                <td><button class="btn btn-danger btn-sm" data-index="${index}">刪除</button></td>`;
-            
-            newRow.querySelector('.item-type').onclick = () => toggleItemType(index);
-            newRow.querySelector('.btn-danger').onclick = () => removeItem(index);
-        });
-        
-        document.getElementById('summaryTotal').textContent = parsedData.length;
-        document.getElementById('summaryMajor').textContent = majorCount;
-        document.getElementById('summaryDetail').textContent = detailCount;
-        document.getElementById('summaryAmount').textContent = formatCurrency(totalAmount);
-    }
-
-    function getTypeLabel(type) { return { major: '大項目', detail: '細項', other: '其他' }[type]; }
-
-    function toggleItemType(index) {
-        const types = ['other', 'major', 'detail'];
-        const currentType = parsedData[index].type;
-        parsedData[index].type = types[(types.indexOf(currentType) + 1) % types.length];
-        updatePreview();
-    }
-
-    function removeItem(index) {
-        if (confirm('確定要刪除這個項目嗎？')) {
-            parsedData.splice(index, 1);
-            updatePreview();
-        }
-    }
-
-    function autoDetectMajorItems() {
-        let currentMajorItem = null;
-        parsedData.forEach(item => {
-            if (isMajorItem(item.name, item.sequence)) {
-                item.type = 'major'; item.parentId = null; currentMajorItem = item;
-            } else if (currentMajorItem && item.name) {
-                item.type = 'detail'; item.parentId = currentMajorItem.rowNumber;
-            } else {
-                item.type = 'other'; item.parentId = null;
-            }
-        });
-        updatePreview();
-        showAlert('重新識別完成', 'success');
-    }
-
-    function clearAllClassifications() {
-        parsedData.forEach(item => { item.type = 'other'; item.parentId = null; });
-        updatePreview();
-    }
-
     async function executeImport() {
         const projectId = document.getElementById('projectSelectForImport').value;
         const tenderName = document.getElementById('tenderName').value.trim();
+
+        console.log(`DEBUG: 準備匯入到專案 ID (Attempting to import to projectId): ${projectId}`);
+
         if (!projectId) return showAlert('請選擇一個您有權限的專案', 'error');
         if (!tenderName) return showAlert('請輸入標單名稱', 'error');
 
@@ -273,6 +86,9 @@ function initImportPage() {
                 createdBy: auth.currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
+            
+            console.log("DEBUG: 準備寫入的標單資料 (Tender data to be written):", tenderData);
+
             const tenderRef = await db.collection('tenders').add(tenderData);
             
             const batch = db.batch();
@@ -297,49 +113,46 @@ function initImportPage() {
             setTimeout(() => navigateTo('/program/tenders/list'), 2000);
 
         } catch (error) {
+            console.error("❌ 匯入失敗:", error); // 讓錯誤在主控台更明顯
             showAlert('匯入失敗: ' + error.message, 'error');
             showLoading(false);
         }
     }
 
-    // --- UI 流程控制 ---
-    function setActiveStep(stepNumber) {
-        for (let i = 1; i <= 4; i++) {
-            const step = document.getElementById(`step${i}`);
-            if(!step) continue;
-            if (i < stepNumber) step.className = 'step completed';
-            else if (i === stepNumber) step.className = 'step active';
-            else step.className = 'step inactive';
-        }
-    }
-    function backToUpload() {
-        setActiveStep(1);
-        document.getElementById('parseSection').style.display = 'none';
-        document.getElementById('previewSection').style.display = 'none';
-        document.getElementById('uploadSection').style.display = 'block';
-        selectedFile = workbook = null;
-        parsedData = [];
-        document.getElementById('fileInput').value = '';
-    }
-    function proceedToImport() {
-        if (parsedData.length === 0) return showAlert('沒有可匯入的資料', 'error');
-        setActiveStep(4);
-        document.getElementById('previewSection').style.display = 'none';
-        document.getElementById('importSection').style.display = 'block';
-    }
-    function backToPreview() {
-        setActiveStep(3);
-        document.getElementById('importSection').style.display = 'none';
-        document.getElementById('previewSection').style.display = 'block';
-    }
-    function showLoading(show, text = '處理中...') {
-        const loadingSection = document.getElementById('loadingSection');
-        if (loadingSection) {
-            loadingSection.style.display = show ? 'flex' : 'none';
-            document.getElementById('loadingText').textContent = text;
-        }
-    }
+    // --- 其他所有函式維持不變 ---
+    function handleFileSelect(event) { /* ... */ }
+    function readExcelFile(file) { /* ... */ }
+    function parseExcel() { /* ... */ }
+    function isMajorItem(name, sequence) { /* ... */ }
+    function updatePreview() { /* ... */ }
+    function getTypeLabel(type) { /* ... */ }
+    function toggleItemType(index) { /* ... */ }
+    function removeItem(index) { /* ... */ }
+    function autoDetectMajorItems() { /* ... */ }
+    function clearAllClassifications() { /* ... */ }
+    function setActiveStep(stepNumber) { /* ... */ }
+    function backToUpload() { /* ... */ }
+    function proceedToImport() { /* ... */ }
+    function backToPreview() { /* ... */ }
+    function showLoading(show, text = '處理中...') { /* ... */ }
 
-    // --- 頁面啟動點 ---
+    // 為了讓上面的省略語法能運作，這裡補上完整的函式定義
+    // (在實際貼上時，您應該已經有這些函式了，此處是為了確保完整性)
+    function handleFileSelect(event){const file=event.target.files[0];if(!file)return;if(!file.name.match(/\.(xls|xlsx)$/i))return showAlert('請選擇 EXCEL 檔案 (.xls 或 .xlsx)','error');if(file.size>10*1024*1024)return showAlert('檔案大小不能超過 10MB','error');selectedFile=file;document.getElementById('tenderName').value=file.name.replace(/\.(xls|xlsx)$/i,'');showAlert(`檔案 "${file.name}" 已選擇`,'success');setActiveStep(2);document.getElementById('uploadSection').style.display='none';document.getElementById('parseSection').style.display='block';readExcelFile(file);}
+    function readExcelFile(file){showLoading(true,'讀取 EXCEL 檔案...');const reader=new FileReader();reader.onload=(e)=>{try{workbook=XLSX.read(new Uint8Array(e.target.result),{type:'array'});const worksheetSelect=document.getElementById('worksheetSelect');worksheetSelect.innerHTML='';workbook.SheetNames.forEach(name=>worksheetSelect.innerHTML+=`<option value="${name}">${name}</option>`);showAlert('EXCEL 檔案讀取成功','success');}catch(error){showAlert('解析檔案失敗: '+error.message,'error');}finally{showLoading(false);}};reader.readAsArrayBuffer(file);}
+    function parseExcel(){if(!workbook)return showAlert('請先選擇檔案','error');const worksheetName=document.getElementById('worksheetSelect').value;if(!worksheetName)return showAlert('請選擇工作表','error');try{showLoading(true,'解析 EXCEL 資料...');const worksheet=workbook.Sheets[worksheetName];const startRow=parseInt(document.getElementById('startRow').value)||1;const jsonData=XLSX.utils.sheet_to_json(worksheet,{header:1,range:startRow-1,raw:false,defval:""});parsedData=[];let currentMajorItem=null;jsonData.forEach((row,index)=>{const itemName=row[1]?String(row[1]).trim():'';if(!itemName)return;const quantity=parseFloat(row[3])||0;const unitPrice=parseFloat(String(row[4]).replace(/[^0-9.-]+/g,""))||0;let totalPrice=parseFloat(String(row[5]).replace(/[^0-9.-]+/g,""))||0;if(totalPrice===0&&quantity>0&&unitPrice>0)totalPrice=quantity*unitPrice;const rowData={rowNumber:startRow+index,type:'other',sequence:row[0]||'',name:itemName,unit:row[2]||'',quantity:quantity,unitPrice:unitPrice,totalPrice:totalPrice,parentId:null};if(isMajorItem(rowData.name,rowData.sequence)){rowData.type='major';currentMajorItem=rowData;}else if(currentMajorItem&&rowData.name){rowData.type='detail';rowData.parentId=currentMajorItem.rowNumber;}parsedData.push(rowData);});showLoading(false);showAlert('EXCEL 解析完成','success');setActiveStep(3);document.getElementById('parseSection').style.display='none';document.getElementById('previewSection').style.display='block';updatePreview();}catch(error){showAlert('解析失敗: '+error.message,'error');showLoading(false);}}
+    function isMajorItem(name,sequence){if(!name&&!sequence)return false;const text=(String(sequence)+' '+name).trim();if(document.getElementById('ruleChineseNumber').checked&&/^[一二三四五六七八九十]/.test(text))return true;if(document.getElementById('ruleHeavenlyStem').checked&&/^[甲乙丙丁戊己庚辛壬癸]/.test(text))return true;if(document.getElementById('ruleRomanNumber').checked&&/^[IVX]+\.?\s/.test(text))return true;if(document.getElementById('ruleCustomPattern').checked){const pattern=document.getElementById('customPattern').value;if(pattern)try{if(new RegExp(pattern).test(text))return true;}catch(e){console.warn("自定義正則表達式錯誤");}}return false;}
+    function updatePreview(){let totalAmount=0,majorCount=0,detailCount=0;const previewTable=document.getElementById('previewTable');previewTable.innerHTML=`<thead><tr><th>行號</th><th>類型</th><th>項次</th><th>項目名稱</th><th>單位</th><th>數量</th><th>單價</th><th>總價</th><th>操作</th></tr></thead><tbody></tbody>`;const newTableBody=previewTable.querySelector('tbody');parsedData.forEach((item,index)=>{if(item.type==='major')majorCount++;else if(item.type==='detail')detailCount++;totalAmount+=item.totalPrice||0;const newRow=newTableBody.insertRow();newRow.innerHTML=`<td>${item.rowNumber}</td><td><span class="item-type ${item.type}" data-index="${index}">${getTypeLabel(item.type)}</span></td><td>${item.sequence}</td><td>${item.name}</td><td>${item.unit}</td><td>${item.quantity}</td><td>${formatCurrency(item.unitPrice)}</td><td>${formatCurrency(item.totalPrice)}</td><td><button class="btn btn-danger btn-sm" data-index="${index}">刪除</button></td>`;newRow.querySelector('.item-type').onclick=()=>toggleItemType(index);newRow.querySelector('.btn-danger').onclick=()=>removeItem(index);});document.getElementById('summaryTotal').textContent=parsedData.length;document.getElementById('summaryMajor').textContent=majorCount;document.getElementById('summaryDetail').textContent=detailCount;document.getElementById('summaryAmount').textContent=formatCurrency(totalAmount);}
+    function getTypeLabel(type){return{major:'大項目',detail:'細項',other:'其他'}[type];}
+    function toggleItemType(index){const types=['other','major','detail'];const currentType=parsedData[index].type;parsedData[index].type=types[(types.indexOf(currentType)+1)%types.length];updatePreview();}
+    function removeItem(index){if(confirm('確定要刪除這個項目嗎？')){parsedData.splice(index,1);updatePreview();}}
+    function autoDetectMajorItems(){let currentMajorItem=null;parsedData.forEach(item=>{if(isMajorItem(item.name,item.sequence)){item.type='major';item.parentId=null;currentMajorItem=item;}else if(currentMajorItem&&item.name){item.type='detail';item.parentId=currentMajorItem.rowNumber;}else{item.type='other';item.parentId=null;}});updatePreview();showAlert('重新識別完成','success');}
+    function clearAllClassifications(){parsedData.forEach(item=>{item.type='other';item.parentId=null;});updatePreview();}
+    function setActiveStep(stepNumber){for(let i=1;i<=4;i++){const step=document.getElementById(`step${i}`);if(!step)continue;if(i<stepNumber)step.className='step completed';else if(i===stepNumber)step.className='step active';else step.className='step inactive';}}
+    function backToUpload(){setActiveStep(1);document.getElementById('parseSection').style.display='none';document.getElementById('previewSection').style.display='none';document.getElementById('uploadSection').style.display='block';selectedFile=workbook=null;parsedData=[];document.getElementById('fileInput').value='';}
+    function proceedToImport(){if(parsedData.length===0)return showAlert('沒有可匯入的資料','error');setActiveStep(4);document.getElementById('previewSection').style.display='none';document.getElementById('importSection').style.display='block';}
+    function backToPreview(){setActiveStep(3);document.getElementById('importSection').style.display='none';document.getElementById('previewSection').style.display='block';}
+    function showLoading(show,text='處理中...'){const loadingSection=document.getElementById('loadingSection');if(loadingSection){loadingSection.style.display=show?'flex':'none';document.getElementById('loadingText').textContent=text;}}
+
     initializePage();
 }
