@@ -1,5 +1,5 @@
 /**
- * EXCEL 匯入頁面 (tenders/import.js) (SPA 版本) - v2.2 新增天干地支規則
+ * EXCEL 匯入頁面 (tenders/import.js) (SPA 版本) - v3.0 (權限系統整合)
  * 由 router.js 呼叫 initImportPage() 函數來啟動
  */
 function initImportPage() {
@@ -8,14 +8,14 @@ function initImportPage() {
     let selectedFile = null;
     let workbook = null;
     let parsedData = [];
-    let projects = [];
+    let projectsWithPermission = []; // 只儲存有權限的專案
 
     // --- 初始化與事件綁定 ---
     function initializePage() {
-        console.log("🚀 初始化 EXCEL 匯入頁面...");
-        if (!currentUser) return showAlert("無法獲取用戶資訊", "error");
+        console.log("🚀 初始化 EXCEL 匯入頁面 (v3.0)...");
+        if (!auth.currentUser) return showAlert("無法獲取用戶資訊", "error");
         setupEventListeners();
-        loadProjects();
+        loadProjectsWithPermission(); // 改為載入有權限的專案
     }
 
     function setupEventListeners() {
@@ -48,19 +48,20 @@ function initImportPage() {
         document.getElementById('clear-classBtn')?.addEventListener('click', clearAllClassifications);
     }
     
-    function parseCurrency(value) {
-        if (typeof value === 'number') return value;
-        if (typeof value !== 'string' || value.trim() === '') return 0;
-        const cleanedValue = value.replace(/[^0-9.-]+/g,"");
-        return parseFloat(cleanedValue) || 0;
-    }
-
     // --- 核心邏輯 ---
-    async function loadProjects() {
+    async function loadProjectsWithPermission() {
         try {
             showLoading(true, '載入專案列表...');
-            const projectDocs = await safeFirestoreQuery("projects", [{ field: "createdBy", operator: "==", value: currentUser.email }], { field: "name", direction: "asc" });
-            projects = projectDocs.docs;
+            // 呼叫 firebase-config.js 中具備權限的函式
+            const allMyProjects = await loadProjects(); 
+            const userEmail = auth.currentUser.email;
+
+            // 在前端再次篩選，只留下有權限匯入標單的專案
+            projectsWithPermission = allMyProjects.filter(project => {
+                const memberInfo = project.members[userEmail];
+                return memberInfo && (memberInfo.role === 'owner' || (memberInfo.role === 'editor' && memberInfo.permissions.canAccessTenders));
+            });
+
             updateProjectOptions();
         } catch (error) {
             showAlert('載入專案失敗: ' + error.message, 'error');
@@ -72,10 +73,14 @@ function initImportPage() {
     function updateProjectOptions() {
         const projectSelect = document.getElementById('projectSelectForImport');
         if (!projectSelect) return;
-        projectSelect.innerHTML = '<option value="">請選擇專案</option>';
-        projects.forEach(project => {
-            projectSelect.innerHTML += `<option value="${project.id}">${project.name}</option>`;
-        });
+        projectSelect.innerHTML = '<option value="">請選擇要匯入的專案</option>';
+        if (projectsWithPermission.length === 0) {
+            projectSelect.innerHTML += '<option value="" disabled>您沒有可匯入標單的專案</option>';
+        } else {
+            projectsWithPermission.forEach(project => {
+                projectSelect.innerHTML += `<option value="${project.id}">${project.name}</option>`;
+            });
+        }
     }
 
     function handleFileSelect(event) {
@@ -131,8 +136,8 @@ function initImportPage() {
                 if (!itemName) return;
                 
                 const quantity = parseFloat(row[3]) || 0;
-                const unitPrice = parseCurrency(row[4]);
-                let totalPrice = parseCurrency(row[5]);
+                const unitPrice = parseFloat(String(row[4]).replace(/[^0-9.-]+/g,"")) || 0;
+                let totalPrice = parseFloat(String(row[5]).replace(/[^0-9.-]+/g,"")) || 0;
                 
                 if (totalPrice === 0 && quantity > 0 && unitPrice > 0) totalPrice = quantity * unitPrice;
 
@@ -168,7 +173,6 @@ function initImportPage() {
         const text = (String(sequence) + ' ' + name).trim();
         
         if (document.getElementById('ruleChineseNumber').checked && /^[一二三四五六七八九十]/.test(text)) return true;
-        // --- 【關鍵修正】: 新增對天干地支的判斷規則 ---
         if (document.getElementById('ruleHeavenlyStem').checked && /^[甲乙丙丁戊己庚辛壬癸]/.test(text)) return true;
         if (document.getElementById('ruleRomanNumber').checked && /^[IVX]+\.?\s/.test(text)) return true;
         if (document.getElementById('ruleCustomPattern').checked) {
@@ -256,7 +260,9 @@ function initImportPage() {
     async function executeImport() {
         const projectId = document.getElementById('projectSelectForImport').value;
         const tenderName = document.getElementById('tenderName').value.trim();
-        if (!projectId || !tenderName) return showAlert('請選擇專案並輸入標單名稱', 'error');
+        if (!projectId) return showAlert('請選擇一個您有權限的專案', 'error');
+        if (!tenderName) return showAlert('請輸入標單名稱', 'error');
+
         try {
             showLoading(true, '正在匯入資料到 Firebase...');
             const totalAmount = parsedData.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
@@ -264,7 +270,7 @@ function initImportPage() {
                 projectId, name: tenderName, contractorName: document.getElementById('contractorName').value.trim(),
                 code: `TENDER-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-4)}`,
                 totalAmount, tax: Math.round(totalAmount * 0.05), status: 'planning',
-                createdBy: currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdBy: auth.currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
             const tenderRef = await db.collection('tenders').add(tenderData);
@@ -276,12 +282,12 @@ function initImportPage() {
 
             majorItems.forEach(majorItem => {
                 const majorRef = db.collection('majorItems').doc();
-                batch.set(majorRef, { tenderId: tenderRef.id, sequence: majorItem.sequence || '', name: majorItem.name || '', amount: majorItem.totalPrice || 0, status: 'planning', createdBy: currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                batch.set(majorRef, { tenderId: tenderRef.id, sequence: majorItem.sequence || '', name: majorItem.name || '', amount: majorItem.totalPrice || 0, status: 'planning', createdBy: auth.currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                 majorItemMap[majorItem.rowNumber] = majorRef.id;
             });
             detailItems.forEach(detailItem => {
                 const detailRef = db.collection('detailItems').doc();
-                batch.set(detailRef, { tenderId: tenderRef.id, majorItemId: majorItemMap[detailItem.parentId] || null, sequence: detailItem.sequence || '', name: detailItem.name || '', unitPrice: detailItem.unitPrice || 0, totalPrice: detailItem.totalPrice || 0, unit: detailItem.unit || '', totalQuantity: detailItem.quantity || 0, createdBy: currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                batch.set(detailRef, { tenderId: tenderRef.id, majorItemId: majorItemMap[detailItem.parentId] || null, sequence: detailItem.sequence || '', name: detailItem.name || '', unitPrice: detailItem.unitPrice || 0, totalPrice: detailItem.totalPrice || 0, unit: detailItem.unit || '', totalQuantity: detailItem.quantity || 0, createdBy: auth.currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
             });
             await batch.commit();
 
