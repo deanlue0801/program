@@ -1,195 +1,273 @@
-/**
- * 標單列表頁面 (tenders/list.js) - v4.0 (權限 Map 結構)
+assets/js/projects-edit.js (權限最終修正版)請用以下完整的程式碼，替換掉您現有的 assets/js/projects-edit.js 檔案。/**
+ * 編輯專案頁面 (projects-edit.js) - v3.0 (權限 Map 結構)
+ * 實現了成員管理介面、操作邏輯與權限守衛功能。
  */
-function initTendersListPage() {
-    let allTenders = [], allProjects = [], filteredAndGroupedData = [];
+function initProjectEditPage() {
+    console.log("🚀 初始化編輯專案頁面 (v3.0)...");
 
-    async function loadAllData() {
+    // --- 全域變數與狀態管理 ---
+    let projectId = null;
+    let currentProjectData = {}; // 儲存當前專案的完整資料
+    let currentUserRole = null; // 儲存當前登入者的角色
+
+    // --- DOM 元素快取 ---
+    const form = document.getElementById('projectEditForm');
+    const pageTitleEl = document.querySelector('.page-title');
+    const permissionAlert = document.getElementById('permissionAlert');
+    const memberManagementSection = document.getElementById('memberManagementSection');
+    const membersTableBody = document.getElementById('membersTableBody');
+    const newMemberEmailInput = document.getElementById('newMemberEmail');
+    const newMemberRoleSelect = document.getElementById('newMemberRole');
+    const permissionsContainer = document.getElementById('permissionsContainer');
+    const addMemberBtn = document.getElementById('addMemberBtn');
+    const saveChangesBtn = document.getElementById('saveChangesBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+
+
+    // --- 主要流程 ---
+    async function loadPageData() {
         showLoading(true);
+        const urlParams = new URLSearchParams(window.location.search);
+        projectId = urlParams.get('id');
+
+        if (!projectId) {
+            showAlert('無效的專案ID', 'error');
+            return navigateTo('/program/projects/list');
+        }
+
         try {
-            const [tenders, projects] = await Promise.all([loadTenders(), loadProjects()]);
-            allProjects = projects;
-            allTenders = tenders.map(tender => ({ ...tender, projectName: projects.find(p => p.id === tender.projectId)?.name || '未歸屬專案' }));
-            updateProjectFilter();
-            applyFiltersAndGroup();
-            updateSummary();
-        } catch (error) {
-            console.error('❌ 載入列表資料失敗:', error);
-            showAlert('載入資料失敗，請稍後再試', 'error');
-        } finally {
-            showLoading(false);
-        }
-    }
-
-    function updateProjectFilter() {
-        const projectFilter = document.getElementById('projectFilter');
-        if (!projectFilter) return;
-        projectFilter.innerHTML = '<option value="">所有專案</option>';
-        allProjects.forEach(project => {
-            const option = document.createElement('option');
-            option.value = project.id;
-            option.textContent = project.name;
-            projectFilter.appendChild(option);
-        });
-    }
-
-    function updateSummary() {
-        const totalTendersEl = document.getElementById('totalTenders');
-        const totalAmountEl = document.getElementById('totalAmount');
-        const activeTendersEl = document.getElementById('activeTenders');
-        const completedTendersEl = document.getElementById('completedTenders');
-
-        if(totalTendersEl) totalTendersEl.textContent = allTenders.length;
-        if(totalAmountEl) {
-             const totalAmount = allTenders.reduce((sum, tender) => sum + (tender.totalAmount || 0), 0);
-             totalAmountEl.textContent = formatCurrency(totalAmount);
-        }
-        if(activeTendersEl) activeTendersEl.textContent = allTenders.filter(t => t.status === 'active').length;
-        if(completedTendersEl) completedTendersEl.textContent = allTenders.filter(t => t.status === 'completed').length;
-    }
-
-    function renderTenders() {
-        const tbody = document.getElementById('tendersTableBody');
-        const emptyState = document.getElementById('emptyState');
-        const tableContainer = document.querySelector('.table-container');
-        if (!tbody || !emptyState || !tableContainer) return;
-        if (filteredAndGroupedData.length === 0) {
-            tbody.innerHTML = '';
-            tableContainer.style.display = 'none';
-            emptyState.style.display = 'block';
-            return;
-        }
-        tableContainer.style.display = 'block';
-        emptyState.style.display = 'none';
-        let html = '';
-        const currentUserEmail = auth.currentUser.email;
-        filteredAndGroupedData.forEach(group => {
-            const memberInfo = group.project.members[currentUserEmail];
-            const userRole = memberInfo ? memberInfo.role : null;
-            const userPermissions = (memberInfo && memberInfo.permissions) ? memberInfo.permissions : {};
-            const canEditProject = userRole === 'owner';
-            const canEditTenders = userRole === 'owner' || (userRole === 'editor' && userPermissions.canAccessTenders);
-
-            html += `<tr class="project-group-header"><td colspan="6"><strong>📁 專案：${escapeHtml(group.project.name)}</strong><span class="project-code">(${escapeHtml(group.project.code || 'N/A')})</span></td><td class="project-actions">${canEditProject ? `<button class="btn btn-sm btn-edit-project" data-action="edit-project" data-project-id="${group.project.id}">編輯專案</button>` : ''}</td></tr>`;
-            if (group.tenders && group.tenders.length > 0) {
-                group.tenders.forEach(tender => {
-                    html += `<tr class="tender-row"><td><a href="/program/tenders/detail?id=${tender.id}" data-route>${escapeHtml(tender.name || '未命名標單')}</a></td><td><code>${escapeHtml(tender.code || 'N/A')}</code></td><td>${escapeHtml(tender.projectName)}</td><td><strong>${formatCurrency(tender.totalAmount || 0)}</strong></td><td><span class="status-badge ${tender.status || 'planning'}">${getStatusText(tender.status)}</span></td><td>${formatDate(tender.createdAt)}</td><td><div class="action-buttons"><button class="btn btn-sm btn-view" data-action="view-tender" data-tender-id="${tender.id}">查看</button>${canEditTenders ? `<button class="btn btn-sm btn-edit" data-action="edit-tender" data-tender-id="${tender.id}">編輯標單</button><button class="btn btn-sm btn-delete" data-action="delete-tender" data-tender-id="${tender.id}" data-tender-name="${escapeHtml(tender.name)}">刪除</button>` : ''}</div></td></tr>`;
-                });
-            } else {
-                 html += `<tr><td colspan="7" class="no-tenders-in-group">此專案下沒有符合篩選條件的標單。</td></tr>`;
+            const projectDoc = await db.collection('projects').doc(projectId).get();
+            if (!projectDoc.exists) {
+                showAlert('找不到指定的專案', 'error');
+                return navigateTo('/program/projects/list');
             }
-        });
-        tbody.innerHTML = html;
-    }
-
-    function setupEventListeners() {
-        const mainContent = document.getElementById('mainContent');
-        if (!mainContent) return;
-
-        mainContent.addEventListener('click', (event) => {
-            const target = event.target.closest('button[data-action]');
-            if (!target) return;
             
-            const { action, tenderId, tenderName, projectId } = target.dataset;
-
-            switch (action) {
-                case 'view-tender': viewTender(tenderId); break;
-                case 'edit-tender': editTender(tenderId); break;
-                case 'delete-tender': deleteTender(tenderId, tenderName); break;
-                case 'edit-project': editProject(projectId); break;
-                case 'clear-filters': clearFilters(); break;
+            currentProjectData = { id: projectDoc.id, ...projectDoc.data() };
+            
+            // 權限檢查：使用者是否為成員
+            if (!currentProjectData.memberEmails.includes(auth.currentUser.email)) {
+                showAlert('您沒有權限查看此專案', 'error');
+                return navigateTo('/program/projects/list');
             }
-        });
 
-        document.getElementById('projectFilter')?.addEventListener('change', applyFiltersAndGroup);
-        document.getElementById('statusFilter')?.addEventListener('change', applyFiltersAndGroup);
-        document.getElementById('searchInput')?.addEventListener('input', applyFiltersAndGroup);
-    }
+            populateForm(currentProjectData);
+            renderMembersTable();
+            setupEventListeners();
+            setupUIPermissions();
+            
+            showLoading(false);
 
-    function applyFiltersAndGroup() {
-        const projectFilter = document.getElementById('projectFilter')?.value || '';
-        const statusFilter = document.getElementById('statusFilter')?.value || '';
-        const searchInput = document.getElementById('searchInput')?.value.toLowerCase() || '';
-
-        const filteredTenders = allTenders.filter(tender => {
-            if (projectFilter && tender.projectId !== projectFilter) return false;
-            if (statusFilter && tender.status !== statusFilter) return false;
-            if (searchInput) {
-                const searchFields = [ tender.name || '', tender.code || '', tender.projectName || '' ].join(' ').toLowerCase();
-                if (!searchFields.includes(searchInput)) return false;
-            }
-            return true;
-        });
-
-        const groups = {};
-        filteredTenders.forEach(tender => {
-            const projectId = tender.projectId || 'unassigned';
-            if (!groups[projectId]) {
-                const projectInfo = allProjects.find(p => p.id === projectId);
-                if (projectInfo) {
-                    groups[projectId] = { project: projectInfo, tenders: [] };
-                }
-            }
-            if (groups[projectId]) {
-                groups[projectId].tenders.push(tender);
-            }
-        });
-
-        filteredAndGroupedData = Object.values(groups);
-        renderTenders();
-    }
-
-    function clearFilters() {
-        document.getElementById('projectFilter').value = '';
-        document.getElementById('statusFilter').value = '';
-        document.getElementById('searchInput').value = '';
-        applyFiltersAndGroup();
-    }
-
-    function viewTender(tenderId) { navigateTo(`/program/tenders/detail?id=${tenderId}`); }
-    function editTender(tenderId) { navigateTo(`/program/tenders/edit?id=${tenderId}`); }
-    function editProject(projectId) { navigateTo(`/program/projects/edit?id=${projectId}`); }
-
-    async function deleteTender(tenderId, tenderName) {
-        if (!confirm(`確定要刪除標單「${tenderName}」嗎？\n此操作將一併刪除所有相關資料且無法復原！`)) return;
-
-        showLoading(true, '刪除中...');
-        try {
-            await deleteTenderAndRelatedData(tenderId);
-            allTenders = allTenders.filter(t => t.id !== tenderId);
-            applyFiltersAndGroup();
-            updateSummary();
-            showAlert('標單已成功刪除！', 'success');
         } catch (error) {
-            console.error('❌ 刪除標單失敗:', error);
-            showAlert('刪除失敗：' + error.message, 'error');
+            console.error("載入專案資料失敗:", error);
+            showAlert("載入專案資料失敗: " + error.message, "error");
+            showLoading(false);
+        }
+    }
+
+    // --- 權限檢查與 UI 設定 ---
+    function setupUIPermissions() {
+        // 【結構修正】直接從 Map 中取得使用者資訊
+        const userMemberInfo = currentProjectData.members[auth.currentUser.email];
+        currentUserRole = userMemberInfo ? userMemberInfo.role : null;
+
+        // 只有 owner 才能編輯
+        const canEdit = currentUserRole === 'owner';
+        
+        console.log(`[權限] 使用者角色: ${currentUserRole}, 是否可編輯: ${canEdit}`);
+
+        if (!canEdit) {
+            // 禁用所有表單元素
+            form.querySelectorAll('input, select, textarea').forEach(el => el.disabled = true);
+            // 隱藏儲存按鈕和成員管理區塊
+            saveChangesBtn.style.display = 'none';
+            memberManagementSection.style.display = 'none';
+            // 顯示權限不足的提示
+            permissionAlert.style.display = 'block';
+        } else {
+            // 確保有權限時，所有東西都是可見且可用的
+            form.querySelectorAll('input, select, textarea').forEach(el => el.disabled = false);
+            saveChangesBtn.style.display = 'inline-block';
+            memberManagementSection.style.display = 'block';
+            permissionAlert.style.display = 'none';
+        }
+    }
+
+    // --- UI 渲染 ---
+    function populateForm(project) {
+        if (pageTitleEl) pageTitleEl.textContent = `✏️ 編輯專案：${project.name || ''}`;
+        
+        document.getElementById('projectName').value = project.name || '';
+        document.getElementById('projectCode').value = project.code || '';
+        document.getElementById('statusSelect').value = project.status || 'planning';
+        const startDateEl = document.getElementById('startDate');
+        if(startDateEl) startDateEl.value = safeFormatDateForInput(project.startDate);
+        const endDateEl = document.getElementById('endDate');
+        if(endDateEl) endDateEl.value = safeFormatDateForInput(project.endDate);
+        const contractorNameEl = document.getElementById('contractorName');
+        if(contractorNameEl) contractorNameEl.value = project.contractorName || '';
+        const contractorContactEl = document.getElementById('contractorContact');
+        if(contractorContactEl) contractorContactEl.value = project.contractorContact || '';
+        const descriptionEl = document.getElementById('description');
+        if(descriptionEl) descriptionEl.value = project.description || '';
+        const notesEl = document.getElementById('notes');
+        if(notesEl) notesEl.value = project.notes || '';
+    }
+    
+    function renderMembersTable() {
+        if (!membersTableBody) return;
+        membersTableBody.innerHTML = '';
+        
+        // 【結構修正】遍歷 Map 物件
+        for (const email in currentProjectData.members) {
+            const member = currentProjectData.members[email];
+            const tr = document.createElement('tr');
+            const roleText = { owner: '擁有者', editor: '編輯者', viewer: '檢視者' }[member.role] || member.role;
+            
+            tr.innerHTML = `
+                <td>${email}</td>
+                <td><span class="status-badge ${member.role}">${roleText}</span></td>
+                <td>
+                    ${member.role !== 'owner' ? `<button type="button" class="btn btn-sm btn-danger" data-action="remove-member" data-email="${email}">移除</button>` : '—'}
+                </td>
+            `;
+            membersTableBody.appendChild(tr);
+        }
+    }
+
+    // --- 事件監聽器設定 ---
+    function setupEventListeners() {
+        if (form.dataset.initialized) return;
+        form.dataset.initialized = 'true';
+
+        form.addEventListener('submit', handleFormSubmit);
+        cancelBtn.addEventListener('click', () => navigateTo('/program/projects/list'));
+        addMemberBtn.addEventListener('click', handleAddMember);
+        newMemberRoleSelect.addEventListener('change', () => {
+            permissionsContainer.style.display = newMemberRoleSelect.value === 'editor' ? 'block' : 'none';
+        });
+        
+        membersTableBody.addEventListener('click', e => {
+            if (e.target.dataset.action === 'remove-member') {
+                handleRemoveMember(e.target.dataset.email);
+            }
+        });
+    }
+
+    // --- 操作處理函式 ---
+    async function handleFormSubmit(e) {
+        e.preventDefault();
+        
+        const updatedData = {
+            name: document.getElementById('projectName').value.trim(),
+            code: document.getElementById('projectCode').value.trim(),
+            status: document.getElementById('statusSelect').value,
+            // 注意：這裡只更新專案基本資料，成員資料由專門的函式處理
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (!updatedData.name) return showAlert("專案名稱為必填項", "error");
+
+        try {
+            showLoading(true, '儲存中...');
+            await db.collection('projects').doc(projectId).update(updatedData);
+            showAlert("專案資料更新成功！", "success");
+            navigateTo(`/program/projects/list`);
+        } catch (error) {
+            console.error("更新專案失敗:", error);
+            showAlert("更新失敗: " + error.message, "error");
+        } finally {
+            showLoading(false);
+        }
+    }
+    
+    async function handleAddMember() {
+        const email = newMemberEmailInput.value.trim().toLowerCase();
+        const role = newMemberRoleSelect.value;
+        
+        if (!email) return showAlert('請輸入成員的 Email', 'warning');
+        if (currentProjectData.memberEmails.includes(email)) return showAlert('該成員已在專案中', 'warning');
+
+        const newMember = { role };
+        if (role === 'editor') {
+            newMember.permissions = {};
+            permissionsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                newMember.permissions[cb.dataset.permission] = cb.checked;
+            });
+        }
+        
+        // 【結構修正】直接在 Map 和 Array 中新增
+        const updatedMembers = { ...currentProjectData.members, [email]: newMember };
+        const updatedMemberEmails = [...currentProjectData.memberEmails, email];
+
+        try {
+            showLoading(true, '新增成員中...');
+            await db.collection('projects').doc(projectId).update({
+                members: updatedMembers,
+                memberEmails: updatedMemberEmails,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            // 同步本地資料
+            currentProjectData.members = updatedMembers;
+            currentProjectData.memberEmails = updatedMemberEmails;
+            showAlert('成員新增成功！', 'success');
+            renderMembersTable();
+            newMemberEmailInput.value = '';
+        } catch (error) {
+            console.error("新增成員失敗:", error);
+            showAlert("新增成員失敗: " + error.message, "error");
+        } finally {
+            showLoading(false);
+        }
+    }
+    
+    async function handleRemoveMember(emailToRemove) {
+        if (!confirm(`確定要從專案中移除成員「${emailToRemove}」嗎？`)) return;
+
+        // 【結構修正】從 Map 和 Array 中移除
+        const updatedMembers = { ...currentProjectData.members };
+        delete updatedMembers[emailToRemove];
+        const updatedMemberEmails = currentProjectData.memberEmails.filter(e => e !== emailToRemove);
+        try {
+            showLoading(true, '移除成員中...');
+            await db.collection('projects').doc(projectId).update({
+                members: updatedMembers,
+                memberEmails: updatedMemberEmails,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            // 同步本地資料
+            currentProjectData.members = updatedMembers;
+            currentProjectData.memberEmails = updatedMemberEmails;
+            showAlert('成員移除成功！', 'success');
+            renderMembersTable();
+        } catch (error) {
+            console.error("移除成員失敗:", error);
+            showAlert("移除成員失敗: " + error.message, "error");
+            loadPageData();
         } finally {
             showLoading(false);
         }
     }
 
-    function getStatusText(status) {
-        const statusMap = { 'planning': '規劃中', 'bidding': '招標中', 'awarded': '得標', 'active': '進行中', 'completed': '已完成', 'paused': '暫停' };
-        return statusMap[status] || '未設定';
-    }
-    function escapeHtml(text) {
-        if (typeof text !== 'string') return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-    function showLoading(isLoading, message = '載入資料中...') {
+    // --- 輔助函數 ---
+    function showLoading(isLoading, message = '處理中...') {
         const loadingEl = document.getElementById('loading');
-        const mainContentEl = document.getElementById('mainContent');
+        const formEl = document.getElementById('projectEditForm');
         if (loadingEl) {
             loadingEl.style.display = isLoading ? 'flex' : 'none';
-            const p = loadingEl.querySelector('p');
-            if (p) p.textContent = message;
+            if (loadingEl.querySelector('p')) loadingEl.querySelector('p').textContent = message;
         }
-        if (mainContentEl) mainContentEl.style.display = isLoading ? 'none' : 'block';
+        if (formEl) {
+            formEl.style.display = isLoading ? 'none' : 'block';
+        }
     }
 
-    console.log("🚀 初始化標單列表頁面...");
-    loadAllData();
-    setupEventListeners();
+    function safeFormatDateForInput(dateField) {
+        if (!dateField) return '';
+        const date = dateField.toDate ? dateField.toDate() : new Date(dateField);
+        if (isNaN(date.getTime())) return '';
+        return date.toISOString().split('T')[0];
+    }
+    
+    // --- 啟動頁面 ---
+    loadPageData();
 }
