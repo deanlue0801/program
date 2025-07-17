@@ -1,158 +1,140 @@
-/**
- * 編輯專案頁面 (projects-edit.js) - v3.0 (權限 Map 結構)
- */
-function initProjectEditPage() {
-    let projectId = null, currentProjectData = {}, currentUserRole = null;
-    const form = document.getElementById('projectEditForm');
-    const memberManagementSection = document.getElementById('memberManagementSection');
-    const membersTableBody = document.getElementById('membersTableBody');
-    const newMemberEmailInput = document.getElementById('newMemberEmail');
-    const newMemberRoleSelect = document.getElementById('newMemberRole');
-    const permissionsContainer = document.getElementById('permissionsContainer');
-    const addMemberBtn = document.getElementById('addMemberBtn');
-    const saveChangesBtn = document.getElementById('saveChangesBtn');
-    const permissionAlert = document.getElementById('permissionAlert');
+<div class="content-card">
+    <div class="page-header">
+        <h1 class="page-title">✏️ 編輯專案</h1>
+        <!-- 我們將在這裡動態加入權限提示 -->
+        <div id="permissionAlert" class="alert alert-warning" style="display: none; margin-top: 1rem;">
+            您在此專案中為「檢視者」或權限不足，僅能查看資料，無法進行任何編輯。
+        </div>
+    </div>
 
-    async function loadPageData() {
-        showLoading(true);
-        projectId = new URLSearchParams(window.location.search).get('id');
-        if (!projectId) {
-            showAlert('無效的專案ID', 'error');
-            return navigateTo('/program/projects/list');
-        }
-        try {
-            const projectDoc = await db.collection('projects').doc(projectId).get();
-            if (!projectDoc.exists) {
-                showAlert('找不到指定的專案', 'error');
-                return navigateTo('/program/projects/list');
-            }
-            currentProjectData = { id: projectDoc.id, ...projectDoc.data() };
-            if (!currentProjectData.memberEmails.includes(auth.currentUser.email)) {
-                showAlert('您沒有權限查看此專案', 'error');
-                return navigateTo('/program/projects/list');
-            }
-            populateForm(currentProjectData);
-            renderMembersTable();
-            setupEventListeners();
-            setupUIPermissions();
-            showLoading(false);
-        } catch (error) {
-            console.error("載入專案資料失敗:", error);
-            showAlert("載入專案資料失敗: " + error.message, "error");
-            showLoading(false);
-        }
-    }
+    <div id="loading" class="loading" style="display: flex;">
+        <div class="spinner"></div>
+        <p>載入專案資料中...</p>
+    </div>
 
-    function setupUIPermissions() {
-        const userMemberInfo = currentProjectData.members[auth.currentUser.email];
-        currentUserRole = userMemberInfo ? userMemberInfo.role : null;
-        const canEdit = currentUserRole === 'owner';
-        if (!canEdit) {
-            form.querySelectorAll('input, select, textarea').forEach(el => el.disabled = true);
-            saveChangesBtn.style.display = 'none';
-            memberManagementSection.style.display = 'none';
-            permissionAlert.style.display = 'block';
-        }
-    }
+    <!-- 【結構整理】將 form 的 ID 改為 projectEditForm，並移除 onsubmit -->
+    <form id="projectEditForm" style="display: none;">
+        <div class="form-container">
+            <!-- 主要專案資訊 -->
+            <div class="form-grid">
+                <div class="form-section">
+                    <h3>基本資訊</h3>
+                    <!-- 【結構整理】將 ID 從 tenderName/tenderCode 改為 projectName/projectCode -->
+                    <div class="form-group">
+                        <label for="projectName">專案名稱 *</label>
+                        <input type="text" id="projectName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="projectCode">專案編號</label>
+                        <input type="text" id="projectCode" class="form-control">
+                    </div>
+                     <div class="form-group">
+                        <label for="statusSelect">專案狀態</label>
+                        <select id="statusSelect" class="form-control">
+                            <option value="planning">規劃中</option>
+                            <option value="active">進行中</option>
+                            <option value="completed">已完成</option>
+                            <option value="paused">暫停</option>
+                        </select>
+                    </div>
+                </div>
 
-    function renderMembersTable() {
-        membersTableBody.innerHTML = '';
-        for (const email in currentProjectData.members) {
-            const member = currentProjectData.members[email];
-            const tr = document.createElement('tr');
-            const roleText = { owner: '擁有者', editor: '編輯者', viewer: '檢視者' }[member.role] || member.role;
-            tr.innerHTML = `<td>${email}</td><td><span class="status-badge ${member.role}">${roleText}</span></td><td>${member.role !== 'owner' ? `<button type="button" class="btn btn-sm btn-danger" data-action="remove-member" data-email="${email}">移除</button>` : '—'}</td>`;
-            membersTableBody.appendChild(tr);
-        }
-    }
+                <div class="form-section">
+                    <h3>時程與承包商</h3>
+                    <div class="form-group">
+                        <label for="startDate">開始日期</label>
+                        <input type="date" id="startDate" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="endDate">結束日期</label>
+                        <input type="date" id="endDate" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="contractorName">承包商名稱</label>
+                        <input type="text" id="contractorName" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="contractorContact">聯絡方式</label>
+                        <input type="text" id="contractorContact" class="form-control">
+                    </div>
+                </div>
 
-    async function handleAddMember() {
-        const email = newMemberEmailInput.value.trim().toLowerCase();
-        const role = newMemberRoleSelect.value;
-        if (!email) return showAlert('請輸入成員的 Email', 'warning');
-        if (currentProjectData.memberEmails.includes(email)) return showAlert('該成員已在專案中', 'warning');
+                <div class="form-section" style="grid-column: 1 / -1;">
+                     <h3>描述與備註</h3>
+                    <div class="form-group">
+                        <label for="description">專案描述</label>
+                        <textarea id="description" class="form-control"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">備註</label>
+                        <textarea id="notes" class="form-control"></textarea>
+                    </div>
+                </div>
+            </div>
 
-        const newMember = { role };
-        if (role === 'editor') {
-            newMember.permissions = {};
-            permissionsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-                newMember.permissions[cb.dataset.permission] = cb.checked;
-            });
-        }
-        
-        const updatedMembers = { ...currentProjectData.members, [email]: newMember };
-        const updatedMemberEmails = [...currentProjectData.memberEmails, email];
+            <!-- ================================================================= -->
+            <!-- ✨✨✨ 第二階段：新增「成員管理」區塊 ✨✨✨ -->
+            <!-- ================================================================= -->
+            <div id="memberManagementSection" class="form-section" style="grid-column: 1 / -1; margin-top: 2rem;">
+                <h3 class="section-title"><span>👥</span> 成員管理</h3>
+                
+                <!-- 現有成員列表 -->
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>成員 Email</th>
+                                <th>角色</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="membersTableBody">
+                            <!-- 成員列表將由 JavaScript 動態生成 -->
+                        </tbody>
+                    </table>
+                </div>
 
-        try {
-            showLoading(true, '新增成員中...');
-            await db.collection('projects').doc(projectId).update({ members: updatedMembers, memberEmails: updatedMemberEmails, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-            currentProjectData.members = updatedMembers;
-            currentProjectData.memberEmails = updatedMemberEmails;
-            showAlert('成員新增成功！', 'success');
-            renderMembersTable();
-            newMemberEmailInput.value = '';
-        } catch (error) {
-            console.error("新增成員失敗:", error);
-            showAlert("新增成員失敗: " + error.message, "error");
-        } finally {
-            showLoading(false);
-        }
-    }
-    
-    async function handleRemoveMember(emailToRemove) {
-        if (!confirm(`確定要從專案中移除成員「${emailToRemove}」嗎？`)) return;
-        const updatedMembers = { ...currentProjectData.members };
-        delete updatedMembers[emailToRemove];
-        const updatedMemberEmails = currentProjectData.memberEmails.filter(e => e !== emailToRemove);
-        try {
-            showLoading(true, '移除成員中...');
-            await db.collection('projects').doc(projectId).update({ members: updatedMembers, memberEmails: updatedMemberEmails, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-            currentProjectData.members = updatedMembers;
-            currentProjectData.memberEmails = updatedMemberEmails;
-            showAlert('成員移除成功！', 'success');
-            renderMembersTable();
-        } catch (error) {
-            console.error("移除成員失敗:", error);
-            showAlert("移除成員失敗: " + error.message, "error");
-            loadPageData();
-        } finally {
-            showLoading(false);
-        }
-    }
-    
-    function setupEventListeners() {
-        if (form.dataset.initialized) return;
-        form.dataset.initialized = 'true';
-        form.addEventListener('submit', handleFormSubmit);
-        document.getElementById('cancelBtn').addEventListener('click', () => navigateTo('/program/projects/list'));
-        addMemberBtn.addEventListener('click', handleAddMember);
-        newMemberRoleSelect.addEventListener('change', () => { permissionsContainer.style.display = newMemberRoleSelect.value === 'editor' ? 'block' : 'none'; });
-        membersTableBody.addEventListener('click', e => { if (e.target.dataset.action === 'remove-member') handleRemoveMember(e.target.dataset.email); });
-    }
-    
-    async function handleFormSubmit(e) {
-        e.preventDefault();
-        const updatedData = {
-            name: document.getElementById('projectName').value.trim(),
-            code: document.getElementById('projectCode').value.trim(),
-            status: document.getElementById('statusSelect').value,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        if (!updatedData.name) return showAlert("專案名稱為必填項", "error");
-        try {
-            showLoading(true, '儲存中...');
-            await db.collection('projects').doc(projectId).update(updatedData);
-            showAlert("專案資料更新成功！", "success");
-            navigateTo(`/program/projects/list`);
-        } catch (error) {
-            console.error("更新專案失敗:", error);
-            showAlert("更新失敗: " + error.message, "error");
-        } finally {
-            showLoading(false);
-        }
-    }
+                <!-- 新增成員表單 -->
+                <div class="add-member-form" style="margin-top: 1.5rem; border-top: 1px solid #eee; padding-top: 1.5rem;">
+                    <h4>新增成員</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="newMemberEmail">電子郵件</label>
+                            <input type="email" id="newMemberEmail" class="form-control" placeholder="輸入新成員的 Email">
+                        </div>
+                        <div class="form-group">
+                            <label for="newMemberRole">角色</label>
+                            <select id="newMemberRole" class="form-control">
+                                <option value="editor">編輯者</option>
+                                <option value="viewer">檢視者</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- 精細權限設定 (預設隱藏) -->
+                    <div id="permissionsContainer" class="permissions-container" style="margin-top: 1rem;">
+                        <h5>精細權限 (僅對「編輯者」有效)</h5>
+                        <div class="permission-checkboxes">
+                            <label><input type="checkbox" data-permission="canAccessTenders"> 存取標單管理</label>
+                            <label><input type="checkbox" data-permission="canAccessDistribution"> 存取樓層分配</label>
+                            <label><input type="checkbox" data-permission="canUploadPhotos"> 允許上傳照片</label>
+                            <label><input type="checkbox" data-permission="canManageMembers"> 允許管理成員</label>
+                            <!-- 更多權限可在此處添加 -->
+                        </div>
+                    </div>
+                    
+                    <button type="button" id="addMemberBtn" class="btn btn-info" style="margin-top: 1rem;">新增成員</button>
+                </div>
+            </div>
+            <!-- ================================================================= -->
+            <!-- ✨✨✨ 區塊結束 ✨✨✨ -->
+            <!-- ================================================================= -->
 
-    function populateForm(project) { /* ... (內容不變) ... */ }
-    function showLoading(isLoading, message = '處理中...') { /* ... (內容不變) ... */ }
-    loadPageData();
-}
+
+            <div class="form-actions">
+                <button type="button" id="cancelBtn" class="btn btn-secondary">取消</button>
+                <button type="submit" id="saveChangesBtn" class="btn btn-success">儲存變更</button>
+            </div>
+        </div>
+    </form>
+</div>
