@@ -1,4 +1,4 @@
-/**
+標單管理模組權限最終修正assets/js/tenders-detail.js (權限最終修正版)修改重點：loadMajorAndDetailItems() 及 loadDistributionData()：修正了查詢子集合的方式，在查詢條件中加入了 projectId，以符合後端安全規則。/**
  * 標單詳情頁面 (tenders-detail.js) - v4.0 (權限最終修正)
  */
 function initTenderDetailPage() {
@@ -170,7 +170,6 @@ function initTenderDetailPage() {
         }
     }
     
-    // --- 其他所有函式維持不變 ---
     function renderStatistics() { const totalAmount = currentTender.totalAmount || 0; const majorItemsCount = majorItems.length; const detailItemsCount = detailItems.length; const distributedMajorItems = calculateDistributedMajorItems(); const distributionProgress = majorItemsCount > 0 ? (distributedMajorItems / majorItemsCount) * 100 : 0; document.getElementById('totalAmount').textContent = formatCurrency(totalAmount); document.getElementById('majorItemsCount').textContent = majorItemsCount; document.getElementById('detailItemsCount').textContent = detailItemsCount; document.getElementById('overallProgress').textContent = `0%`; document.getElementById('distributionProgress').textContent = `${Math.round(distributionProgress)}%`; document.getElementById('billingAmount').textContent = formatCurrency(0); }
     function renderOverviewTab() { const distributedMajorItems = calculateDistributedMajorItems(); const undistributedMajorItems = majorItems.length - distributedMajorItems; const distributionAreas = calculateDistributionAreas(); document.getElementById('distributedMajorItems').textContent = distributedMajorItems; document.getElementById('undistributedMajorItems').textContent = undistributedMajorItems; document.getElementById('distributionAreas').textContent = distributionAreas; document.getElementById('overviewStartDate').textContent = formatDate(currentTender.startDate); document.getElementById('overviewEndDate').textContent = formatDate(currentTender.endDate); document.getElementById('executedDays').textContent = calculateExecutedDays(); document.getElementById('remainingDays').textContent = calculateRemainingDays(); }
     function renderMajorItemsTab() { const container = document.getElementById('majorItemsList'); const emptyState = document.getElementById('emptyMajorItemsState'); if (majorItems.length === 0) { container.innerHTML = ''; emptyState.style.display = 'block'; return; } emptyState.style.display = 'none'; container.innerHTML = ''; majorItems.forEach(majorItem => container.appendChild(createMajorItemCard(majorItem))); }
