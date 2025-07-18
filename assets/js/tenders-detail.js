@@ -195,6 +195,3 @@
     loadAllData();
 
 function naturalSequenceSort(a, b) { const CHINESE_NUM_MAP = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10, '甲': 1, '乙': 2, '丙': 3, '丁': 4, '戊': 5, '己': 6, '庚': 7, '辛': 8, '壬': 9, '癸': 10 }; const re = /(\d+(\.\d+)?)|([一二三四五六七八九十甲乙丙丁戊己庚辛壬癸])|(\D+)/g; const seqA = String(a.sequence || ''); const seqB = String(b.sequence || ''); const partsA = seqA.match(re) || []; const partsB = seqB.match(re) || []; const len = Math.min(partsA.length, partsB.length); for (let i = 0; i < len; i++) { const partA = partsA[i]; const partB = partsB[i]; let numA = parseFloat(partA); let numB = parseFloat(partB); if (isNaN(numA)) numA = CHINESE_NUM_MAP[partA]; if (isNaN(numB)) numB = CHINESE_NUM_MAP[partB]; if (numA !== undefined && numB !== undefined) { if (numA !== numB) return numA - numB; } else { const comparison = partA.localeCompare(partB); if (comparison !== 0) return comparison; } } return partsA.length - partsB.length; }
-
-// 這裡多了一個 } 導致了問題
-}
