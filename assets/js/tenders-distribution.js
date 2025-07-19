@@ -79,6 +79,31 @@ function initDistributionPage() {
         }
     }
 
+    // 【v3.1 修正】新增遺漏的 clearAllDistributions 函式
+    function clearAllDistributions() {
+        if (!selectedMajorItem) return showAlert('請先選擇大項目', 'warning');
+        if (!confirm(`確定要清空「${selectedMajorItem.name}」的所有樓層分配嗎？\n此操作不會立即儲存，您需要點擊「儲存所有分配」按鈕來確認變更。`)) return;
+
+        // 將表格中所有的 input 欄位的值都設為空
+        document.querySelectorAll('.quantity-input').forEach(input => {
+            input.value = '';
+        });
+        
+        // 重新計算一次已分配數量，確保介面更新
+        document.querySelectorAll('.item-row').forEach(row => {
+            const distributedCell = document.getElementById(`distributed-${row.dataset.itemId}`);
+            if (distributedCell) {
+                const strongTag = distributedCell.querySelector('strong');
+                if(strongTag) {
+                    strongTag.textContent = '0';
+                }
+                distributedCell.classList.remove('error');
+            }
+        });
+
+        showAlert('已清空畫面上的分配，請點擊儲存按鈕以生效。', 'info');
+    }
+    
     async function onMajorItemChange() {
         const majorItemId = document.getElementById('majorItemSelect').value;
         if (!majorItemId) { hideMainContent(); return; }
