@@ -68,7 +68,11 @@ function initDistributionPage() {
         majorItemSelect.innerHTML = '<option value="">載入中...</option>';
         majorItemSelect.disabled = true;
         try {
-            const majorItemDocs = await safeFirestoreQuery("majorItems", [{ field: "tenderId", operator: "==", value: tenderId }]);
+            // 【v3.2 修正】查詢時必須同時傳入 projectId，以符合 Firebase 安全規則
+            const majorItemDocs = await safeFirestoreQuery("majorItems", [
+                { field: "tenderId", operator: "==", value: tenderId },
+                { field: "projectId", operator: "==", value: selectedProject.id } // 加上這一行
+            ]);
             majorItems = majorItemDocs.docs;
             majorItemSelect.innerHTML = '<option value="">請選擇大項目...</option>';
             majorItems.forEach(item => majorItemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`);
