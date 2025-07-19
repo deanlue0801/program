@@ -105,9 +105,10 @@ function initTenderDetailPage() {
             ])
         ]);
         
-        majorItems = majorItemsResult.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(naturalSequenceSort);
-        detailItems = detailItemsResult.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort(naturalSequenceSort);
-    }
+        // 【v4.1 修正】safeFirestoreQuery 已經返回處理好的物件陣列，無需再呼叫 .data()
+        majorItems = majorItemsResult.docs.sort(naturalSequenceSort);
+        detailItems = detailItemsResult.docs.sort(naturalSequenceSort);
+        }
 
     async function loadDistributionData() {
         if (detailItems.length === 0) { 
