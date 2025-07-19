@@ -1,131 +1,106 @@
-<!-- pages/dashboard.html -->
-<div class="dashboard-container">
-    <div class="dashboard-header">
-        <div id="welcomeMessage">
-            <h1 class="page-title">歡迎回來！</h1>
-            <p class="page-subtitle">這是您所有專案的即時總覽。</p>
+<div class="distribution-page-wrapper">
+    <section class="selection-panel">
+        <div class="selection-grid">
+            <div>
+                <label class="selection-label" for="projectSelect">📁 選擇專案</label>
+                <select class="form-select" id="projectSelect">
+                    <option value="">載入中...</option>
+                </select>
+            </div>
+            <div>
+                <label class="selection-label" for="tenderSelect">📋 選擇標單</label>
+                <select class="form-select" id="tenderSelect" disabled>
+                    <option value="">請先選擇專案</option>
+                </select>
+            </div>
+            <div>
+                <label class="selection-label" for="majorItemSelect">🔧 選擇大項目</label>
+                <select class="form-select" id="majorItemSelect" disabled>
+                    <option value="">請先選擇標單</option>
+                </select>
+            </div>
         </div>
-        <div class="stats-grid">
-            <div class="stat-card"><div class="stat-icon project">📁</div><div class="stat-value" id="projectCount">0</div><div class="stat-label">進行中專案</div><div class="stat-change" id="projectChange">共 0 個專案</div></div>
-            <div class="stat-card"><div class="stat-icon tender">📋</div><div class="stat-value" id="tenderCount">0</div><div class="stat-label">標單總數</div><div class="stat-change" id="tenderChange">共 0 個標單</div></div>
-            <div class="stat-card"><div class="stat-icon amount">💰</div><div class="stat-value" id="totalAmount">NT$ 0</div><div class="stat-label">合約總金額</div><div class="stat-change" id="amountChange">總計 NT$ 0</div></div>
-            <div class="stat-card"><div class="stat-icon time">⏰</div><div class="stat-value" id="lastUpdate">--:--</div><div class="stat-label">最後更新</div><div class="stat-change" id="updateTime">等待資料...</div></div>
+    </section>
+
+    <div class="distribution-body">
+        <div class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>載入資料中...</p>
+        </div>
+
+        <div id="mainContent" style="display: none;">
+            <div class="actions-panel">
+                <h2 style="color: #333; font-size: 20px;">樓層數量分配</h2>
+                <div class="action-buttons">
+                    <button id="saveDistributionsBtn" class="btn btn-success">💾 儲存所有分配</button>
+                    <button id="clearDistributionsBtn" class="btn btn-danger">🗑️ 清空此大項分配</button>
+                    <button id="floorManagerBtn" class="btn btn-info">🏢 管理樓層</button>
+                    <button id="sequenceManagerBtn" class="btn btn-primary">🔄 管理項次</button>
+                    <button id="importBtn" class="btn btn-primary">📥 匯入 Excel</button>
+                    <input type="file" id="importInput" accept=".xlsx, .xls" style="display: none;">
+                    <button id="exportBtn" class="btn btn-warning">📤 匯出 Excel</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table class="distribution-table">
+                    <thead id="tableHeader"></thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="emptyState" class="empty-state" style="display: flex;">
+            <div class="empty-state-icon">↖️</div>
+            <p>請從上方的下拉選單選擇「專案」、「標單」及「大項目」以開始作業</p>
         </div>
     </div>
-    <div class="dashboard-main-content">
-        <div class="content-card recent-activity">
-            <h3 class="card-title">最近活動</h3>
-            <ul class="activity-list" id="activityList"></ul>
-        </div>
-    </div>
-</div>
-<div id="loading" class="loading" style="display: flex; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.8); z-index: 10;">
-    <div class="spinner"></div><p>載入儀表板資料中...</p>
 </div>
 
-<script>
-function initDashboardPage() {
-    const loadingEl = document.getElementById('loading');
-    const mainContentEl = document.querySelector('.dashboard-container');
-    async function loadDashboardData() {
-        console.log('📊 載入主控台資料 (v4.0)...');
-        showLoading(true);
-        try {
-            const projects = await loadProjects();
-            const tenders = await loadTenders();
-            const stats = calculateStats(projects, tenders);
-            const activities = getRecentActivities(tenders);
-            updateStatsDisplay(stats);
-            updateActivitiesDisplay(activities);
-            console.log('✅ 主控台資料載入完成');
-        } catch(error) {
-            console.error("❌ 主控台資料載入失敗", error);
-            showAlert("無法載入您的主控台資料，請檢查網路連線或稍後再試。", "error");
-        } finally {
-            showLoading(false);
-        }
-    }
-    function calculateStats(projects, tenders) {
-        try {
-            let totalAmount = 0, lastUpdate = null;
-            tenders.forEach(tender => {
-                totalAmount += tender.totalAmount || 0;
-                const updateTime = tender.updatedAt || tender.createdAt;
-                if (updateTime && (!lastUpdate || updateTime.toDate() > lastUpdate)) lastUpdate = updateTime.toDate();
-            });
-            return { projectCount: projects.length, tenderCount: tenders.length, totalAmount, lastUpdate: lastUpdate || new Date() };
-        } catch (error) {
-            console.error('❌ 計算統計資料失敗:', error);
-            return { projectCount: 0, tenderCount: 0, totalAmount: 0, lastUpdate: new Date() };
-        }
-    }
-    function getRecentActivities(tenders) {
-        try {
-            return tenders
-                .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
-                .slice(0, 5)
-                .map(tender => ({ type: 'tender', title: `新增標單：${tender.name || '未命名'}`, time: tender.createdAt, icon: '📋' }));
-        } catch (error) {
-            console.error('❌ 處理活動記錄失敗:', error);
-            return [];
-        }
-    }
-    function startAutoRefresh() {
-        setInterval(async () => {
-            if (auth.currentUser) {
-                try {
-                    const projects = await loadProjects();
-                    const tenders = await loadTenders();
-                    updateStatsDisplay(calculateStats(projects, tenders));
-                } catch (error) { console.error('❌ 自動刷新失敗:', error); }
-            }
-        }, 300000);
-    }
-    function updateStatsDisplay(stats) {
-        document.getElementById('projectCount').textContent = stats.projectCount;
-        document.getElementById('tenderCount').textContent = stats.tenderCount;
-        document.getElementById('totalAmount').textContent = formatCurrency(stats.totalAmount);
-        document.getElementById('lastUpdate').textContent = stats.lastUpdate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
-        document.getElementById('projectChange').textContent = `共 ${stats.projectCount} 個專案`;
-        document.getElementById('tenderChange').textContent = `共 ${stats.tenderCount} 個標單`;
-        document.getElementById('amountChange').textContent = `總計 ${formatCurrency(stats.totalAmount)}`;
-        document.getElementById('updateTime').textContent = `於 ${formatDateTime(stats.lastUpdate)} 更新`;
-    }
-    function updateActivitiesDisplay(activities) {
-        const activityList = document.getElementById('activityList');
-        if (!activityList) return;
-        if (activities.length === 0) {
-            activityList.innerHTML = `<li class="activity-item"><div class="activity-icon project">ℹ️</div><div class="activity-content"><div class="activity-title">暫無活動記錄</div><div class="activity-time">開始使用系統後將會顯示您的活動</div></div></li>`;
-            return;
-        }
-        activityList.innerHTML = activities.map(activity => `<li class="activity-item"><div class="activity-icon ${activity.type}">${activity.icon}</div><div class="activity-content"><div class="activity-title">${activity.title}</div><div class="activity-time">${formatRelativeTime(activity.time)}</div></div></li>`).join('');
-    }
-    function formatRelativeTime(timestamp) {
-        if (!timestamp) return '未知時間';
-        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.round(diffMs / 60000);
-        if (diffMins < 1) return '剛剛';
-        if (diffMins < 60) return `${diffMins} 分鐘前`;
-        const diffHours = Math.round(diffMs / 3600000);
-        if (diffHours < 24) return `${diffHours} 小時前`;
-        const diffDays = Math.round(diffMs / 86400000);
-        return diffDays < 7 ? `${diffDays} 天前` : date.toLocaleDateString('zh-TW');
-    }
-    function showLoading(isLoading) {
-        if (loadingEl) loadingEl.style.display = isLoading ? 'flex' : 'none';
-        if (mainContentEl) mainContentEl.style.visibility = isLoading ? 'hidden' : 'visible';
-    }
-    function startPage() {
-        console.log("🚀 初始化儀表板頁面 (v4.0)...");
-        if (!auth.currentUser) {
-            showAlert("無法獲取用戶資訊，請重新登入", "error");
-            return;
-        }
-        loadDashboardData();
-        startAutoRefresh();
-    }
-    startPage();
-}
-</script>
+<div id="floorModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>🏢 樓層設定管理</h3>
+        <p>為此標單設定全域的樓層。設定將套用於此標單下的所有大項目。</p>
+        <div class="modal-section">
+            <h4>樣板快速新增</h4>
+            <div class="template-buttons" id="templateButtons">
+                <button class="btn" data-template="B1-10F">B1 ~ 10F</button>
+                <button class="btn" data-template="1F-20F">1F ~ 20F</button>
+                <button class="btn" data-template="B3-15F_R">B3 ~ 15F + R</button>
+            </div>
+        </div>
+        <div class="modal-section">
+            <h4>✏️ 自訂樓層 (以逗號分隔)</h4>
+            <div class="custom-add-section">
+                <input type="text" id="newFloorInput" class="form-control" placeholder="例如：B2, B1, 1F, 2F, R">
+                <button id="addCustomFloorBtn" class="btn btn-success">➕ 新增</button>
+            </div>
+        </div>
+        <div class="modal-section">
+            <h4>🎯 目前樓層設定 (可拖曳排序)</h4>
+            <div id="currentFloorsList"></div>
+        </div>
+        <div class="modal-actions">
+            <button id="clearAllFloorsBtn" class="btn btn-danger">🗑️ 清空所有</button>
+            <div>
+                <button id="saveFloorSettingsBtn" class="btn btn-success">💾 儲存設定</button>
+                <button id="cancelFloorModalBtn" class="btn btn-secondary">❌ 取消</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="sequenceModal" class="modal-overlay">
+    <div class="modal-content">
+         <h3>🔄 細項排序管理</h3>
+        <p>拖曳項目調整順序，或直接修改項次編號。此順序將會影響分配表的顯示。</p>
+        <div class="sequence-list-container" id="sequenceList">
+            </div>
+        <div class="modal-actions">
+            <button id="resetOrderBtn" class="btn btn-warning">🔄 重置為原始順序</button>
+            <div>
+                <button id="saveSequenceBtn" class="btn btn-success">💾 儲存順序</button>
+                <button id="cancelSequenceModalBtn" class="btn btn-secondary">❌ 取消</button>
+            </div>
+        </div>
+    </div>
+</div>
