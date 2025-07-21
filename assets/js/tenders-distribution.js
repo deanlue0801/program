@@ -605,7 +605,22 @@ function initDistributionPage() {
     
     function onProjectChange() { const projectId = document.getElementById('projectSelect').value; document.getElementById('tenderSelect').disabled = true; document.getElementById('majorItemSelect').disabled = true; hideMainContent(); if (!projectId) return; selectedProject = projects.find(p => p.id === projectId); loadTenders(projectId); }
     function onTenderChange() { const tenderId = document.getElementById('tenderSelect').value; document.getElementById('majorItemSelect').disabled = true; hideMainContent(); if (!tenderId) return; selectedTender = tenders.find(t => t.id === tenderId); loadMajorItems(tenderId); }
-    async function loadFloorSettings(tenderId) { try { const snapshot = await db.collection("floorSettings").where("tenderId", "==", tenderId).limit(1).get(); floors = snapshot.empty ? [] : (snapshot.docs[0].data().floors || []).sort(sortFloors); } catch (error) { console.error("載入樓層設定失敗", error); floors = []; } }
+        async function loadFloorSettings(tenderId) {
+        try {
+            // 【v3.3 修正】查詢時必須同時傳入 projectId，以符合 Firebase 安全規則
+            const snapshot = await db.collection("floorSettings")
+                .where("tenderId", "==", tenderId)
+                .where("projectId", "==", selectedProject.id) // 加上這一行
+                .limit(1)
+                .get();
+            floors = snapshot.empty ? [] : (snapshot.docs[0].data().floors || []).sort(sortFloors);
+        } catch (error) {
+            console.error("載入樓層設定失敗", error);
+            floors = [];
+            // 主動拋出錯誤，讓呼叫者知道載入失敗
+            throw new Error('無法載入樓層設定，請檢查權限。');
+        }
+    }
     async function loadDetailItems(majorItemId) { const detailItemDocs = await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: majorItemId }]); detailItems = detailItemDocs.docs.sort(naturalSequenceSort); }
     async function loadDistributions(majorItemId) { const distributionDocs = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: majorItemId }]); distributions = distributionDocs.docs; }
     async function loadAllAdditionItems(tenderId) { const additionDocs = await safeFirestoreQuery("detailItems", [{ field: "tenderId", operator: "==", value: tenderId }, { field: "isAddition", operator: "==", value: true }]); allAdditionItems = additionDocs.docs; }
