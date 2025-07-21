@@ -1,30 +1,26 @@
 /**
- * 簡易前端路由器 (SPA Router) - v15.0 (最終穩定版)
- * 修正了腳本執行的競爭條件，確保初始化函數能被穩定呼叫。
+ * 簡易前端路由器 (SPA Router) - v16.0 (穩定版)
+ * 確保在動態載入 HTML 後，能穩定地找到並執行對應的初始化腳本。
  */
 
 const routes = {
-    '/': { html: 'pages/dashboard.html', init: 'initDashboardPage', title: '首頁' },
-    '/dashboard': { html: 'pages/dashboard.html', init: 'initDashboardPage', title: '儀表板' },
-    '/tenders/list': { html: 'pages/tenders/list.html', init: 'initTendersListPage', title: '標單列表' },
-    '/tenders/detail': { html: 'pages/tenders/detail.html', init: 'initTenderDetailPage', title: '標單詳情' },
-    '/tenders/distribution': { html: 'pages/tenders/distribution.html', init: 'initDistributionPage', title: '樓層分配' },
-    '/tenders/space-distribution': { html: 'pages/tenders/space-distribution.html', init: 'initSpaceDistributionPage', title: '空間分配' },
-    '/tenders/progress-management': { html: 'pages/tenders/progress-management.html', init: 'initProgressManagementPage', title: '進度管理' },
-    '/tenders/tracking-setup': { html: 'pages/tenders/tracking-setup.html', init: 'initTenderTrackingSetupPage', title: '追蹤設定' },
-    '/tenders/import': { html: 'pages/tenders/import.html', init: 'initImportPage', title: '匯入標單' },
-    '/projects/create': { html: 'pages/projects/create.html', init: 'initProjectCreatePage', title: '新增專案' },
-    '/projects/edit': { html: 'pages/projects/edit.html', init: 'initProjectEditPage', title: '編輯專案' },
-    // 【新增】專案列表頁面的路由
-    '/projects/list': { html: 'pages/projects/list.html', init: 'initProjectsListPage', title: '專案管理' },
-    '/tenders/edit': { html: 'pages/tenders/edit.html', init: 'initTenderEditPage', title: '編輯標單' },
-    '404': { html: 'pages/404.html', title: '找不到頁面' }
+    '/program/': { html: '/program/pages/dashboard.html', init: 'initDashboardPage', title: '儀表板' },
+    '/program/dashboard': { html: '/program/pages/dashboard.html', init: 'initDashboardPage', title: '儀表板' },
+    '/program/projects/list': { html: '/program/pages/projects/list.html', init: 'initProjectsListPage', title: '專案管理' },
+    '/program/projects/create': { html: '/program/pages/projects/create.html', init: 'initProjectCreatePage', title: '新增專案' },
+    '/program/projects/edit': { html: '/program/pages/projects/edit.html', init: 'initProjectEditPage', title: '編輯專案' },
+    '/program/tenders/list': { html: '/program/pages/tenders/list.html', init: 'initTendersListPage', title: '標單列表' },
+    '/program/tenders/detail': { html: '/program/pages/tenders/detail.html', init: 'initTenderDetailPage', title: '標單詳情' },
+    '/program/tenders/edit': { html: '/program/pages/tenders/edit.html', init: 'initTenderEditPage', title: '編輯標單' },
+    '/program/tenders/distribution': { html: '/program/pages/tenders/distribution.html', init: 'initDistributionPage', title: '樓層分配' },
+    '/program/tenders/space-distribution': { html: '/program/pages/tenders/space-distribution.html', init: 'initSpaceDistributionPage', title: '空間分配' },
+    '/program/tenders/progress-management': { html: '/program/pages/tenders/progress-management.html', init: 'initProgressManagementPage', title: '進度管理' },
+    '/program/tenders/tracking-setup': { html: '/program/pages/tenders/tracking-setup.html', init: 'initTenderTrackingSetupPage', title: '追蹤設定' },
+    '/program/tenders/import': { html: '/program/pages/tenders/import.html', init: 'initImportPage', title: '匯入標單' },
+    '404': { html: '/program/pages/404.html', title: '找不到頁面' }
 };
 
-function getBasePath() {
-    return window.location.hostname.includes('github.io') ? '/program' : '';
-}
-
+// 全域函數，用於導航
 function navigateTo(url) {
     history.pushState(null, null, url);
     handleLocation();
@@ -32,66 +28,34 @@ function navigateTo(url) {
 
 async function handleLocation() {
     const appContainer = document.getElementById('app-content');
-    if (!appContainer) { return; }
-
-    const path = window.location.pathname;
-    const basePath = getBasePath();
-    let routeKey = path.startsWith(basePath) ? path.substring(basePath.length) || '/' : path;
-    
-    const route = routes[routeKey] || routes['404'];
-    if (!route) {
-        appContainer.innerHTML = `<h1>路由錯誤</h1>`;
-        return;
+    if (!appContainer) { 
+        console.error("Router Error: 'app-content' container not found!");
+        return; 
     }
 
+    const path = window.location.pathname;
+    const route = routes[path] || routes['404'];
+    
     document.title = route.title || '專案管理系統';
 
     try {
-        const fetchPath = `${basePath}/${route.html}`;
-        const response = await fetch(fetchPath);
-        if (!response.ok) throw new Error(`無法載入頁面: ${fetchPath}`);
+        const response = await fetch(route.html);
+        if (!response.ok) throw new Error(`無法載入頁面: ${route.html}`);
         
         const html = await response.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const fetchUrlBase = new URL(fetchPath, window.location.origin);
+        appContainer.innerHTML = html; // 將新頁面內容注入
 
-        // 動態樣式處理
-        document.querySelectorAll('[data-dynamic-style]').forEach(el => el.remove());
-        doc.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
-            const originalHref = link.getAttribute('href');
-            if (originalHref) {
-                const correctCssUrl = new URL(originalHref, fetchUrlBase);
-                const newLink = document.createElement('link');
-                newLink.rel = 'stylesheet';
-                newLink.href = correctCssUrl.pathname;
-                newLink.setAttribute('data-dynamic-style', 'true');
-                document.head.appendChild(newLink);
-            }
-        });
-
-        // 替換內容並手動執行腳本
-        appContainer.innerHTML = doc.body.innerHTML;
-        const scripts = appContainer.querySelectorAll('script');
-        for (const script of scripts) {
-            const newScript = document.createElement('script');
-            for (const attr of script.attributes) {
-                newScript.setAttribute(attr.name, attr.value);
-            }
-            newScript.textContent = script.textContent;
-            script.parentNode.replaceChild(newScript, script);
-        }
-
+        // 使用 setTimeout 延遲執行，確保 DOM 更新完畢
         setTimeout(() => {
             if (route.init && typeof window[route.init] === 'function') {
-                console.log(`✅ Router: 找到並成功執行初始化函數: ${route.init}`);
+                console.log(`✅ Router: 執行初始化函數 -> ${route.init}`);
                 window[route.init]();
             } else if (route.init) {
-                console.error(`❌ Router: 路由需要函數 ${route.init}，但它在延遲後仍未被定義。請檢查 ${route.html} 中的腳本是否有誤。`);
+                console.error(`❌ Router: 找不到初始化函數: ${route.init}`);
             }
         }, 0);
 
-        updateSidebarActiveState();
+        updateSidebarActiveState(path);
 
     } catch (error) {
         console.error('Routing error:', error);
@@ -99,8 +63,7 @@ async function handleLocation() {
     }
 }
 
-function updateSidebarActiveState() {
-    const currentPath = window.location.pathname;
+function updateSidebarActiveState(currentPath) {
     document.querySelectorAll('#sidebar a[data-route]').forEach(link => {
         const linkPath = new URL(link.href).pathname;
         link.classList.toggle('active', linkPath === currentPath);
@@ -118,8 +81,10 @@ function setupRouter() {
     });
 }
 
+// --- 應用程式啟動點 ---
 document.addEventListener('DOMContentLoaded', () => {
     initFirebase(
+        // onAuthSuccess: 用戶登入成功後執行的函數
         (user) => {
             const currentUserEl = document.getElementById('currentUser');
             if (currentUserEl) {
@@ -127,11 +92,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (document.getElementById('app-content')) {
                 setupRouter();
-                handleLocation();
+                handleLocation(); // 初始載入頁面
             }
         },
+        // onAuthFail: 用戶未登入時執行的函數
         () => {
-            const loginUrl = `${getBasePath()}/login_page.html`;
+            const loginUrl = `/program/login_page.html`;
             if (!window.location.pathname.endsWith('login_page.html')) {
                 window.location.href = loginUrl;
             }
