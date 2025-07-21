@@ -1,6 +1,4 @@
-<!-- pages/dashboard.html -->
-<div class="dashboard-container">
-    <!-- 頂部歡迎與統計卡片 -->
+<div class="dashboard-container" style="visibility: hidden;">
     <div class="dashboard-header">
         <div id="welcomeMessage">
             <h1 class="page-title">歡迎回來！</h1>
@@ -11,53 +9,49 @@
                 <div class="stat-icon project">📁</div>
                 <div class="stat-value" id="projectCount">0</div>
                 <div class="stat-label">進行中專案</div>
-                <div class="stat-change" id="projectChange">共 0 個專案</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon tender">📋</div>
                 <div class="stat-value" id="tenderCount">0</div>
                 <div class="stat-label">標單總數</div>
-                <div class="stat-change" id="tenderChange">共 0 個標單</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon amount">💰</div>
                 <div class="stat-value" id="totalAmount">NT$ 0</div>
                 <div class="stat-label">合約總金額</div>
-                <div class="stat-change" id="amountChange">總計 NT$ 0</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon time">⏰</div>
                 <div class="stat-value" id="lastUpdate">--:--</div>
                 <div class="stat-label">最後更新</div>
-                <div class="stat-change" id="updateTime">等待資料...</div>
             </div>
         </div>
     </div>
 
-    <!-- 主內容區塊 -->
     <div class="dashboard-main-content">
-        <!-- 最近活動 -->
         <div class="content-card recent-activity">
             <h3 class="card-title">最近活動</h3>
             <ul class="activity-list" id="activityList">
-                <!-- 活動項目將由 JS 動態生成 -->
+                <li class="activity-item">
+                    <div class="activity-icon">ℹ️</div>
+                    <div class="activity-content">
+                        <div class="activity-title">載入活動中...</div>
+                    </div>
+                </li>
             </ul>
         </div>
-        <!-- 其他圖表或資訊卡片可以放在這裡 -->
-    </div>
+        </div>
 </div>
 
-<!-- 載入動畫 -->
-<div id="loading" class="loading" style="display: flex; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.8); z-index: 10;">
+<div id="loading" class="loading" style="display: flex;">
     <div class="spinner"></div>
     <p>載入儀表板資料中...</p>
 </div>
 
-<!-- 【核心修改】將 dashboard.js 的所有邏輯內嵌到這裡 -->
 <script>
 /**
  * 專案管理系統 - 主控台 (Dashboard) 邏輯 (內嵌版本)
- * v4.0 - 權限系統最終修正版
+ * v5.0 - 修正 SPA 腳本執行問題
  * 由 router.js 呼叫 initDashboardPage() 函數來啟動
  */
 function initDashboardPage() {
@@ -68,13 +62,17 @@ function initDashboardPage() {
 
     // --- 主要資料處理與載入 ---
     async function loadDashboardData() {
-        console.log('📊 載入主控台資料 (v4.0)...');
+        console.log('📊 載入主控台資料 (v5.0)...');
         showLoading(true);
         try {
-            const projects = await loadProjects();
-            const tenders = await loadTenders();
+            // 使用 Promise.all 平行載入專案和標單
+            const [projects, tenders] = await Promise.all([
+                loadProjects(), // 來自 firebase-config.js
+                loadTenders()   // 來自 firebase-config.js
+            ]);
+            
             const stats = calculateStats(projects, tenders);
-            const activities = getRecentActivities(tenders);
+            const activities = getRecentActivities(tenders, projects);
             
             updateStatsDisplay(stats);
             updateActivitiesDisplay(activities);
@@ -82,97 +80,80 @@ function initDashboardPage() {
             console.log('✅ 主控台資料載入完成');
         } catch(error) {
             console.error("❌ 主控台資料載入失敗", error);
-            showAlert("無法載入您的主控台資料，請檢查網路連線或稍後再試。", "error");
+            if (mainContentEl) {
+                mainContentEl.innerHTML = `
+                    <div class="alert error" style="display: block;">
+                        無法載入您的主控台資料，請檢查網路連線或稍後再試。
+                    </div>`;
+            }
         } finally {
             showLoading(false);
         }
     }
 
     function calculateStats(projects, tenders) {
-        try {
-            let totalAmount = 0;
-            let lastUpdate = null;
-            tenders.forEach(tender => {
-                totalAmount += tender.totalAmount || 0;
-                const updateTime = tender.updatedAt || tender.createdAt;
-                if (updateTime && (!lastUpdate || updateTime.toDate() > lastUpdate)) {
-                    lastUpdate = updateTime.toDate();
-                }
-            });
-            return {
-                projectCount: projects.length,
-                tenderCount: tenders.length,
-                totalAmount: totalAmount,
-                lastUpdate: lastUpdate || new Date()
-            };
-        } catch (error) {
-            console.error('❌ 計算統計資料失敗:', error);
-            return { projectCount: 0, tenderCount: 0, totalAmount: 0, lastUpdate: new Date() };
-        }
-    }
+        let totalAmount = 0;
+        let lastUpdate = null;
 
-    function getRecentActivities(tenders) {
-        try {
-            return tenders
-                .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
-                .slice(0, 5)
-                .map(tender => ({
-                    type: 'tender',
-                    title: `新增標單：${tender.name || '未命名'}`,
-                    time: tender.createdAt,
-                    icon: '📋'
-                }));
-        } catch (error) {
-            console.error('❌ 處理活動記錄失敗:', error);
-            return [];
-        }
-    }
-
-    function startAutoRefresh() {
-        console.log('🔄 啟動每 5 分鐘自動刷新機制');
-        setInterval(async () => {
-            if (auth.currentUser) {
-                try {
-                    const projects = await loadProjects();
-                    const tenders = await loadTenders();
-                    const stats = calculateStats(projects, tenders);
-                    updateStatsDisplay(stats);
-                    console.log('🔄 資料已自動刷新');
-                } catch (error) {
-                    console.error('❌ 自動刷新失敗:', error);
+        tenders.forEach(tender => {
+            totalAmount += tender.totalAmount || 0;
+            const updateTime = tender.updatedAt || tender.createdAt;
+            if (updateTime) {
+                const date = updateTime.toDate ? updateTime.toDate() : new Date(updateTime);
+                if (!lastUpdate || date > lastUpdate) {
+                    lastUpdate = date;
                 }
             }
-        }, 300000);
+        });
+
+        return {
+            projectCount: projects.length,
+            tenderCount: tenders.length,
+            totalAmount: totalAmount,
+            lastUpdate: lastUpdate || new Date()
+        };
+    }
+
+    function getRecentActivities(tenders, projects) {
+        // 建立一個 projectId -> projectName 的查找表以提高效率
+        const projectMap = new Map(projects.map(p => [p.id, p.name]));
+        
+        return tenders
+            .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0))
+            .slice(0, 5) // 只取最近 5 筆
+            .map(tender => ({
+                type: 'tender',
+                title: `${tender.name || '未命名'}`,
+                subtitle: `歸屬於專案：${projectMap.get(tender.projectId) || '未知專案'}`,
+                time: tender.createdAt,
+                icon: '📋'
+            }));
     }
 
     // --- UI 更新與顯示 ---
     function updateStatsDisplay(stats) {
-        const projectCountEl = document.getElementById('projectCount');
-        if (projectCountEl) projectCountEl.textContent = stats.projectCount;
-        const tenderCountEl = document.getElementById('tenderCount');
-        if (tenderCountEl) tenderCountEl.textContent = stats.tenderCount;
-        const totalAmountEl = document.getElementById('totalAmount');
-        if (totalAmountEl) totalAmountEl.textContent = formatCurrency(stats.totalAmount);
-        const lastUpdateEl = document.getElementById('lastUpdate');
-        if (lastUpdateEl) lastUpdateEl.textContent = stats.lastUpdate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
-        const projectChangeEl = document.getElementById('projectChange');
-        if(projectChangeEl) projectChangeEl.textContent = `共 ${stats.projectCount} 個專案`;
-        const tenderChangeEl = document.getElementById('tenderChange');
-        if(tenderChangeEl) tenderChangeEl.textContent = `共 ${stats.tenderCount} 個標單`;
-        const amountChangeEl = document.getElementById('amountChange');
-        if(amountChangeEl) amountChangeEl.textContent = `總計 ${formatCurrency(stats.totalAmount)}`;
-        const updateTimeEl = document.getElementById('updateTime');
-        if(updateTimeEl) updateTimeEl.textContent = `於 ${formatDateTime(stats.lastUpdate)} 更新`;
+        document.getElementById('projectCount').textContent = stats.projectCount;
+        document.getElementById('tenderCount').textContent = stats.tenderCount;
+        document.getElementById('totalAmount').textContent = formatCurrency(stats.totalAmount);
+        document.getElementById('lastUpdate').textContent = stats.lastUpdate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
     }
 
     function updateActivitiesDisplay(activities) {
         const activityList = document.getElementById('activityList');
         if (!activityList) return;
         if (activities.length === 0) {
-            activityList.innerHTML = `<li class="activity-item"><div class="activity-icon project">ℹ️</div><div class="activity-content"><div class="activity-title">暫無活動記錄</div><div class="activity-time">開始使用系統後將會顯示您的活動</div></div></li>`;
+            activityList.innerHTML = `<li class="activity-item"><div class="activity-icon">ℹ️</div><div class="activity-content"><div class="activity-title">暫無活動記錄</div><div class="activity-time">開始新增標單後將會顯示您的最近活動</div></div></li>`;
             return;
         }
-        activityList.innerHTML = activities.map(activity => `<li class="activity-item"><div class="activity-icon ${activity.type}">${activity.icon}</div><div class="activity-content"><div class="activity-title">${activity.title}</div><div class="activity-time">${formatRelativeTime(activity.time)}</div></div></li>`).join('');
+        activityList.innerHTML = activities.map(activity => `
+            <li class="activity-item">
+                <div class="activity-icon ${activity.type}">${activity.icon}</div>
+                <div class="activity-content">
+                    <div class="activity-title">${activity.title}</div>
+                    <div class="activity-subtitle">${activity.subtitle}</div>
+                    <div class="activity-time">${formatRelativeTime(activity.time)}</div>
+                </div>
+            </li>`).join('');
     }
 
     function formatRelativeTime(timestamp) {
@@ -186,8 +167,7 @@ function initDashboardPage() {
         const diffHours = Math.round(diffMs / 3600000);
         if (diffHours < 24) return `${diffHours} 小時前`;
         const diffDays = Math.round(diffMs / 86400000);
-        if (diffDays < 7) return `${diffDays} 天前`;
-        return date.toLocaleDateString('zh-TW');
+        return `${diffDays} 天前`;
     }
 
     function showLoading(isLoading) {
@@ -196,17 +176,11 @@ function initDashboardPage() {
     }
 
     // --- 頁面啟動點 ---
-    function startPage() {
-        console.log("🚀 初始化儀表板頁面 (v4.0)...");
-        if (!auth.currentUser) {
-            showAlert("無法獲取用戶資訊，請重新登入", "error");
-            return;
-        }
-        console.log(`主控台：歡迎 ${auth.currentUser.email}！`);
-        loadDashboardData();
-        startAutoRefresh();
+    console.log("🚀 初始化儀表板頁面 (v5.0)...");
+    if (!auth.currentUser) {
+        showAlert("無法獲取用戶資訊，請重新登入", "error");
+        return;
     }
-
-    startPage();
+    loadDashboardData();
 }
 </script>
