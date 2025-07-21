@@ -1,5 +1,5 @@
 /**
- * 標單列表頁面 (tenders/list.js) - v4.0 (權限 Map 結構)
+ * 標單列表頁面 (tenders/list.js) - v4.1 (修正版)
  */
 function initTendersListPage() {
     let allTenders = [], allProjects = [], filteredAndGroupedData = [];
@@ -64,7 +64,6 @@ function initTendersListPage() {
         let html = '';
         const currentUserEmail = auth.currentUser.email;
         filteredAndGroupedData.forEach(group => {
-            // 【結構修正】從 Map 中讀取權限
             const memberInfo = (group.project.members && group.project.members[currentUserEmail]) ? group.project.members[currentUserEmail] : null;
             const userRole = memberInfo ? memberInfo.role : null;
             const userPermissions = (memberInfo && memberInfo.permissions) ? memberInfo.permissions : {};
@@ -74,7 +73,24 @@ function initTendersListPage() {
             html += `<tr class="project-group-header"><td colspan="6"><strong>📁 專案：${escapeHtml(group.project.name)}</strong><span class="project-code">(${escapeHtml(group.project.code || 'N/A')})</span></td><td class="project-actions">${canEditProject ? `<button class="btn btn-sm btn-edit-project" data-action="edit-project" data-project-id="${group.project.id}">編輯專案</button>` : ''}</td></tr>`;
             if (group.tenders && group.tenders.length > 0) {
                 group.tenders.forEach(tender => {
-                    html += `<tr class="tender-row"><td><a href="/program/tenders/detail?id=${tender.id}" data-route>${escapeHtml(tender.name || '未命名標單')}</a></td><td><code>${escapeHtml(tender.code || 'N/A')}</code></td><td>${escapeHtml(tender.projectName)}</td><td><strong>${formatCurrency(tender.totalAmount || 0)}</strong></td><td><span class="status-badge ${tender.status || 'planning'}">${getStatusText(tender.status)}</span></td><td>${formatDate(tender.createdAt)}</td><td><div class="action-buttons"><button class="btn btn-sm btn-view" data-action="view-tender" data-tender-id="${tender.id}">查看</button>${canEditTenders ? `<button class="btn btn-sm btn-edit" data-action="edit-tender" data-tender-id="${tender.id}">編輯標單</button><button class="btn btn-sm btn-delete" data-action="delete-tender" data-tender-id="${tender.id}" data-tender-name="${escapeHtml(tender.name)}">刪除</button>` : ''}</div></td></tr>`;
+                    // 【修正】在連結中同時加入 tenderId 和 projectId
+                    const detailUrl = `/program/tenders/detail?tenderId=${tender.id}&projectId=${tender.projectId}`;
+                    const editUrl = `/program/tenders/edit?id=${tender.id}`;
+                    
+                    html += `<tr class="tender-row">
+                        <td><a href="${detailUrl}" data-route>${escapeHtml(tender.name || '未命名標單')}</a></td>
+                        <td><code>${escapeHtml(tender.code || 'N/A')}</code></td>
+                        <td>${escapeHtml(tender.projectName)}</td>
+                        <td><strong>${formatCurrency(tender.totalAmount || 0)}</strong></td>
+                        <td><span class="status-badge ${tender.status || 'planning'}">${getStatusText(tender.status)}</span></td>
+                        <td>${formatDate(tender.createdAt)}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn btn-sm btn-view" data-action="view-tender" data-tender-id="${tender.id}" data-project-id="${tender.projectId}">查看</button>
+                                ${canEditTenders ? `<button class="btn btn-sm btn-edit" data-action="edit-tender" data-tender-id="${tender.id}">編輯標單</button><button class="btn btn-sm btn-delete" data-action="delete-tender" data-tender-id="${tender.id}" data-tender-name="${escapeHtml(tender.name)}">刪除</button>` : ''}
+                            </div>
+                        </td>
+                    </tr>`;
                 });
             } else {
                  html += `<tr><td colspan="7" class="no-tenders-in-group">此專案下沒有符合篩選條件的標單。</td></tr>`;
@@ -94,7 +110,8 @@ function initTendersListPage() {
             const { action, tenderId, tenderName, projectId } = target.dataset;
 
             switch (action) {
-                case 'view-tender': viewTender(tenderId); break;
+                // 【修正】傳遞 projectId
+                case 'view-tender': viewTender(tenderId, projectId); break;
                 case 'edit-tender': editTender(tenderId); break;
                 case 'delete-tender': deleteTender(tenderId, tenderName); break;
                 case 'edit-project': editProject(projectId); break;
@@ -147,7 +164,8 @@ function initTendersListPage() {
         applyFiltersAndGroup();
     }
 
-    function viewTender(tenderId) { navigateTo(`/program/tenders/detail?id=${tenderId}`); }
+    // 【修正】navigateTo 函數現在傳遞兩個參數
+    function viewTender(tenderId, projectId) { navigateTo(`/program/tenders/detail?tenderId=${tenderId}&projectId=${projectId}`); }
     function editTender(tenderId) { navigateTo(`/program/tenders/edit?id=${tenderId}`); }
     function editProject(projectId) { navigateTo(`/program/projects/edit?id=${projectId}`); }
 
