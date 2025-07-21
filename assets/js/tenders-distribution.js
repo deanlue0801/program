@@ -1,5 +1,5 @@
 /**
- * 樓層分配管理系統 (distribution.js) (SPA 版本) - v3.7 (最終安全修正版)
+ * 樓層分配管理系統 (distribution.js) (SPA 版本) - v4.0 (後端修正對應版)
  */
 function initDistributionPage() {
 
@@ -13,7 +13,7 @@ function initDistributionPage() {
     // --- 初始化與資料載入 ---
 
     async function initializePage() {
-        console.log("🚀 初始化樓層分配頁面 (v3.7)...");
+        console.log("🚀 初始化樓層分配頁面 (v4.0)...");
         if (!auth.currentUser) return showAlert("無法獲取用戶資訊", "error");
         
         setupEventListeners();
@@ -48,7 +48,7 @@ function initDistributionPage() {
             populateSelect(tenderSelect, tenders, '請選擇標單...');
         } catch (error) {
             showAlert('載入標單失敗', 'error');
-            tenderSelect.innerHTML = '<option value="">載入失敗</option>';
+            populateSelect(tenderSelect, [], '載入失敗');
         }
     }
 
@@ -65,10 +65,10 @@ function initDistributionPage() {
             populateSelect(majorItemSelect, majorItems, '請選擇大項目...');
         } catch (error) {
             showAlert('載入大項目失敗', 'error');
-            majorItemSelect.innerHTML = '<option value="">載入失敗</option>';
+            populateSelect(majorItemSelect, [], '載入失敗');
         }
     }
-
+    
     async function onMajorItemChange() {
         const majorItemId = document.getElementById('majorItemSelect').value;
         if (!majorItemId) { hideMainContent(); return; }
@@ -107,7 +107,7 @@ function initDistributionPage() {
         }
     }
 
-    // 【v3.7 核心修正】移除不安全的 fallback 查詢，只使用安全查詢
+    // 只使用安全的方式查詢
     async function loadFloorSettings(tenderId) {
         try {
             const snapshot = await db.collection("floorSettings")
@@ -116,20 +116,15 @@ function initDistributionPage() {
                 .limit(1)
                 .get();
             
-            if (snapshot.empty) {
-                console.warn(`對於 Tender ID: ${tenderId}，找不到符合權限的樓層設定。這可能是新標單，或是需要透過「管理樓層」->「儲存」來升級的舊資料。`);
-                floors = []; // 如果找不到就設為空陣列
-            } else {
-                floors = (snapshot.docs[0].data().floors || []).sort(sortFloors);
-            }
+            floors = snapshot.empty ? [] : (snapshot.docs[0].data().floors || []).sort(sortFloors);
         } catch (error) {
-            console.error("載入樓層設定失敗", error);
-            floors = []; // 出錯時也確保是空陣列
-            throw new Error('無法載入樓層設定，請檢查權限或資料庫索引。');
+            console.error("載入樓層設定失敗，請檢查 Firestore 索引與安全規則。", error);
+            floors = []; // 出錯時確保是空陣列
+            throw new Error('無法載入樓層設定。');
         }
     }
     
-    // 【v3.7 核心修正】強化儲存邏輯，使其能升級舊資料
+    // 儲存/升級資料
     async function saveFloorSettings() {
         if (!selectedTender) return showAlert('請先選擇標單', 'warning');
         if (currentUserRole !== 'owner' && !(currentUserPermissions.canAccessDistribution)) return showAlert('權限不足', 'error');
@@ -138,33 +133,43 @@ function initDistributionPage() {
         try {
             const floorSettingsRef = db.collection("floorSettings");
             
-            // 嘗試用不安全的方式先定位到舊文件ID (這是唯一需要用舊方式的地方)
-            const oldQuery = await db.collection("floorSettings").where("tenderId", "==", selectedTender.id).limit(1).get();
+            // 優先用安全的方式尋找文件
+            let docId = null;
+            const safeQuery = await floorSettingsRef.where("tenderId", "==", selectedTender.id).where("projectId", "==", selectedProject.id).limit(1).get();
+            if (!safeQuery.empty) {
+                docId = safeQuery.docs[0].id;
+            } else {
+                // 如果找不到，代表可能是需要升級的舊資料，用不安全的方式定位一次 (需要暫時放寬安全規則)
+                try {
+                    const oldQuery = await db.collection("floorSettings").where("tenderId", "==", selectedTender.id).limit(1).get();
+                    if (!oldQuery.empty) docId = oldQuery.docs[0].id;
+                } catch(e) {
+                     console.warn("無法用舊方式定位文件，可能安全規則已收緊。將建立新文件。");
+                }
+            }
             
             const floorData = {
-                projectId: selectedProject.id, // 【核心】確保寫入 projectId
+                projectId: selectedProject.id,
                 tenderId: selectedTender.id,
                 floors: floors,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedBy: auth.currentUser.email
             };
 
-            if (!oldQuery.empty) {
-                // 如果找到了舊文件，就在原文件上更新，完成「升級」
-                await floorSettingsRef.doc(oldQuery.docs[0].id).update(floorData);
-                 showAlert('✅ 舊資料已更新！', 'success');
-            } else {
-                // 如果連舊文件都找不到，代表是全新的，直接新增
+            if (docId) { // 如果找到了文件 (無論新舊)，就更新它
+                await floorSettingsRef.doc(docId).update(floorData);
+                showAlert('✅ 設定已更新！', 'success');
+            } else { // 找不到就新增
                 floorData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 floorData.createdBy = auth.currentUser.email;
                 await floorSettingsRef.add(floorData);
+                showAlert('✅ 設定已成功新增！', 'success');
             }
 
             closeModal('floorModal');
             if (selectedMajorItem) {
                 await loadMajorItemData(selectedMajorItem.id);
             }
-            showAlert('✅ 樓層設定已成功儲存！', 'success');
         } catch (error) {
             showAlert('儲存樓層設定失敗: ' + error.message, 'error');
         } finally {
@@ -172,10 +177,10 @@ function initDistributionPage() {
         }
     }
 
-    // --- 其他所有函式 (保持不變) ---
-    function onProjectChange() { const projectId = document.getElementById('projectSelect').value; resetSelect('tenderSelect'); resetSelect('majorItemSelect'); hideMainContent(); if (!projectId) return; selectedProject = projects.find(p => p.id === projectId); loadTenders(projectId); }
-    function onTenderChange() { const tenderId = document.getElementById('tenderSelect').value; resetSelect('majorItemSelect'); hideMainContent(); if (!tenderId) return; selectedTender = tenders.find(t => t.id === tenderId); loadMajorItems(tenderId); }
-    function resetSelect(selectId) { const select = document.getElementById(selectId); if (select) { select.innerHTML = `<option value="">請先選擇上一個項目</option>`; select.disabled = true; } }
+    // --- 其他所有函式 (UI, Event Listeners etc.) ---
+    function onProjectChange() { const projectId = document.getElementById('projectSelect').value; resetSelect('tenderSelect', '請先選擇專案'); resetSelect('majorItemSelect', '請先選擇標單'); hideMainContent(); if (!projectId) return; selectedProject = projects.find(p => p.id === projectId); loadTenders(projectId); }
+    function onTenderChange() { const tenderId = document.getElementById('tenderSelect').value; resetSelect('majorItemSelect', '請先選擇標單'); hideMainContent(); if (!tenderId) return; selectedTender = tenders.find(t => t.id === tenderId); loadMajorItems(tenderId); }
+    function resetSelect(selectId, text) { const select = document.getElementById(selectId); if (select) { select.innerHTML = `<option value="">${text}</option>`; select.disabled = true; } }
     async function loadDetailItems(majorItemId) { const detailItemDocs = await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: majorItemId }]); detailItems = detailItemDocs.docs.sort(naturalSequenceSort); }
     async function loadDistributions(majorItemId) { const distributionDocs = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: majorItemId }]); distributions = distributionDocs.docs; }
     async function loadAllAdditionItems(tenderId) { const additionDocs = await safeFirestoreQuery("detailItems", [{ field: "tenderId", operator: "==", value: tenderId }, { field: "isAddition", operator: "==", value: true }]); allAdditionItems = additionDocs.docs; }
