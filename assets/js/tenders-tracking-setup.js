@@ -1,5 +1,5 @@
 /**
- * 追蹤項目設定 (tenders-tracking-setup.js) - v2.1 (權限最終修正版)
+ * 追蹤項目設定 (tenders-tracking-setup.js) - v2.2 (排序最終修正版)
  */
 function initTenderTrackingSetupPage() {
 
@@ -24,14 +24,30 @@ function initTenderTrackingSetupPage() {
     const currentUser = firebase.auth().currentUser;
 
     if (!currentUser) {
-        console.error("❌ Firebase Auth: 使用者未登入，無法初始化頁面。");
         showAlert("錯誤：您的登入狀態已失效，請重新整理頁面或登入。", "error");
         return;
     }
 
+    // --- 【核心修正】將排序函數內建於此檔案中 ---
+    function naturalSequenceSort(a, b) {
+        const re = /(\d+(\.\d+)?)|(\D+)/g;
+        const pA = String(a.sequence || '').match(re) || [];
+        const pB = String(b.sequence || '').match(re) || [];
+        for (let i = 0; i < Math.min(pA.length, pB.length); i++) {
+            const nA = parseFloat(pA[i]);
+            const nB = parseFloat(pB[i]);
+            if (!isNaN(nA) && !isNaN(nB)) {
+                if (nA !== nB) return nA - nB;
+            } else if (pA[i] !== pB[i]) {
+                return pA[i].localeCompare(pB[i]);
+            }
+        }
+        return pA.length - pB.length;
+    }
+
     // --- 初始化流程 ---
     async function initializePage() {
-        console.log("🚀 初始化追蹤項目設定頁面 (v2.1)...");
+        console.log("🚀 初始化追蹤項目設定頁面 (v2.2)...");
         showMainContent(false);
         setupEventListeners();
         await loadProjectsWithPermission();
@@ -39,7 +55,7 @@ function initTenderTrackingSetupPage() {
 
     async function loadProjectsWithPermission() {
         try {
-            const allMyProjects = await loadProjects(); // 來自 firebase-config.js
+            const allMyProjects = await loadProjects();
             const userEmail = currentUser.email;
             projects = allMyProjects.filter(project => {
                 const memberInfo = project.members[userEmail];
@@ -124,7 +140,6 @@ function initTenderTrackingSetupPage() {
         ui.majorItemSelect.innerHTML = '<option value="">載入中...</option>';
         ui.majorItemSelect.disabled = true;
         try {
-            // 【核心修正】查詢 majorItems 時，必須同時提供 projectId
             const majorItemDocs = await safeFirestoreQuery("majorItems", [
                 { field: "tenderId", operator: "==", value: tenderId },
                 { field: "projectId", operator: "==", value: selectedProject.id }
@@ -135,24 +150,19 @@ function initTenderTrackingSetupPage() {
             ui.majorItemSelect.disabled = false;
         } catch (error) {
             console.error("❌ 載入大項目失敗:", error);
-            showAlert('載入大項目失敗: ' + error.message, 'error'); // 向使用者顯示錯誤
+            showAlert('載入大項目失敗: ' + error.message, 'error');
             ui.majorItemSelect.innerHTML = '<option value="">載入失敗</option>';
         }
     }
 
     async function loadDetailItems(majorItemId) {
-        // 【核心修正】查詢 detailItems 時，也必須同時提供 projectId
         const detailItemDocs = await safeFirestoreQuery("detailItems", [
             { field: "majorItemId", operator: "==", value: majorItemId },
             { field: "projectId", operator: "==", value: selectedProject.id }
         ]);
         
-        // 確保 naturalSequenceSort 函數存在
-        if (typeof naturalSequenceSort === 'function') {
-            detailItems = detailItemDocs.docs.sort(naturalSequenceSort);
-        } else {
-            detailItems = detailItemDocs.docs;
-        }
+        // 【核心修正】直接使用內建的排序函數，不再需要檢查
+        detailItems = detailItemDocs.docs.sort(naturalSequenceSort);
     }
     
     // --- 儲存與UI渲染 ---
