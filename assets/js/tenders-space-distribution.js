@@ -1,5 +1,5 @@
 /**
- * 空間分配管理系統 (space-distribution.js) - v3.1 (權限修正版)
+ * 空間分配管理系統 (space-distribution.js) - v3.2 (最終修正版)
  */
 function initSpaceDistributionPage() {
     
@@ -9,7 +9,7 @@ function initSpaceDistributionPage() {
     let detailItems = [], floorDistributions = [], spaceDistributions = [], spaces = []; 
 
     async function initializePage() {
-        console.log("🚀 初始化獨立空間分配頁面 (v3.1)...");
+        console.log("🚀 初始化獨立空間分配頁面 (v3.2)...");
         if (!auth.currentUser) return showAlert("無法獲取用戶資訊", "error");
         setupEventListeners();
         await loadProjectsWithPermission();
@@ -66,7 +66,6 @@ function initSpaceDistributionPage() {
         majorItemSelect.disabled = true;
 
         try {
-            // 【核心修正】查詢 majorItems 和 floorSettings 時，都必須提供 projectId
             const [majorItemDocs, floorSettingsDoc] = await Promise.all([
                 safeFirestoreQuery("majorItems", [
                     { field: "tenderId", operator: "==", value: tenderId },
@@ -92,6 +91,7 @@ function initSpaceDistributionPage() {
 
     async function onMajorItemChange(majorItemId) {
         resetSelects('floor');
+        hideContent();
         if(!majorItemId) return;
         selectedMajorItem = majorItems.find(m => m.id === majorItemId);
 
@@ -143,7 +143,7 @@ function initSpaceDistributionPage() {
                     { field: "floorName", operator: "==", value: selectedFloor },
                     { field: "projectId", operator: "==", value: selectedProject.id }
                 ]),
-                safeFirestoreQuery("spaceDistribution", [
+                safeFirestoreQuery("spaceDistribution", [ // <-- 查詢 spaceDistribution
                     { field: "majorItemId", operator: "==", value: selectedMajorItem.id },
                     { field: "floorName", operator: "==", value: selectedFloor },
                     { field: "projectId", operator: "==", value: selectedProject.id }
