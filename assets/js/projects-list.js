@@ -1,4 +1,4 @@
-assets/js/projects-list.js (權限最終修正版)請用以下完整的程式碼，替換掉您現有的 assets/js/projects-list.js 檔案。/**
+/**
  * 專案列表頁面 (projects-list.js) - v3.0 (權限最終修正)
  * 負責載入並顯示使用者有權限的專案列表。
  */
@@ -14,11 +14,18 @@ function initProjectsListPage() {
     // --- 主要流程 ---
     async function loadAndRenderProjects() {
         showLoading(true);
-        container.innerHTML = ''; // 清空舊內容
+        if (container) {
+            container.innerHTML = ''; // 清空舊內容
+        }
         
         try {
             // loadProjects() 來自 firebase-config.js，已具備權限檢查
             const projects = await loadProjects();
+
+            if (!container || !emptyStateEl || !cardTemplate) {
+                 console.error("專案列表頁缺少必要的 HTML 元素 (container, emptyState, or cardTemplate)");
+                 return;
+            }
 
             if (projects.length === 0) {
                 emptyStateEl.style.display = 'block';
@@ -35,9 +42,11 @@ function initProjectsListPage() {
             }
         } catch (error) {
             console.error("❌ 載入專案列表失敗:", error);
-            showAlert("載入專案列表失敗: " + error.message, 'error');
-            emptyStateEl.style.display = 'block';
-            emptyStateEl.innerHTML = '<h3>載入失敗</h3><p>無法讀取專案資料，請稍後再試。</p>';
+            if(emptyStateEl){
+                showAlert("載入專案列表失敗: " + error.message, 'error');
+                emptyStateEl.style.display = 'block';
+                emptyStateEl.innerHTML = '<h3>載入失敗</h3><p>無法讀取專案資料，請稍後再試。</p>';
+            }
         } finally {
             showLoading(false);
         }
@@ -67,12 +76,12 @@ function initProjectsListPage() {
         const editBtn = card.querySelector('[data-action="edit"]');
         const deleteBtn = card.querySelector('[data-action="delete"]');
         
-        editBtn.addEventListener('click', () => navigateTo(`/program/projects/edit?id=${project.id}`));
+        if(editBtn) editBtn.addEventListener('click', () => navigateTo(`/program/projects/edit?id=${project.id}`));
         
         // 只有 owner 才能看到刪除按鈕
-        if (userRole === 'owner') {
+        if (userRole === 'owner' && deleteBtn) {
             deleteBtn.addEventListener('click', () => handleDeleteProject(project.id, project.name));
-        } else {
+        } else if(deleteBtn) {
             deleteBtn.style.display = 'none';
         }
 
