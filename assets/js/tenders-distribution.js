@@ -1,5 +1,5 @@
 /**
- * 樓層分配管理系統 (distribution.js) (SPA 版本) - v3.4 (權限與功能完整修正)
+ * 樓層分配管理系統 (distribution.js) (SPA 版本) - v3.5 (最終安全修正)
  */
 function initDistributionPage() {
 
@@ -13,7 +13,7 @@ function initDistributionPage() {
     // --- 初始化與資料載入 ---
 
     async function initializePage() {
-        console.log("🚀 初始化樓層分配頁面 (v3.4)...");
+        console.log("🚀 初始化樓層分配頁面 (v3.5)...");
         if (!auth.currentUser) return showAlert("無法獲取用戶資訊", "error");
         
         setupEventListeners();
@@ -30,14 +30,7 @@ function initDistributionPage() {
                 const memberInfo = project.members[userEmail];
                 return memberInfo && (memberInfo.role === 'owner' || (memberInfo.role === 'editor' && memberInfo.permissions.canAccessDistribution));
             });
-
-            const projectSelect = document.getElementById('projectSelect');
-            projectSelect.innerHTML = '<option value="">請選擇專案...</option>';
-            if (projects.length === 0) {
-                projectSelect.innerHTML += '<option value="" disabled>您沒有可進行樓層分配的專案</option>';
-            } else {
-                projects.forEach(project => projectSelect.innerHTML += `<option value="${project.id}">${project.name}</option>`);
-            }
+            populateSelect(document.getElementById('projectSelect'), projects, '請選擇專案...', '您沒有可進行樓層分配的專案');
         } catch (error) {
             showAlert('載入專案失敗', 'error');
         } finally {
@@ -114,30 +107,21 @@ function initDistributionPage() {
         }
     }
 
-    // 【v3.4 核心修正】修正 floorSettings 的讀取與寫入邏輯
+    // 【v3.5 核心修正】移除不安全的 fallback 查詢，只使用安全查詢
     async function loadFloorSettings(tenderId) {
         try {
-            // 先嘗試用新的、安全的查詢方式
-            let snapshot = await db.collection("floorSettings")
+            const snapshot = await db.collection("floorSettings")
                 .where("tenderId", "==", tenderId)
                 .where("projectId", "==", selectedProject.id)
                 .limit(1)
                 .get();
-
-            // 如果找不到（代表是舊資料），則用舊的方式再查一次
-            if (snapshot.empty) {
-                console.warn("使用新的安全查詢找不到樓層設定，嘗試使用舊版查詢...");
-                snapshot = await db.collection("floorSettings")
-                    .where("tenderId", "==", tenderId)
-                    .limit(1)
-                    .get();
-                if (!snapshot.empty) {
-                     console.warn("成功使用舊版查詢找到資料。請點擊「管理樓層」後直接儲存，以將資料更新至新版結構。");
-                }
-            }
             
-            floors = snapshot.empty ? [] : (snapshot.docs[0].data().floors || []).sort(sortFloors);
-
+            if (snapshot.empty) {
+                console.warn(`對於 Tender ID: ${tenderId}，找不到對應的樓層設定。這可能是新標單或需要手動更新的舊資料。`);
+                floors = []; // 如果找不到就設為空陣列
+            } else {
+                floors = (snapshot.docs[0].data().floors || []).sort(sortFloors);
+            }
         } catch (error) {
             console.error("載入樓層設定失敗", error);
             floors = [];
@@ -152,20 +136,28 @@ function initDistributionPage() {
         showLoading(true, '儲存樓層設定中...');
         try {
             const floorSettingsRef = db.collection("floorSettings");
-            const q = floorSettingsRef.where("tenderId", "==", selectedTender.id).limit(1);
+            // 【v3.5 修正】查詢時也必須用安全的方式
+            const q = floorSettingsRef.where("tenderId", "==", selectedTender.id).where("projectId", "==", selectedProject.id).limit(1);
             const existingQuery = await q.get();
 
             const floorData = {
-                projectId: selectedProject.id, // 【v3.4 核心修正】確保寫入 projectId
+                projectId: selectedProject.id, // 【核心】確保寫入 projectId
                 tenderId: selectedTender.id,
                 floors: floors,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedBy: auth.currentUser.email
             };
 
             if (existingQuery.empty) {
-                floorData.createdBy = auth.currentUser.email;
-                floorData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                await floorSettingsRef.add(floorData);
+                // 如果是舊資料（只有 tenderId 能找到），需要找到舊文件並更新
+                const oldQuery = await db.collection("floorSettings").where("tenderId", "==", selectedTender.id).limit(1).get();
+                if(!oldQuery.empty) {
+                    await floorSettingsRef.doc(oldQuery.docs[0].id).update(floorData);
+                } else {
+                    floorData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    floorData.createdBy = auth.currentUser.email;
+                    await floorSettingsRef.add(floorData);
+                }
             } else {
                 await floorSettingsRef.doc(existingQuery.docs[0].id).update(floorData);
             }
@@ -174,7 +166,7 @@ function initDistributionPage() {
             if (selectedMajorItem) {
                 await loadMajorItemData(selectedMajorItem.id);
             }
-            showAlert('✅ 樓層設定已成功儲存！', 'success');
+            showAlert('✅ 樓層設定已成功儲存！資料已更新至最新結構。', 'success');
         } catch (error) {
             showAlert('儲存樓層設定失敗: ' + error.message, 'error');
         } finally {
@@ -182,12 +174,11 @@ function initDistributionPage() {
         }
     }
 
-    // --- 其他所有函式 (包含之前遺漏的) ---
-
+    // --- 其他所有函式 ---
     function onProjectChange() {
         const projectId = document.getElementById('projectSelect').value;
-        document.getElementById('tenderSelect').disabled = true;
-        document.getElementById('majorItemSelect').disabled = true;
+        resetSelect('tenderSelect');
+        resetSelect('majorItemSelect');
         hideMainContent();
         if (!projectId) return;
         selectedProject = projects.find(p => p.id === projectId);
@@ -196,28 +187,24 @@ function initDistributionPage() {
 
     function onTenderChange() {
         const tenderId = document.getElementById('tenderSelect').value;
-        document.getElementById('majorItemSelect').disabled = true;
+        resetSelect('majorItemSelect');
         hideMainContent();
         if (!tenderId) return;
         selectedTender = tenders.find(t => t.id === tenderId);
         loadMajorItems(tenderId);
     }
-
-    async function loadDetailItems(majorItemId) {
-        const detailItemDocs = await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: majorItemId }]);
-        detailItems = detailItemDocs.docs.sort(naturalSequenceSort);
+    
+    function resetSelect(selectId) {
+        const select = document.getElementById(selectId);
+        if (select) {
+            select.innerHTML = `<option value="">請先選擇上一個項目</option>`;
+            select.disabled = true;
+        }
     }
-
-    async function loadDistributions(majorItemId) {
-        const distributionDocs = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: majorItemId }]);
-        distributions = distributionDocs.docs;
-    }
-
-    async function loadAllAdditionItems(tenderId) {
-        const additionDocs = await safeFirestoreQuery("detailItems", [{ field: "tenderId", operator: "==", value: tenderId }, { field: "isAddition", operator: "==", value: true }]);
-        allAdditionItems = additionDocs.docs;
-    }
-
+    
+    async function loadDetailItems(majorItemId) { const detailItemDocs = await safeFirestoreQuery("detailItems", [{ field: "majorItemId", operator: "==", value: majorItemId }]); detailItems = detailItemDocs.docs.sort(naturalSequenceSort); }
+    async function loadDistributions(majorItemId) { const distributionDocs = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: majorItemId }]); distributions = distributionDocs.docs; }
+    async function loadAllAdditionItems(tenderId) { const additionDocs = await safeFirestoreQuery("detailItems", [{ field: "tenderId", operator: "==", value: tenderId }, { field: "isAddition", operator: "==", value: true }]); allAdditionItems = additionDocs.docs; }
     function buildDistributionTable() {
         const tableHeader = document.getElementById('tableHeader');
         const tableBody = document.getElementById('tableBody');
@@ -251,170 +238,11 @@ function initDistributionPage() {
             });
         }
         tableBody.innerHTML = bodyHTML;
-        tableBody.querySelectorAll('.quantity-input').forEach(input => {
-            input.addEventListener('input', () => onQuantityChange(input));
-        });
+        tableBody.querySelectorAll('.quantity-input').forEach(input => input.addEventListener('input', () => onQuantityChange(input)));
     }
-
-    function onQuantityChange(inputElement) {
-        const itemId = inputElement.dataset.itemId;
-        const allInputsForRow = document.querySelectorAll(`input[data-item-id="${itemId}"]`);
-        const distributedCell = document.getElementById(`distributed-${itemId}`);
-        if (!distributedCell) return;
-        const itemRow = distributedCell.closest('tr');
-        if (!itemRow) return;
-        const totalQuantity = parseFloat(itemRow.dataset.totalQuantity) || 0;
-        let otherInputsTotal = 0;
-        allInputsForRow.forEach(input => {
-            if (input !== inputElement) {
-                otherInputsTotal += (Number(input.value) || 0);
-            }
-        });
-        const maxAllowed = totalQuantity - otherInputsTotal;
-        let currentInputValue = Number(inputElement.value) || 0;
-        if (currentInputValue > maxAllowed) {
-            showAlert(`分配數量已達上限 (${totalQuantity})，已自動修正為最大可分配量: ${maxAllowed}`, 'warning');
-            inputElement.value = maxAllowed;
-            currentInputValue = maxAllowed;
-        }
-        const finalDistributed = otherInputsTotal + currentInputValue;
-        const strongTag = distributedCell.querySelector('strong');
-        if(strongTag) { strongTag.textContent = finalDistributed; }
-        distributedCell.classList.toggle('error', finalDistributed > totalQuantity);
-    }
-    
-    async function saveAllDistributions() {
-        if (!selectedMajorItem) return showAlert('請先選擇大項目', 'warning');
-        if (currentUserRole !== 'owner' && !(currentUserPermissions.canAccessDistribution)) return showAlert('權限不足', 'error');
-
-        showLoading(true, '儲存中...');
-        try {
-            const batch = db.batch();
-            const existingDistributions = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }]);
-            existingDistributions.docs.forEach(doc => {
-                batch.delete(db.collection("distributionTable").doc(doc.id));
-            });
-            document.querySelectorAll('.quantity-input').forEach(input => {
-                const quantity = parseInt(input.value) || 0;
-                if (quantity > 0) {
-                    const docRef = db.collection("distributionTable").doc();
-                    batch.set(docRef, { 
-                        projectId: selectedProject.id, 
-                        tenderId: selectedTender.id, 
-                        majorItemId: selectedMajorItem.id, 
-                        detailItemId: input.dataset.itemId, 
-                        areaType: "樓層", 
-                        areaName: input.dataset.floor, 
-                        quantity: quantity, 
-                        createdBy: auth.currentUser.email, 
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp() 
-                    });
-                }
-            });
-            await batch.commit();
-            await loadDistributions(selectedMajorItem.id);
-            buildDistributionTable();
-            showAlert('✅ 所有分配已儲存成功！', 'success');
-        } catch (error) {
-            showAlert('儲存失敗: ' + error.message, 'error');
-        } finally {
-            showLoading(false);
-        }
-    }
-
-    function clearAllDistributions() {
-        if (!selectedMajorItem) return showAlert('請先選擇大項目', 'warning');
-        if (!confirm(`確定要清空「${selectedMajorItem.name}」的所有樓層分配嗎？\n此操作不會立即儲存，您需要點擊「儲存所有分配」按鈕來確認變更。`)) return;
-
-        document.querySelectorAll('.quantity-input').forEach(input => {
-            input.value = '';
-            input.classList.remove('has-value');
-        });
-        
-        document.querySelectorAll('.item-row').forEach(row => {
-            const distributedCell = document.getElementById(`distributed-${row.dataset.itemId}`);
-            if (distributedCell) {
-                distributedCell.querySelector('strong').textContent = '0';
-                distributedCell.classList.remove('error');
-            }
-        });
-        showAlert('已清空畫面上的分配，請點擊儲存按鈕以生效。', 'info');
-    }
-
-    // --- Modal and UI functions ---
-    function showFloorManager() {
-        if (!selectedTender) return showAlert('請先選擇標單', 'warning');
-        displayCurrentFloors();
-        document.getElementById('floorModal').style.display = 'flex';
-    }
-
-    function displayCurrentFloors() {
-        const container = document.getElementById('currentFloorsList');
-        container.innerHTML = floors.length === 0 ? '<p style="color: #6c757d;">尚未設定樓層</p>' : floors.map(floor => `<div class="floor-tag"><span>${floor}</span><button data-floor="${floor}" class="remove-floor-btn">&times;</button></div>`).join('');
-        container.querySelectorAll('.remove-floor-btn').forEach(btn => btn.onclick = () => {
-            floors = floors.filter(f => f !== btn.dataset.floor);
-            displayCurrentFloors();
-        });
-        if (sortableInstance) sortableInstance.destroy();
-        sortableInstance = new Sortable(container, {
-            animation: 150,
-            onEnd: (evt) => {
-                const element = floors.splice(evt.oldIndex, 1)[0];
-                floors.splice(evt.newIndex, 0, element);
-            }
-        });
-    }
-
-    function addCustomFloor() {
-        const input = document.getElementById('newFloorInput');
-        const values = input.value.trim().toUpperCase();
-        if (!values) return;
-        const newFloors = values.split(/,|、/).map(val => val.trim()).filter(Boolean);
-        newFloors.forEach(f => { if (!floors.includes(f)) floors.push(f); });
-        floors.sort(sortFloors);
-        displayCurrentFloors();
-        input.value = '';
-    }
-
-    function applyFloorTemplate(template) {
-        let templateFloors = [];
-        if (template === 'B1-10F') templateFloors = ['B1', ...Array.from({length: 10}, (_, i) => `${i + 1}F`)];
-        if (template === '1F-20F') templateFloors = Array.from({length: 20}, (_, i) => `${i + 1}F`);
-        if (template === 'B3-15F_R') templateFloors = ['B3','B2','B1', ...Array.from({length: 15}, (_, i) => `${i + 1}F`), 'R'];
-        floors = [...new Set([...floors, ...templateFloors])].sort(sortFloors);
-        displayCurrentFloors();
-    }
-    
-    function clearAllFloors() {
-        if (confirm('確定要清空所有樓層嗎？')) {
-            floors = [];
-            displayCurrentFloors();
-        }
-    }
-    
-    // --- Helper Functions ---
-    function setupEventListeners() {
-        document.getElementById('projectSelect')?.addEventListener('change', onProjectChange);
-        document.getElementById('tenderSelect')?.addEventListener('change', onTenderChange);
-        document.getElementById('majorItemSelect')?.addEventListener('change', onMajorItemChange);
-        document.getElementById('saveDistributionsBtn')?.addEventListener('click', saveAllDistributions);
-        document.getElementById('clearDistributionsBtn')?.addEventListener('click', clearAllDistributions);
-        document.getElementById('floorManagerBtn')?.addEventListener('click', showFloorManager);
-        document.getElementById('templateButtons')?.addEventListener('click', (e) => { if (e.target.tagName === 'BUTTON') applyFloorTemplate(e.target.dataset.template); });
-        document.getElementById('addCustomFloorBtn')?.addEventListener('click', addCustomFloor);
-        document.getElementById('clearAllFloorsBtn')?.addEventListener('click', clearAllFloors);
-        document.getElementById('saveFloorSettingsBtn')?.addEventListener('click', saveFloorSettings);
-        document.getElementById('cancelFloorModalBtn')?.addEventListener('click', () => closeModal('floorModal'));
-    }
-    function hideMainContent() { document.getElementById('mainContent').style.display = 'none'; document.getElementById('emptyState').style.display = 'flex'; }
-    function showMainContent() { document.getElementById('mainContent').style.display = 'block'; document.getElementById('emptyState').style.display = 'none'; }
-    function closeModal(modalId) { const modal = document.getElementById(modalId); if (modal) modal.style.display = 'none'; }
-    function showLoading(isLoading, message='載入中...') { const loadingEl = document.querySelector('.loading'); if(loadingEl) { loadingEl.style.display = isLoading ? 'flex' : 'none'; const textEl = loadingEl.querySelector('p'); if (textEl) textEl.textContent = message; } }
-    function populateSelect(selectEl, options, defaultText) { let html = `<option value="">${defaultText}</option>`; options.forEach(option => { html += `<option value="${option.id}">${option.name}</option>`; }); selectEl.innerHTML = html; selectEl.disabled = false; }
-    function formatCurrency(amount) { return `NT$ ${parseInt(amount || 0).toLocaleString()}`; }
-    function sortFloors(a, b) { const getFloorParts = (floorStr) => { const s = String(floorStr).toUpperCase(); const buildingPrefixMatch = s.match(/^([^\dBRF]+)/); const buildingPrefix = buildingPrefixMatch ? buildingPrefixMatch[1] : ''; const floorMatch = s.match(/([B|R]?)(\d+)/); if (!floorMatch) return { building: buildingPrefix, type: 2, num: 0 }; const [, type, numStr] = floorMatch; const floorType = (type === 'B') ? 0 : (type === 'R') ? 2 : 1; return { building: buildingPrefix, type: floorType, num: parseInt(numStr, 10) }; }; const partsA = getFloorParts(a); const partsB = getFloorParts(b); if (partsA.building.localeCompare(partsB.building) !== 0) return partsA.building.localeCompare(partsB.building); if (partsA.type !== partsB.type) return partsA.type - partsB.type; if (partsA.type === 0) return partsB.num - partsA.num; return partsA.num - partsB.num; }
-    function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length-pB.length; }
-    function showAlert(message, type = 'info') { alert(`[${type.toUpperCase()}] ${message}`); }
-
-    initializePage();
-}
+    function onQuantityChange(inputElement) { const itemId = inputElement.dataset.itemId; const allInputsForRow = document.querySelectorAll(`input[data-item-id="${itemId}"]`); const distributedCell = document.getElementById(`distributed-${itemId}`); if (!distributedCell) return; const itemRow = distributedCell.closest('tr'); if (!itemRow) return; const totalQuantity = parseFloat(itemRow.dataset.totalQuantity) || 0; let otherInputsTotal = 0; allInputsForRow.forEach(input => { if (input !== inputElement) { otherInputsTotal += (Number(input.value) || 0); } }); const maxAllowed = totalQuantity - otherInputsTotal; let currentInputValue = Number(inputElement.value) || 0; if (currentInputValue > maxAllowed) { showAlert(`分配數量已達上限 (${totalQuantity})，已自動修正為最大可分配量: ${maxAllowed}`, 'warning'); inputElement.value = maxAllowed; currentInputValue = maxAllowed; } const finalDistributed = otherInputsTotal + currentInputValue; const strongTag = distributedCell.querySelector('strong'); if(strongTag) { strongTag.textContent = finalDistributed; } distributedCell.classList.toggle('error', finalDistributed > totalQuantity); }
+    async function saveAllDistributions() { if (!selectedMajorItem) return showAlert('請先選擇大項目', 'warning'); if (currentUserRole !== 'owner' && !(currentUserPermissions.canAccessDistribution)) return showAlert('權限不足', 'error'); showLoading(true, '儲存中...'); try { const batch = db.batch(); const existingDistributions = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }]); existingDistributions.docs.forEach(doc => { batch.delete(db.collection("distributionTable").doc(doc.id)); }); document.querySelectorAll('.quantity-input').forEach(input => { const quantity = parseInt(input.value) || 0; if (quantity > 0) { const docRef = db.collection("distributionTable").doc(); batch.set(docRef, { projectId: selectedProject.id, tenderId: selectedTender.id, majorItemId: selectedMajorItem.id, detailItemId: input.dataset.itemId, areaType: "樓層", areaName: input.dataset.floor, quantity: quantity, createdBy: auth.currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); } }); await batch.commit(); await loadDistributions(selectedMajorItem.id); buildDistributionTable(); showAlert('✅ 所有分配已儲存成功！', 'success'); } catch (error) { showAlert('儲存失敗: ' + error.message, 'error'); } finally { showLoading(false); } }
+    function clearAllDistributions() { if (!selectedMajorItem) return showAlert('請先選擇大項目', 'warning'); if (!confirm(`確定要清空「${selectedMajorItem.name}」的所有樓層分配嗎？\n此操作不會立即儲存，您需要點擊「儲存所有分配」按鈕來確認變更。`)) return; document.querySelectorAll('.quantity-input').forEach(input => { input.value = ''; input.classList.remove('has-value'); }); document.querySelectorAll('.item-row').forEach(row => { const distributedCell = document.getElementById(`distributed-${row.dataset.itemId}`); if (distributedCell) { distributedCell.querySelector('strong').textContent = '0'; distributedCell.classList.remove('error'); } }); showAlert('已清空畫面上的分配，請點擊儲存按鈕以生效。', 'info'); }
+    function showFloorManager() { if (!selectedTender) return showAlert('請先選擇標單', 'warning'); displayCurrentFloors(); document.getElementById('floorModal').style.display = 'flex'; }
+    function displayCurrentFloors() { const container = document.getElementById('currentFloorsList'); container.innerHTML = floors.length === 0 ? '<p style="color: #6c757d;">尚未設定樓層</p>' : floors.map(floor => `<div class="floor-tag"><span>${floor}</span><button data-floor="${floor}" class="remove-floor-btn">&times;</button></div>`).join(''); container.querySelectorAll('.remove-floor-btn').forEach(btn => btn.onclick = () => { floors = floors.filter(f => f !== btn.dataset.floor); displayCurrentFloors(); }); if (sortableInstance) sortableInstance.destroy(); sortableInstance = new Sortable(container, { animation: 150, onEnd: (evt) => { const element = floors.splice(evt.oldIndex, 1)[0]; floors.splice(evt.newIndex, 0, element); } }); }
+    function addCustomFloor() { const input = document.getElementById('newFloorInput'); const values = input.value.trim().toUpperCase(); if (!values) return; const newFloors = values.split(/,|、/).map(val => val.
