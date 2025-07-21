@@ -1,8 +1,7 @@
 /**
- * 樓層分配管理系統 (distribution.js) (SPA 版本) - v7.0 (功能完整最終版)
- * - 整合「項次管理」、「匯入/匯出」等所有功能
- * - 強化事件監聽，確保所有按鈕正常運作
- * - 採用與 detail.js 相同的安全查詢模式
+ * 樓層分配管理系統 (distribution.js) (SPA 版本) - v7.1 (安全規則修正版)
+ * - 修正 floorSettings 相關的查詢，使其符合最新的安全規則
+ * - 確保所有資料庫互動都包含 projectId
  */
 function initDistributionPage() {
 
@@ -15,10 +14,10 @@ function initDistributionPage() {
     // --- 初始化與資料載入 ---
 
     async function initializePage() {
-        console.log("🚀 初始化樓層分配頁面 (v7.0)...");
+        console.log("🚀 初始化樓層分配頁面 (v7.1)...");
         if (!auth.currentUser) return showAlert("無法獲取用戶資訊", "error");
         
-        setupEventListeners(); // 確保所有事件監聽都已設定
+        setupEventListeners();
         await loadProjectsWithPermission();
     }
 
@@ -96,9 +95,10 @@ function initDistributionPage() {
 
     async function loadFloorSettings(tenderId) {
         try {
-            // 根據您最後成功的安全規則，我們只需要 tenderId
+            // 【核心修正】查詢 floorSettings 時，必須同時提供 projectId
             const result = await safeFirestoreQuery("floorSettings", [
-                { field: "tenderId", operator: "==", value: tenderId }
+                { field: "tenderId", operator: "==", value: tenderId },
+                { field: "projectId", operator: "==", value: selectedProject.id }
             ]);
             
             if (result.docs.length === 0) {
@@ -136,7 +136,8 @@ function initDistributionPage() {
             const batch = db.batch();
             const existingDistributions = await safeFirestoreQuery("distributionTable", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }, { field: "projectId", operator: "==", value: selectedProject.id }]);
             existingDistributions.docs.forEach(doc => {
-                batch.delete(db.collection("distributionTable").doc(doc.id));
+                const docRef = db.collection("distributionTable").doc(doc.id);
+                batch.delete(docRef);
             });
             document.querySelectorAll('.quantity-input').forEach(input => {
                 const quantity = parseInt(input.value) || 0;
@@ -172,7 +173,7 @@ function initDistributionPage() {
         showAlert('已清空畫面上的分配，請點擊儲存按鈕以生效。', 'info');
     }
 
-    // --- 【恢復功能】匯入 / 匯出 ---
+    // --- 匯入 / 匯出 ---
     function handleFileImport(event) {
         const file = event.target.files[0];
         if (!file) return;
@@ -218,10 +219,11 @@ function initDistributionPage() {
                     const input = document.querySelector(`input[data-item-id="${detailItem.id}"][data-floor="${floor}"]`);
                     if (input) {
                         input.value = quantity > 0 ? quantity : '';
-                        onQuantityChange(input);
                         if(quantity > 0) importCount++;
                     }
                 });
+                const firstInput = document.querySelector(`input[data-item-id="${detailItem.id}"]`);
+                if(firstInput) onQuantityChange(firstInput);
             }
         }
         showAlert(importCount > 0 ? `成功匯入 ${importCount} 筆分配資料！` : '沒有找到可匹配的資料', importCount > 0 ? 'success' : 'warning');
@@ -251,7 +253,7 @@ function initDistributionPage() {
         XLSX.writeFile(wb, `樓層分配_${selectedTender.name}_${selectedMajorItem.name}.xlsx`);
     }
 
-    // --- 【恢復功能】樓層 & 項次管理 ---
+    // --- 樓層 & 項次管理 ---
     function showFloorManager() {
         if (!selectedTender) return showAlert('請先選擇標單', 'warning');
         displayCurrentFloors();
@@ -308,7 +310,12 @@ function initDistributionPage() {
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedBy: auth.currentUser.email
             };
-            const existingResult = await safeFirestoreQuery("floorSettings", [{ field: "tenderId", operator: "==", value: selectedTender.id }]);
+            // 【核心修正】查詢時也必須加入 projectId
+            const existingResult = await safeFirestoreQuery("floorSettings", [
+                { field: "tenderId", operator: "==", value: selectedTender.id },
+                { field: "projectId", operator: "==", value: selectedProject.id }
+            ]);
+            
             if (existingResult.docs.length > 0) {
                 const docId = existingResult.docs[0].id;
                 await db.collection("floorSettings").doc(docId).update(floorData);
@@ -347,18 +354,18 @@ function initDistributionPage() {
     async function saveSequenceChanges() {
         const items = document.querySelectorAll('#sequenceList .sequence-item');
         if (items.length === 0) return closeModal('sequenceModal');
-        const batch = db.batch();
-        const newDetailItems = [];
-        items.forEach((item) => {
-            const itemId = item.dataset.itemId;
-            const sequence = item.querySelector('.sequence-input').value.trim();
-            const docRef = db.collection("detailItems").doc(itemId);
-            batch.update(docRef, { sequence });
-            const originalItem = detailItems.find(d => d.id === itemId);
-            newDetailItems.push({ ...originalItem, sequence });
-        });
         showLoading(true, '儲存順序中...');
         try {
+            const batch = db.batch();
+            const newDetailItems = [];
+            items.forEach((item) => {
+                const itemId = item.dataset.itemId;
+                const sequence = item.querySelector('.sequence-input').value.trim();
+                const docRef = db.collection("detailItems").doc(itemId);
+                batch.update(docRef, { sequence });
+                const originalItem = detailItems.find(d => d.id === itemId);
+                if(originalItem) newDetailItems.push({ ...originalItem, sequence });
+            });
             await batch.commit();
             detailItems = newDetailItems.sort(naturalSequenceSort);
             buildDistributionTable();
@@ -397,13 +404,13 @@ function initDistributionPage() {
     function closeModal(modalId) { const modal = document.getElementById(modalId); if(modal) modal.style.display = 'none'; }
     function resetSelect(selectId, text) { const select = document.getElementById(selectId); if (select) { select.innerHTML = `<option value="">${text}</option>`; select.disabled = true; } }
     function buildDistributionTable() { const tableHeader = document.getElementById('tableHeader'); const tableBody = document.getElementById('tableBody'); let headerHTML = '<tr><th style="width: 300px;">細項名稱</th><th class="total-column">總量</th>'; floors.forEach(floor => headerHTML += `<th class="floor-header">${floor}</th>`); headerHTML += '<th class="total-column">已分配</th></tr>'; tableHeader.innerHTML = headerHTML; let bodyHTML = ''; if (detailItems.length === 0) { bodyHTML = `<tr><td colspan="${floors.length + 3}" style="text-align:center; padding: 2rem;">此大項目沒有細項資料</td></tr>`; } else { detailItems.forEach((item, index) => { const originalQuantity = item.totalQuantity || 0; const relatedAdditions = allAdditionItems.filter(add => add.relatedItemId === item.id); const additionalQuantity = relatedAdditions.reduce((sum, add) => sum + (add.totalQuantity || 0), 0); const currentTotalQuantity = originalQuantity + additionalQuantity; let distributedQuantity = 0; let rowHTML = `<tr class="item-row" data-total-quantity="${currentTotalQuantity}" data-item-id="${item.id}">`; rowHTML += `<td><div class="item-info"><div class="item-name">${item.sequence || `#${index + 1}`}. ${item.name || '未命名'}</div><div class="item-details">單位: ${item.unit || '-'} | 單價: ${formatCurrency(item.unitPrice || 0)}</div></div></td>`; rowHTML += `<td class="total-column" id="total-qty-${item.id}"><strong>${currentTotalQuantity}</strong></td>`; floors.forEach(floor => { const dist = distributions.find(d => d.detailItemId === item.id && d.areaName === floor); const quantity = dist ? dist.quantity : 0; distributedQuantity += quantity; rowHTML += `<td><input type="number" class="quantity-input ${quantity > 0 ? 'has-value' : ''}" value="${quantity || ''}" min="0" data-item-id="${item.id}" data-floor="${floor}" placeholder="0"></td>`; }); const errorClass = distributedQuantity > currentTotalQuantity ? 'error' : ''; rowHTML += `<td class="total-column ${errorClass}" id="distributed-${item.id}"><strong>${distributedQuantity}</strong></td>`; rowHTML += '</tr>'; bodyHTML += rowHTML; }); } tableBody.innerHTML = bodyHTML; tableBody.querySelectorAll('.quantity-input').forEach(input => input.addEventListener('input', () => onQuantityChange(input))); }
-    function onQuantityChange(inputElement) { const itemId = inputElement.dataset.itemId; const allInputsForRow = document.querySelectorAll(`input[data-item-id="${itemId}"]`); const distributedCell = document.getElementById(`distributed-${itemId}`); if (!distributedCell) return; const itemRow = distributedCell.closest('tr'); if (!itemRow) return; const totalQuantity = parseFloat(itemRow.dataset.totalQuantity) || 0; let otherInputsTotal = 0; allInputsForRow.forEach(input => { if (input !== inputElement) { otherInputsTotal += (Number(input.value) || 0); } }); const maxAllowed = totalQuantity - otherInputsTotal; let currentInputValue = Number(inputElement.value) || 0; if (currentInputValue > maxAllowed) { showAlert(`分配數量已達上限 (${totalQuantity})，已自動修正為最大可分配量: ${maxAllowed}`, 'warning'); inputElement.value = maxAllowed; currentInputValue = maxAllowed; } const finalDistributed = otherInputsTotal + currentInputValue; const strongTag = distributedCell.querySelector('strong'); if(strongTag) { strongTag.textContent = finalDistributed; } distributedCell.classList.toggle('error', finalDistributed > totalQuantity); }
+    function onQuantityChange(inputElement) { const itemId = inputElement.dataset.itemId; if (!itemId) return; const allInputsForRow = document.querySelectorAll(`input[data-item-id="${itemId}"]`); const distributedCell = document.getElementById(`distributed-${itemId}`); if (!distributedCell) return; const itemRow = distributedCell.closest('tr'); if (!itemRow) return; const totalQuantity = parseFloat(itemRow.dataset.totalQuantity) || 0; let currentDistributed = 0; allInputsForRow.forEach(input => { currentDistributed += (Number(input.value) || 0); }); if (currentDistributed > totalQuantity) { const overage = currentDistributed - totalQuantity; inputElement.value = Math.max(0, (Number(inputElement.value) || 0) - overage); showAlert(`分配總數 (${currentDistributed}) 已超過此樓層總量 (${totalQuantity})，已自動修正。`, 'warning'); currentDistributed = totalQuantity; } const strongTag = distributedCell.querySelector('strong'); if(strongTag) strongTag.textContent = currentDistributed; distributedCell.classList.toggle('error', currentDistributed > totalQuantity); }
     function hideMainContent() { document.getElementById('mainContent').style.display = 'none'; document.getElementById('emptyState').style.display = 'flex'; }
     function showMainContent() { document.getElementById('mainContent').style.display = 'block'; document.getElementById('emptyState').style.display = 'none'; }
     function showLoading(isLoading, message='載入中...') { const loadingEl = document.querySelector('.loading'); if(loadingEl) { loadingEl.style.display = isLoading ? 'flex' : 'none'; const textEl = loadingEl.querySelector('p'); if (textEl) textEl.textContent = message; } }
-    function populateSelect(selectEl, options, defaultText, emptyText) { let html = `<option value="">${defaultText}</option>`; if (options.length === 0 && emptyText) { html += `<option value="" disabled>${emptyText}</option>`; } else { options.forEach(option => { html += `<option value="${option.id}">${option.name}</option>`; }); } selectEl.innerHTML = html; selectEl.disabled = false; }
+    function populateSelect(selectEl, options, defaultText, emptyText) { let html = `<option value="">${defaultText}</option>`; if (options.length === 0 && emptyText) { html += `<option value="" disabled>${emptyText}</option>`; } else { options.forEach(option => { html += `<option value="${option.id}">${option.name}</option>`; }); } selectEl.innerHTML = html; selectEl.disabled = (options.length === 0); }
     function formatCurrency(amount) { return `NT$ ${parseInt(amount || 0).toLocaleString()}`; }
-    function sortFloors(a, b) { const getFloorParts = (floorStr) => { const s = String(floorStr).toUpperCase(); const buildingPrefixMatch = s.match(/^([^\dBRF]+)/); const buildingPrefix = buildingPrefixMatch ? buildingPrefixMatch[1] : ''; const floorMatch = s.match(/([B|R]?)(\d+)/); if (!floorMatch) return { building: buildingPrefix, type: 2, num: 0 }; const [, type, numStr] = floorMatch; const floorType = (type === 'B') ? 0 : (type === 'R') ? 2 : 1; return { building: buildingPrefix, type: floorType, num: parseInt(numStr, 10) }; }; const partsA = getFloorParts(a); const partsB = getFloorParts(b); if (partsA.building.localeCompare(partsB.building) !== 0) return partsA.building.localeCompare(partsB.building); if (partsA.type !== partsB.type) return partsA.type - partsB.type; if (partsA.type === 0) return partsB.num - partsA.num; return partsA.num - partsB.num; }
+    function sortFloors(a, b) { const getFloorParts = (floorStr) => { const s = String(floorStr).toUpperCase(); const buildingPrefixMatch = s.match(/^([^\dBRF]+)/); const buildingPrefix = buildingPrefixMatch ? buildingPrefixMatch[1] : ''; const floorMatch = s.match(/([B|R]?)(\d+)/); if (!floorMatch) return { building: buildingPrefix, type: 2, num: 0, raw: s }; const [, type, numStr] = floorMatch; const floorType = (type === 'B') ? 0 : (type === 'R') ? 2 : 1; return { building: buildingPrefix, type: floorType, num: parseInt(numStr, 10), raw: s }; }; const partsA = getFloorParts(a); const partsB = getFloorParts(b); if (partsA.building.localeCompare(partsB.building) !== 0) return partsA.building.localeCompare(partsB.building, 'zh-Hans-CN-u-kn-true'); if (partsA.type !== partsB.type) return partsA.type - partsB.type; if (partsA.type === 0) return partsB.num - partsA.num; if(partsA.num !== partsB.num) return partsA.num - partsB.num; return a.localeCompare(b, 'zh-Hans-CN-u-kn-true'); }
     function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length - pB.length; }
     function showAlert(message, type = 'info') { alert(`[${type.toUpperCase()}] ${message}`); }
 
