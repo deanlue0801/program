@@ -1,25 +1,23 @@
 /**
- * ✅ Firebase 統一配置與核心功能模組 (版本 4.0 - 權限最終修正版)
+ * ✅ Firebase 統一配置與核心功能模組 (版本 5.0 - 穩定版)
  * 職責：初始化 Firebase、提供具備權限檢查的通用資料庫查詢、格式化、用戶登出等
  */
 
-// --- Firebase 配置 ---
 const firebaseConfig = {
     apiKey: "AIzaSyDV26PsFl_nH9SkfQAYgbCPjbanDluFrvo",
     authDomain: "project-management-syste-4c9ce.firebaseapp.com",
     projectId: "project-management-syste-4c9ce",
-    storageBucket: "project-management-syste-4c9ce.firebasestorage.app",
+    storageBucket: "project-management-syste-4c9ce.appspot.com",
     messagingSenderId: "153223609209",
     appId: "1:153223609209:web:f4504f7ac52fc76b910da8",
     measurementId: "G-P57N5Y5BE2"
 };
 
-// --- 全域變數 ---
 let app, auth, db, currentUser;
 
 function initFirebase(onAuthSuccess, onAuthFail) {
     try {
-        console.log('🚀 初始化 Firebase 核心模組 (v4.0)...');
+        console.log('🚀 初始化 Firebase 核心模組 (v5.0)...');
         if (!firebase.apps.length) {
             app = firebase.initializeApp(firebaseConfig);
         } else {
@@ -63,15 +61,28 @@ async function safeFirestoreQuery(collection, whereConditions = [], orderBy = nu
         };
     } catch (indexError) {
         if (indexError.message.includes('index')) {
-            console.warn('⚠️ 索引問題，切換到客戶端排序:', indexError.message);
+            console.warn(`⚠️ 索引問題，切換到客戶端排序: ${collection}`, indexError.message);
             let fallbackQuery = db.collection(collection);
             whereConditions.forEach(condition => {
                 fallbackQuery = fallbackQuery.where(condition.field, condition.operator, condition.value);
             });
+            if (limit) {
+                fallbackQuery = fallbackQuery.limit(limit);
+            }
             const snapshot = await fallbackQuery.get();
             let docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            if (orderBy) {
+                docs.sort((a, b) => {
+                    const fieldA = a[orderBy.field];
+                    const fieldB = b[orderBy.field];
+                    if (fieldA < fieldB) return orderBy.direction === 'desc' ? 1 : -1;
+                    if (fieldA > fieldB) return orderBy.direction === 'desc' ? -1 : 1;
+                    return 0;
+                });
+            }
             return { docs, serverSorted: false };
         } else {
+            console.error(`Firestore 查詢失敗 (${collection}):`, indexError);
             throw indexError;
         }
     }
@@ -81,7 +92,7 @@ async function deleteTenderAndRelatedData(tenderId) {
     try {
         console.log(`🗑️ 開始批次刪除標單 ${tenderId} 及相關資料...`);
         const batch = db.batch();
-        const collectionsToDelete = ['majorItems', 'detailItems', 'distributionTable', 'floorSettings'];
+        const collectionsToDelete = ['majorItems', 'detailItems', 'distributionTable', 'floorSettings', 'spaceSettings', 'progressItems', 'inspectionPhotos'];
         batch.delete(db.collection('tenders').doc(tenderId));
         const promises = collectionsToDelete.map(coll => 
             db.collection(coll).where('tenderId', '==', tenderId).get()
@@ -99,54 +110,31 @@ async function deleteTenderAndRelatedData(tenderId) {
     }
 }
 
-// --- 標準化資料載入函數 (具備權限管理) ---
-
 async function loadProjects() {
-    if (!auth.currentUser) {
-        console.error("loadProjects: 用戶未登入，無法載入專案。");
-        return [];
-    }
-    console.log(`[權限] 正在為 ${auth.currentUser.email} 載入專案...`);
+    if (!auth.currentUser) return [];
     const whereCondition = {
         field: 'memberEmails',
         operator: 'array-contains',
         value: auth.currentUser.email
     };
     const result = await safeFirestoreQuery('projects', [whereCondition], { field: 'createdAt', direction: 'desc' });
-    console.log(`[權限] 成功載入 ${result.docs.length} 個專案。`);
     return result.docs;
 }
 
-/**
- * 【權限最終修正】
- * 載入隸屬於使用者有權限專案的所有標單。
- * 放棄使用 'in' 查詢，改為對每個專案單獨查詢，以符合安全規則。
- */
 async function loadTenders() {
-    if (!auth.currentUser) {
-        console.error("loadTenders: 用戶未登入，無法載入標單。");
-        return [];
-    }
-    console.log(`[權限] 正在為 ${auth.currentUser.email} 載入標單 (v4.0 查詢模式)...`);
-
-    // 步驟 1: 取得使用者有權限的所有專案
+    if (!auth.currentUser) return [];
     const authorizedProjects = await loadProjects();
+    if (authorizedProjects.length === 0) return [];
 
-    // 步驟 2: 如果沒有任何專案權限，直接返回空陣列
-    if (authorizedProjects.length === 0) {
-        console.log("[權限] 使用者沒有任何專案的權限，無需載入標單。");
-        return [];
+    const projectIds = authorizedProjects.map(p => p.id);
+    // 使用 'in' 查詢，一次最多查詢 10 個 projectId 的標單
+    const tenderPromises = [];
+    for (let i = 0; i < projectIds.length; i += 10) {
+        const chunk = projectIds.slice(i, i + 10);
+        tenderPromises.push(db.collection('tenders').where('projectId', 'in', chunk).get());
     }
 
-    // 步驟 3: 為每個專案建立一個查詢 promise
-    const tenderPromises = authorizedProjects.map(project => 
-        db.collection('tenders').where('projectId', '==', project.id).get()
-    );
-
-    // 步驟 4: 等待所有查詢完成
     const tenderSnapshots = await Promise.all(tenderPromises);
-
-    // 步驟 5: 將所有查詢結果合併成一個陣列
     let allTenders = [];
     tenderSnapshots.forEach(snapshot => {
         snapshot.forEach(doc => {
@@ -154,13 +142,11 @@ async function loadTenders() {
         });
     });
     
-    console.log(`[權限] 成功載入 ${allTenders.length} 個標單。`);
-    // 在客戶端進行排序
     allTenders.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
     return allTenders;
 }
 
-// --- 通用工具函數 (維持不變) ---
+// --- 通用工具函數 ---
 function formatCurrency(amount) {
     if (amount === null || amount === undefined || isNaN(amount)) return 'NT$ 0';
     return 'NT$ ' + parseInt(amount, 10).toLocaleString();
@@ -178,7 +164,9 @@ function formatDateTime(timestamp) {
     return date.toLocaleString('zh-TW');
 }
 function showAlert(message, type = 'info') {
+    // 這裡可以替換成更美觀的提示框方案
     console.log(`[${type.toUpperCase()}] ${message}`);
+    alert(`[${type.toUpperCase()}] ${message}`);
 }
 async function logout() {
     if (confirm('確定要登出嗎？')) {
