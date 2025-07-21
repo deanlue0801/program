@@ -1,31 +1,24 @@
 /**
- * 專案列表頁面 (projects-list.js) - v3.0 (權限最終修正)
- * 負責載入並顯示使用者有權限的專案列表。
+ * 專案列表頁面 (projects-list.js) - v4.0 (穩定版)
  */
 function initProjectsListPage() {
-    console.log("🚀 初始化專案列表頁面 (v3.0)...");
+    console.log("🚀 初始化專案列表頁面 (v4.0)...");
 
-    // --- DOM 元素快取 ---
     const loadingEl = document.getElementById('loading');
     const container = document.getElementById('projectsListContainer');
     const emptyStateEl = document.getElementById('emptyState');
     const cardTemplate = document.getElementById('projectCardTemplate');
 
-    // --- 主要流程 ---
     async function loadAndRenderProjects() {
-        showLoading(true);
-        if (container) {
-            container.innerHTML = ''; // 清空舊內容
+        if (!container || !emptyStateEl || !cardTemplate || !loadingEl) {
+            console.error("Projects List Page: 缺少必要的 HTML 元素。");
+            return;
         }
+        showLoading(true);
+        container.innerHTML = '';
         
         try {
-            // loadProjects() 來自 firebase-config.js，已具備權限檢查
             const projects = await loadProjects();
-
-            if (!container || !emptyStateEl || !cardTemplate) {
-                 console.error("專案列表頁缺少必要的 HTML 元素 (container, emptyState, or cardTemplate)");
-                 return;
-            }
 
             if (projects.length === 0) {
                 emptyStateEl.style.display = 'block';
@@ -33,7 +26,7 @@ function initProjectsListPage() {
             } else {
                 emptyStateEl.style.display = 'none';
                 container.style.display = 'grid';
-                container.className = 'projects-grid'; // 應用卡片網格樣式
+                container.className = 'projects-grid';
 
                 projects.forEach(project => {
                     const card = createProjectCard(project);
@@ -42,22 +35,18 @@ function initProjectsListPage() {
             }
         } catch (error) {
             console.error("❌ 載入專案列表失敗:", error);
-            if(emptyStateEl){
-                showAlert("載入專案列表失敗: " + error.message, 'error');
-                emptyStateEl.style.display = 'block';
-                emptyStateEl.innerHTML = '<h3>載入失敗</h3><p>無法讀取專案資料，請稍後再試。</p>';
-            }
+            showAlert("載入專案列表失敗: " + error.message, 'error');
+            emptyStateEl.style.display = 'block';
+            emptyStateEl.innerHTML = '<h3>載入失敗</h3><p>無法讀取專案資料，請稍後再試。</p>';
         } finally {
             showLoading(false);
         }
     }
 
-    // --- UI 渲染 ---
     function createProjectCard(project) {
         const card = cardTemplate.content.cloneNode(true).firstElementChild;
         const userEmail = auth.currentUser.email;
 
-        // 【核心修正】從 Map 物件中直接讀取成員資訊，而不是用 find()
         const memberInfo = (project.members && project.members[userEmail]) ? project.members[userEmail] : null;
         const userRole = memberInfo ? memberInfo.role : '未知';
         const roleText = { owner: '擁有者', editor: '編輯者', viewer: '檢視者' }[userRole] || '未知';
@@ -76,42 +65,39 @@ function initProjectsListPage() {
         const editBtn = card.querySelector('[data-action="edit"]');
         const deleteBtn = card.querySelector('[data-action="delete"]');
         
-        if(editBtn) editBtn.addEventListener('click', () => navigateTo(`/program/projects/edit?id=${project.id}`));
+        editBtn.addEventListener('click', () => navigateTo(`/program/projects/edit?id=${project.id}`));
         
-        // 只有 owner 才能看到刪除按鈕
-        if (userRole === 'owner' && deleteBtn) {
+        if (userRole === 'owner') {
             deleteBtn.addEventListener('click', () => handleDeleteProject(project.id, project.name));
-        } else if(deleteBtn) {
+        } else {
             deleteBtn.style.display = 'none';
         }
-
         return card;
     }
 
-    // --- 操作處理函式 ---
     async function handleDeleteProject(projectId, projectName) {
-        if (!confirm(`您確定要刪除專案「${projectName}」嗎？\n警告：此操作將會刪除專案本身，但不會自動刪除其下的標單資料，請謹慎操作！`)) {
-            return;
-        }
+        if (!confirm(`您確定要刪除專案「${projectName}」嗎？\n此操作無法復原！`)) return;
 
         try {
             showLoading(true, '刪除專案中...');
             await db.collection('projects').doc(projectId).delete();
             showAlert('專案刪除成功！', 'success');
-            // 重新載入列表以反映變更
             loadAndRenderProjects();
         } catch (error) {
             console.error("❌ 刪除專案失敗:", error);
             showAlert("刪除專案失敗: " + error.message, 'error');
+        } finally {
             showLoading(false);
         }
     }
 
-    // --- 輔助函數 ---
-    function showLoading(isLoading) {
-        if (loadingEl) loadingEl.style.display = isLoading ? 'flex' : 'none';
+    function showLoading(isLoading, message = "載入專案資料中...") {
+        if (loadingEl) {
+            loadingEl.style.display = isLoading ? 'flex' : 'none';
+            loadingEl.querySelector('p').textContent = message;
+        }
         if (!isLoading) {
-            // 載入完成後，由 loadAndRenderProjects 決定顯示哪個區塊
+            // 由 loadAndRenderProjects 決定顯示 container 或 emptyState
         } else {
             if(container) container.style.display = 'none';
             if(emptyStateEl) emptyStateEl.style.display = 'none';
@@ -123,6 +109,5 @@ function initProjectsListPage() {
         return statusMap[status] || '未設定';
     }
 
-    // --- 啟動頁面 ---
     loadAndRenderProjects();
 }
