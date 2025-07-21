@@ -93,62 +93,25 @@ function initDistributionPage() {
     //【v6.0 核心】此函式依賴後端複合索引。
     async function loadFloorSettings(tenderId) {
         try {
-            console.log("🔍 載入樓層設定...", {
-                tenderId,
-                projectId: selectedProject?.id,
-                userEmail: auth.currentUser?.email
-            });
-    
-            // 檢查使用者驗證狀態
-            if (!auth.currentUser) {
-                throw new Error('使用者未登入');
-            }
-    
-            // 檢查必要參數
-            if (!selectedProject?.id) {
-                throw new Error('缺少專案ID');
-            }
-    
-            // 嘗試使用複合查詢
-            let result;
-            try {
-                result = await safeFirestoreQuery("floorSettings", [
-                    { field: "tenderId", operator: "==", value: tenderId },
-                    { field: "projectId", operator: "==", value: selectedProject.id }
-                ]);
-            } catch (error) {
-                if (error.code === 'failed-precondition') {
-                    console.log("索引尚未建立，使用單一查詢條件...");
-                    // 降級到單一查詢條件
-                    const allResults = await safeFirestoreQuery("floorSettings", [
-                        { field: "tenderId", operator: "==", value: tenderId }
-                    ]);
-                    // 在客戶端過濾
-                    result = {
-                        docs: allResults.docs.filter(doc => doc.projectId === selectedProject.id)
-                    };
-                } else {
-                    throw error;
-                }
-            }
-            
-            floors = result.docs.length > 0 ? (result.docs[0].floors || []).sort(sortFloors) : [];
-            console.log("✅ 樓層設定載入成功:", floors.length, "個樓層");
-            
-        } catch (error) {
-            console.error("❌ 載入樓層設定失敗:", error);
-            floors = [];
-            
-            // 根據錯誤類型提供具體指導
-            if (error.code === 'permission-denied') {
-                throw new Error('權限不足，請檢查 Firestore 安全規則設定。');
-            } else if (error.code === 'failed-precondition') {
-                throw new Error('缺少必要的資料庫索引，請建立 Firestore 複合索引。');
-            } else if (error.code === 'unavailable') {
-                throw new Error('網路連線問題，請稍後再試。');
+            const result = await safeFirestoreQuery("floorSettings", [
+                { field: "tenderId", operator: "==", value: tenderId },
+                { field: "projectId", operator: "==", value: selectedProject.id }
+            ]);
+
+            if (result.docs.length === 0) {
+                console.warn(`找不到符合權限的樓層設定 (Tender: ${tenderId})。將視為尚未設定。`);
+                floors = [];
             } else {
-                throw new Error(`載入樓層設定時發生錯誤: ${error.message}`);
+                floors = (result.docs[0].floors || []).sort(sortFloors);
             }
+            floors = result.docs.length > 0 ? (result.docs[0].floors || []).sort(sortFloors) : [];
+        } catch (error) {
+            console.error("載入樓層設定失敗，請檢查 Firestore 索引與安全規則。", error);
+            floors = [];
+            throw new Error('無法載入樓層設定。');
+            console.error("載入樓層設定失敗，請確認您已在 Firebase 控制台建立複合索引。", error);
+            floors = []; // 出錯時確保是空陣列
+            throw new Error('無法載入樓層設定，請檢查後端索引。');
         }
     }
     
