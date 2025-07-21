@@ -107,7 +107,7 @@ function initDistributionPage() {
         }
     }
 
-    // 【v3.5 核心修正】移除不安全的 fallback 查詢，只使用安全查詢
+    // 【v3.5 核心修正】移除不安全的 fallback 查詢，只使用安全查詢.
     async function loadFloorSettings(tenderId) {
         try {
             const snapshot = await db.collection("floorSettings")
