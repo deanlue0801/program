@@ -1,5 +1,5 @@
 /**
- * 標單詳情頁 (tenders-detail.js) (SPA 版本) - v4.1 (修正 safeFirestoreQuery 回傳格式)
+ * 標單詳情頁 (tenders-detail.js) (SPA 版本) - v4.2 (修正版)
  */
 function initTenderDetailPage() {
     
@@ -10,18 +10,25 @@ function initTenderDetailPage() {
 
     // --- 初始化 ---
     async function initializePage() {
-        console.log("🚀 初始化標單詳情頁面 (v4.1)...");
+        console.log("🚀 初始化標單詳情頁面 (v4.2)...");
+        // 【修正】直接從 getUrlParams 讀取，它會處理 URL 的解析
         ({ tenderId, projectId } = getUrlParams());
+        
         if (!tenderId || !projectId) {
-            return showAlert('錯誤：缺少標單或專案 ID', 'error');
+            showAlert('錯誤：URL 中缺少標單或專案 ID', 'error');
+            console.error(`讀取到的 ID: tenderId=${tenderId}, projectId=${projectId}`);
+            // 可以選擇導航回列表頁
+            // navigateTo('/program/tenders/list');
+            return; 
         }
         await loadAllData();
     }
     
+    // 【修正】確保函數正確讀取 'tenderId' 和 'projectId'
     function getUrlParams() {
         const params = new URLSearchParams(window.location.search);
         return {
-            tenderId: params.get('tenderId'),
+            tenderId: params.get('tenderId'), 
             projectId: params.get('projectId')
         };
     }
@@ -35,9 +42,7 @@ function initTenderDetailPage() {
                 loadMajorAndDetailItems(),
             ]);
             
-            // 在主要資料載入後，非同步載入附加項，不阻塞渲染
             loadAllAdditionItems().then(() => {
-                // 附加項載入後，需要重新渲染一次表格，確保總量正確
                 buildMajorItemsTables();
             });
 
@@ -66,7 +71,6 @@ function initTenderDetailPage() {
     }
 
     async function loadMajorAndDetailItems() {
-        // 【核心修正】在查詢子集合時，必須同時傳入 projectId，以符合安全規則
         const [majorItemsResult, detailItemsResult] = await Promise.all([
             safeFirestoreQuery('majorItems', [
                 { field: 'tenderId', operator: '==', value: tenderId },
@@ -78,7 +82,6 @@ function initTenderDetailPage() {
             ])
         ]);
         
-        // 【v4.1 修正】safeFirestoreQuery 已經返回處理好的物件陣列，無需再呼叫 .data()
         majorItems = majorItemsResult.docs.sort(naturalSequenceSort);
         detailItems = detailItemsResult.docs.sort(naturalSequenceSort);
     }
@@ -93,7 +96,6 @@ function initTenderDetailPage() {
             allAdditionItems = result.docs;
         } catch (error) {
             console.error("載入所有附加項失敗:", error);
-            // 這個載入失敗不應該阻擋整個頁面，所以只在 console 報錯
         }
     }
 
@@ -102,12 +104,13 @@ function initTenderDetailPage() {
         document.getElementById('tender-name').textContent = currentTender.name || '未命名標單';
         document.getElementById('project-name').textContent = currentProject.name || '未命名專案';
         document.getElementById('tender-date').textContent = `開標日期：${currentTender.tenderDate || '未設定'}`;
-        document.getElementById('tender-id').textContent = `標單號碼：${currentTender.tenderNumber || '未設定'}`;
+        // 【修正】以前的 tenderNumber 可能不存在，用 code 代替
+        document.getElementById('tender-id').textContent = `標單號碼：${currentTender.code || '未設定'}`;
     }
 
     function buildMajorItemsTables() {
         const container = document.getElementById('major-items-container');
-        container.innerHTML = ''; // 清空舊內容
+        container.innerHTML = ''; 
 
         if (majorItems.length === 0) {
             container.innerHTML = '<p class="empty-state">此標單尚無工程大項</p>';
@@ -179,27 +182,34 @@ function initTenderDetailPage() {
     // --- 事件監聽 ---
     function setupEventListeners() {
         const container = document.getElementById('major-items-container');
-        container.addEventListener('click', (event) => {
-            if (event.target.classList.contains('toggle-details-btn')) {
-                toggleDetails(event.target);
-            }
-        });
+        if (container) {
+            container.addEventListener('click', (event) => {
+                if (event.target.classList.contains('toggle-details-btn')) {
+                    toggleDetails(event.target);
+                }
+            });
+        }
         
-        document.getElementById('back-to-list-btn').addEventListener('click', () => {
-            navigateTo('/tenders');
-        });
+        const backBtn = document.getElementById('back-to-list-btn');
+        if(backBtn) {
+            backBtn.addEventListener('click', () => {
+                navigateTo('/program/tenders/list');
+            });
+        }
     }
 
     function toggleDetails(button) {
         const majorId = button.dataset.majorId;
         const detailsContainer = document.getElementById(`details-${majorId}`);
+        if(!detailsContainer) return;
+        
         const isVisible = detailsContainer.style.display === 'block';
 
         if (isVisible) {
             detailsContainer.style.display = 'none';
             button.textContent = '展開細項';
         } else {
-            buildDetailItemsTable(majorId); // 點擊時才建立表格
+            buildDetailItemsTable(majorId); 
             detailsContainer.style.display = 'block';
             button.textContent = '收合細項';
         }
@@ -214,6 +224,9 @@ function initTenderDetailPage() {
     }
     
     function showAlert(message, type = 'info') {
+        // Fallback to console.log if a more sophisticated alert system isn't in place
+        console.log(`[${type.toUpperCase()}] ${message}`);
+        // You can replace this with a proper UI alert if you have one
         alert(`[${type.toUpperCase()}] ${message}`);
     }
     
@@ -237,6 +250,5 @@ function initTenderDetailPage() {
         return pA.length - pB.length;
     }
 
-    // --- 執行初始化 ---
     initializePage();
 }
