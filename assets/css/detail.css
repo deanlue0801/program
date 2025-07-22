@@ -1,16 +1,8 @@
-/* --- 標單詳情頁專屬樣式 (detail.css) v2.0 --- */
-
-/* --- 基礎與全局 --- */
-:root {
-    --card-bg: rgba(255, 255, 255, 0.95);
-    --card-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    --card-radius: 15px;
-    --text-primary: #333;
-    --text-secondary: #666;
-}
+/* --- 標單詳情頁專屬樣式 (detail.css) v3.0 --- */
+/* --- 使用更高權重的選擇器來避免樣式被覆蓋 --- */
 
 /* --- 頂部標題卡片 --- */
-.header-card {
+.detail-page-wrapper .header-card {
     background: var(--card-bg);
     backdrop-filter: blur(10px);
     border-radius: var(--card-radius);
@@ -18,27 +10,27 @@
     margin-bottom: 30px;
     box-shadow: var(--card-shadow);
 }
-.header-content {
+.detail-page-wrapper .header-content {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     flex-wrap: wrap;
     gap: 20px;
 }
-.header-info h1 {
+.detail-page-wrapper .header-info h1 {
     font-size: 32px;
     font-weight: bold;
     color: var(--text-primary);
     margin-bottom: 10px;
 }
-.header-meta {
+.detail-page-wrapper .header-meta {
     display: flex;
     gap: 20px;
     color: var(--text-secondary);
     font-size: 14px;
     flex-wrap: wrap;
 }
-.header-actions {
+.detail-page-wrapper .header-actions {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -46,13 +38,13 @@
 }
 
 /* --- 統計數據卡片 --- */
-.stats-grid {
+.detail-page-wrapper .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 20px;
     margin-bottom: 30px;
 }
-.stat-card {
+.detail-page-wrapper .stat-card {
     background: var(--card-bg);
     backdrop-filter: blur(10px);
     border-radius: var(--card-radius);
@@ -61,21 +53,21 @@
     text-align: center;
     transition: transform 0.3s ease;
 }
-.stat-card:hover { transform: translateY(-5px); }
-.stat-number { font-size: 28px; font-weight: bold; color: var(--primary-color); margin-bottom: 5px; }
-.stat-number.amount { color: var(--success-color); }
-.stat-number.progress { color: var(--info-color); }
-.stat-label { font-size: 14px; color: var(--text-secondary); }
+.detail-page-wrapper .stat-card:hover { transform: translateY(-5px); }
+.detail-page-wrapper .stat-number { font-size: 28px; font-weight: bold; color: var(--primary-color); margin-bottom: 5px; }
+.detail-page-wrapper .stat-number.amount { color: var(--success-color); }
+.detail-page-wrapper .stat-number.progress { color: var(--info-color); }
+.detail-page-wrapper .stat-label { font-size: 14px; color: var(--text-secondary); }
 
 /* --- Tab 導覽列 --- */
-.tab-navigation {
+.detail-page-wrapper .tab-navigation {
     display: flex;
     gap: 10px;
     margin-bottom: 20px;
     border-bottom: 2px solid var(--border-color-light);
     overflow-x: auto;
 }
-.tab-btn {
+.detail-page-wrapper .tab-btn {
     padding: 12px 20px;
     border: none;
     background: none;
@@ -87,36 +79,36 @@
     white-space: nowrap;
     transition: all 0.3s ease;
 }
-.tab-btn.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
-.tab-content { display: none; }
-.tab-content.active { display: block; }
+.detail-page-wrapper .tab-btn.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+.detail-page-wrapper .tab-content { display: none; }
+.detail-page-wrapper .tab-content.active { display: block; }
 
 /* --- 資訊卡片 (總覽與詳細資訊Tab) --- */
-.info-grid {
+.detail-page-wrapper .info-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 30px;
 }
-.info-card {
+.detail-page-wrapper .info-card {
     background: var(--card-bg);
     border-radius: var(--card-radius);
     padding: 25px;
     box-shadow: var(--card-shadow);
 }
-.info-card h3 { font-size: 18px; font-weight: bold; color: var(--text-primary); margin-bottom: 20px; }
-.info-row { display: flex; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color-light); }
-.info-row:last-child { border-bottom: none; margin-bottom: 0; }
-.info-label { font-weight: 500; color: #495057; }
-.info-value { color: var(--text-primary); text-align: right; }
+.detail-page-wrapper .info-card h3 { font-size: 18px; font-weight: bold; color: var(--text-primary); margin-bottom: 20px; }
+.detail-page-wrapper .info-row { display: flex; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color-light); }
+.detail-page-wrapper .info-row:last-child { border-bottom: none; margin-bottom: 0; }
+.detail-page-wrapper .info-label { font-weight: 500; color: #495057; }
+.detail-page-wrapper .info-value { color: var(--text-primary); text-align: right; }
 
-/* --- 工程大項區塊 --- */
-.major-items-section {
+/* --- 【核心修正】工程大項區塊使用更高權重的選擇器 --- */
+.detail-page-wrapper .major-items-section {
     background: var(--card-bg);
     border-radius: var(--card-radius);
     padding: 30px;
     box-shadow: var(--card-shadow);
 }
-.section-header {
+.detail-page-wrapper .section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -124,8 +116,8 @@
     flex-wrap: wrap;
     gap: 15px;
 }
-.section-title { font-size: 24px; font-weight: bold; color: var(--text-primary); }
-.major-item-card {
+.detail-page-wrapper .section-title { font-size: 24px; font-weight: bold; color: var(--text-primary); }
+.detail-page-wrapper .major-item-card {
     border: 1px solid var(--border-color-light);
     border-radius: 12px;
     margin-bottom: 25px;
@@ -133,10 +125,9 @@
     transition: all 0.3s ease;
     background: var(--white);
 }
-.major-item-card:hover { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1); }
+.detail-page-wrapper .major-item-card:hover { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1); }
 
-/* 【核心修正】確保工程大項標題能正確水平排列 */
-.major-item-header {
+.detail-page-wrapper .major-item-header {
     background: #f8f9fa;
     padding: 20px 25px;
     cursor: pointer;
@@ -146,43 +137,42 @@
     flex-wrap: wrap; /* 在小螢幕時允許換行 */
     gap: 15px;
 }
-.major-item-header h4 {
+.detail-page-wrapper .major-item-header h4 {
     font-size: 18px;
     font-weight: bold;
     color: var(--text-primary);
     margin: 0;
 }
-.major-item-meta {
+.detail-page-wrapper .major-item-meta {
     display: flex;
     gap: 20px;
     font-size: 14px;
     color: var(--text-secondary);
-    flex-shrink: 0; /* 防止被壓縮 */
+    flex-shrink: 0;
 }
 
 /* --- 細項表格 --- */
-.detail-items-summary {
+.detail-page-wrapper .detail-items-summary {
     padding: 0;
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.4s ease-out, padding 0.4s ease-out;
 }
-.detail-items-summary.expanded {
-    max-height: 1000px; /* 給一個足夠大的值 */
+.detail-page-wrapper .detail-items-summary.expanded {
+    max-height: 1000px;
     padding: 20px;
     border-top: 1px solid var(--border-color-light);
 }
-/* 讓展開的表格使用統一的 data-table 樣式 */
-.detail-items-summary .data-table {
+.detail-page-wrapper .detail-items-summary .data-table {
     margin-bottom: 0;
 }
 
 /* 空白狀態 */
-.empty-state {
+.detail-page-wrapper .empty-state {
     text-align: center;
     padding: 60px 20px;
     color: var(--text-secondary);
     background: #f8f9fa;
     border-radius: 12px;
 }
-.empty-state .icon { font-size: 48px; margin-bottom: 20px; opacity: 0.5; }
+.detail-page-wrapper .empty-state .icon { font-size: 48px; margin-bottom: 20px; opacity: 0.5; }
