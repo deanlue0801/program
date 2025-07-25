@@ -1,0 +1,29 @@
+/* assets/css/cost-management.css */
+.stats-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+.stat-card-lg {
+    background-color: var(--color-white);
+    border-radius: var(--border-radius-large);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-small);
+}
+.stat-card-lg .stat-label {
+    font-size: 14px;
+    color: var(--text-color-secondary);
+    margin-bottom: 0.5rem;
+}
+.stat-card-lg .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-color-primary);
+}
+.stat-card-lg .stat-value.increase {
+    color: var(--danger-color);
+}
+.text-danger td {
+    color: var(--danger-color);
+}
