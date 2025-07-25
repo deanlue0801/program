@@ -1,4 +1,6 @@
 /* assets/css/procurement.css */
+
+/* --- 原有樣式 --- */
 .procurement-body .table-container {
     margin-top: 1rem;
 }
@@ -35,4 +37,23 @@
 }
 .btn-edit-order:hover {
     opacity: 1;
+}
+
+/* --- 【關鍵修正】新增以下高優先級規則以解決顯示問題 --- */
+#procurementTable > tbody > .major-item-header > td {
+    /* 樣式設定 */
+    background-color: #34495e !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    text-align: left !important;
+    padding: 0.8rem 1rem !important;
+    border-top: 2px solid #2c3e50 !important;
+    border-bottom: 1px solid #2c3e50 !important;
+
+    /* 關鍵覆蓋規則 */
+    position: static !important;
+    min-width: 100% !important;
+    left: auto !important;
+    z-index: auto !important;
+    border-right: none !important;
 }
