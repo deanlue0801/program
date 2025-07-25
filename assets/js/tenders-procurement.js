@@ -1,47 +1,92 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v2.4 (診斷增強最終完整版)
+ * 標單採購管理 (tenders-procurement.js) - v2.3 (執行時機最終修正版)
  */
 function initProcurementPage() {
-    console.log("🚀 [1/5] 初始化標單採購管理頁面...");
+    console.log("🚀 [1/4] 初始化標單採購管理頁面...");
 
-    // 等待頁面主要元素出現後，才執行整個頁面的初始化邏輯
+    // 將等待函數放在最前面，確保它最先被定義
+    function waitForElement(selector, callback) {
+        // 先嘗試立即尋找元素
+        const element = document.querySelector(selector);
+        if (element) {
+            console.log(`✅ [2/4] 元素 "${selector}" 已找到，立即執行。`);
+            callback();
+            return;
+        }
+        // 如果找不到，則啟動計時器持續檢查
+        console.log(`🔍 [2/4] 元素 "${selector}" 尚未出現，開始等待...`);
+        let interval = setInterval(() => {
+            const element = document.querySelector(selector);
+            if (element) {
+                clearInterval(interval);
+                console.log(`✅ [2/4] 元素 "${selector}" 已出現，執行回呼。`);
+                callback();
+            }
+        }, 100);
+    }
+
+    // 等待頁面最關鍵的元素'#projectSelect'出現後，才執行整個頁面的核心邏輯
     waitForElement('#projectSelect', () => {
-        console.log("✅ [2/5] 頁面主要元素已載入，準備執行核心邏輯...");
-
+        
         let projects = [], tenders = [], majorItems = [], detailItems = [], purchaseOrders = [], quotations = [];
         let selectedProject = null, selectedTender = null;
         const db = firebase.firestore();
         const currentUser = firebase.auth().currentUser;
 
-        // --- 初始化與資料載入 ---
-        async function initializePage() {
+        // --- 核心邏輯函數 ---
+        async function runPageLogic() {
+            console.log("🚀 [3/4] 核心邏輯啟動...");
             if (!currentUser) return showAlert("使用者未登入", "error");
             setupEventListeners();
             await loadProjectsWithPermission();
+            console.log("✅ [4/4] 頁面初始化完成。");
         }
 
+        // ===================================================================
+        // 以下是所有函數的完整定義，請直接複製全部內容
+        // ===================================================================
+
+        function setupEventListeners() {
+            const safeAddEventListener = (selector, event, handler) => {
+                const element = document.querySelector(selector);
+                if (element) {
+                    element.addEventListener(event, handler);
+                } else {
+                    console.warn(`Event listener setup failed: Element with selector "${selector}" not found.`);
+                }
+            };
+            safeAddEventListener('#projectSelect', 'change', (e) => onProjectChange(e.target.value));
+            safeAddEventListener('#tenderSelect', 'change', (e) => onTenderChange(e.target.value));
+            safeAddEventListener('#majorItemSelect', 'change', (e) => onMajorItemChange(e.target.value));
+            safeAddEventListener('#exportRfqBtn', 'click', exportRfqExcel);
+            safeAddEventListener('#importQuotesBtn', 'click', () => document.getElementById('importQuotesInput').click());
+            safeAddEventListener('#importQuotesInput', 'change', handleQuoteImport);
+            safeAddEventListener('#cancelCompareModalBtn', 'click', () => closeModal('priceCompareModal'));
+            safeAddEventListener('#orderForm', 'submit', handleFormSubmit);
+
+            document.body.addEventListener('click', (e) => {
+                if (e.target.matches('.btn-compare-price')) {
+                    showPriceComparisonModal(e.target.dataset.itemId);
+                } else if (e.target.matches('.btn-select-quote')) {
+                    const { itemId, supplier, price } = e.target.dataset;
+                    selectQuote(itemId, supplier, parseFloat(price));
+                } else if (e.target.closest('.order-chip')) {
+                    const orderChip = e.target.closest('.order-chip');
+                    const order = purchaseOrders.find(o => o.id === orderChip.dataset.orderId);
+                    if (order) openOrderModal(order);
+                } else if (e.target.matches('.btn-add-order')) {
+                    openOrderModal(null, e.target.dataset.itemId);
+                }
+            });
+        }
+        
         async function loadProjectsWithPermission() {
             showLoading(true);
-            console.log("🔍 [3/5] 準備呼叫 loadProjects() 函數從資料庫讀取專案...");
             try {
-                const allMyProjects = await loadProjects(); // 呼叫 firebase-config.js 中的函數
-                console.log("📦 [4/5] 從資料庫收到的原始專案資料:", allMyProjects);
-
-                if (!allMyProjects || allMyProjects.length === 0) {
-                    console.warn("⚠️ [警告] loadProjects() 回傳了 0 筆專案，下拉選單將沒有內容。");
-                }
-
+                const allMyProjects = await loadProjects();
                 projects = allMyProjects.filter(p => p.members && p.members[currentUser.email]);
-                console.log("✅ [5/5] 經過權限過濾後，最終可顯示的專案資料:", projects);
-                
-                populateSelect(document.getElementById('projectSelect'), projects, '請選擇專案...', '您沒有可存取的專案');
-                
-                if (projects.length === 0) {
-                    console.error("❌ [錯誤] 沒有任何專案可供選擇，流程無法繼續。請檢查資料庫中的 members 與 memberEmails 欄位設定。");
-                }
-
+                populateSelect(document.getElementById('projectSelect'), projects, '請選擇專案...');
             } catch (error) {
-                console.error("❌ [錯誤] 載入專案時發生嚴重錯誤:", error);
                 showAlert('載入專案失敗', 'error');
             } finally {
                 showLoading(false);
@@ -121,7 +166,11 @@ function initProcurementPage() {
             const file = event.target.files[0];
             if (!file || !selectedTender) return;
             const supplier = prompt("請輸入此報價單的「供應商名稱」：");
-            if (!supplier) { showAlert('已取消匯入。', 'info'); event.target.value = ''; return; }
+            if (!supplier) {
+                showAlert('已取消匯入。', 'info');
+                event.target.value = '';
+                return;
+            }
             const reader = new FileReader();
             reader.onload = async (e) => {
                 showLoading(true, '正在匯入報價單...');
@@ -176,34 +225,78 @@ function initProcurementPage() {
         }
         
         function openOrderModal(orderData = null, detailItemId = null) {
-            const modal = document.getElementById('orderModal'); const form = document.getElementById('orderForm'); const deleteBtn = document.getElementById('deleteOrderBtn'); form.reset(); if (orderData) { document.getElementById('modalTitle').textContent = '編輯採購單'; document.getElementById('orderId').value = orderData.id; document.getElementById('detailItemId').value = orderData.detailItemId; const item = detailItems.find(i => i.id === orderData.detailItemId); document.getElementById('itemNameDisplay').textContent = `${item.sequence}. ${item.name}`; document.getElementById('supplier').value = orderData.supplier; document.getElementById('purchaseQuantity').value = orderData.purchaseQuantity; document.getElementById('unitPrice').value = orderData.unitPrice; document.getElementById('status').value = orderData.status; document.getElementById('orderDate').value = orderData.orderDate || ''; document.getElementById('notes').value = orderData.notes || ''; deleteBtn.style.display = 'inline-block'; } else { document.getElementById('modalTitle').textContent = '新增採購單'; document.getElementById('orderId').value = ''; const item = detailItems.find(i => i.id === detailItemId); document.getElementById('detailItemId').value = item.id; document.getElementById('itemNameDisplay').textContent = `${item.sequence}. ${item.name}`; deleteBtn.style.display = 'none'; } modal.style.display = 'flex';
+            const modal = document.getElementById('orderModal');
+            const form = document.getElementById('orderForm');
+            const deleteBtn = document.getElementById('deleteOrderBtn');
+            form.reset();
+            if (orderData) {
+                document.getElementById('modalTitle').textContent = '編輯採購單';
+                document.getElementById('orderId').value = orderData.id;
+                document.getElementById('detailItemId').value = orderData.detailItemId;
+                const item = detailItems.find(i => i.id === orderData.detailItemId);
+                document.getElementById('itemNameDisplay').textContent = `${item.sequence}. ${item.name}`;
+                document.getElementById('supplier').value = orderData.supplier;
+                document.getElementById('purchaseQuantity').value = orderData.purchaseQuantity;
+                document.getElementById('unitPrice').value = orderData.unitPrice;
+                document.getElementById('status').value = orderData.status;
+                document.getElementById('orderDate').value = orderData.orderDate || '';
+                document.getElementById('notes').value = orderData.notes || '';
+                deleteBtn.style.display = 'inline-block';
+            } else {
+                document.getElementById('modalTitle').textContent = '新增採購單';
+                document.getElementById('orderId').value = '';
+                const item = detailItems.find(i => i.id === detailItemId);
+                document.getElementById('detailItemId').value = item.id;
+                document.getElementById('itemNameDisplay').textContent = `${item.sequence}. ${item.name}`;
+                deleteBtn.style.display = 'none';
+            }
+            modal.style.display = 'flex';
         }
 
-        async function handleFormSubmit(e) { e.preventDefault(); const orderId = document.getElementById('orderId').value; const detailItemId = document.getElementById('detailItemId').value; const quantity = parseFloat(document.getElementById('purchaseQuantity').value); const price = parseFloat(document.getElementById('unitPrice').value); const data = { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: detailItemId, supplier: document.getElementById('supplier').value.trim(), purchaseQuantity: quantity, unitPrice: price, totalPrice: quantity * price, status: document.getElementById('status').value, orderDate: document.getElementById('orderDate').value, notes: document.getElementById('notes').value.trim(), updatedBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }; showLoading(true, '儲存中...'); try { if (orderId) { await db.collection('purchaseOrders').doc(orderId).update(data); } else { data.createdBy = currentUser.email; data.createdAt = firebase.firestore.FieldValue.serverTimestamp(); const item = detailItems.find(i => i.id === detailItemId); data.itemName = item.name; data.itemSequence = item.sequence; await db.collection('purchaseOrders').add(data); } document.getElementById('orderModal').style.display = 'none'; await onTenderChange(selectedTender.id); showAlert('✅ 儲存成功！', 'success'); } catch (error) { showAlert('儲存失敗: ' + error.message, 'error'); } finally { showLoading(false); } }
-        async function deleteOrder() { const orderId = document.getElementById('orderId').value; if (!orderId) return; if (!confirm('您確定要刪除這筆採購單嗎？此操作無法復原。')) return; showLoading(true, '刪除中...'); try { await db.collection('purchaseOrders').doc(orderId).delete(); document.getElementById('orderModal').style.display = 'none'; await onTenderChange(selectedTender.id); showAlert('✅ 採購單已刪除！', 'success'); } catch (error) { showAlert('刪除失敗: ' + error.message, 'error'); } finally { showLoading(false); } }
-        
-        function setupEventListeners() {
-            const safeAddEventListener = (selector, event, handler) => {
-                const element = document.querySelector(selector);
-                if (element) {
-                    element.addEventListener(event, handler);
-                } else { console.warn(`Event listener setup failed: Element with selector "${selector}" not found.`); }
-            };
-            safeAddEventListener('#projectSelect', 'change', (e) => onProjectChange(e.target.value));
-            safeAddEventListener('#tenderSelect', 'change', (e) => onTenderChange(e.target.value));
-            safeAddEventListener('#majorItemSelect', 'change', (e) => onMajorItemChange(e.target.value));
-            safeAddEventListener('#exportRfqBtn', 'click', exportRfqExcel);
-            safeAddEventListener('#importQuotesBtn', 'click', () => document.getElementById('importQuotesInput').click());
-            safeAddEventListener('#importQuotesInput', 'change', handleQuoteImport);
-            safeAddEventListener('#cancelCompareModalBtn', 'click', () => closeModal('priceCompareModal'));
-            safeAddEventListener('#orderForm', 'submit', handleFormSubmit);
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const orderId = document.getElementById('orderId').value;
+            const detailItemId = document.getElementById('detailItemId').value;
+            const quantity = parseFloat(document.getElementById('purchaseQuantity').value);
+            const price = parseFloat(document.getElementById('unitPrice').value);
+            const data = { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: detailItemId, supplier: document.getElementById('supplier').value.trim(), purchaseQuantity: quantity, unitPrice: price, totalPrice: quantity * price, status: document.getElementById('status').value, orderDate: document.getElementById('orderDate').value, notes: document.getElementById('notes').value.trim(), updatedBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+            showLoading(true, '儲存中...');
+            try {
+                if (orderId) {
+                    await db.collection('purchaseOrders').doc(orderId).update(data);
+                } else {
+                    data.createdBy = currentUser.email;
+                    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    const item = detailItems.find(i => i.id === detailItemId);
+                    data.itemName = item.name;
+                    data.itemSequence = item.sequence;
+                    await db.collection('purchaseOrders').add(data);
+                }
+                document.getElementById('orderModal').style.display = 'none';
+                await onTenderChange(selectedTender.id);
+                showAlert('✅ 儲存成功！', 'success');
+            } catch (error) {
+                showAlert('儲存失敗: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
 
-            document.body.addEventListener('click', (e) => {
-                if (e.target.matches('.btn-compare-price')) { showPriceComparisonModal(e.target.dataset.itemId); } 
-                else if (e.target.matches('.btn-select-quote')) { const { itemId, supplier, price } = e.target.dataset; selectQuote(itemId, supplier, parseFloat(price)); } 
-                else if (e.target.closest('.order-chip')) { const orderChip = e.target.closest('.order-chip'); const order = purchaseOrders.find(o => o.id === orderChip.dataset.orderId); if (order) openOrderModal(order); } 
-                else if (e.target.matches('.btn-add-order')) { openOrderModal(null, e.target.dataset.itemId); }
-            });
+        async function deleteOrder() {
+            const orderId = document.getElementById('orderId').value;
+            if (!orderId) return;
+            if (!confirm('您確定要刪除這筆採購單嗎？此操作無法復原。')) return;
+            showLoading(true, '刪除中...');
+            try {
+                await db.collection('purchaseOrders').doc(orderId).delete();
+                document.getElementById('orderModal').style.display = 'none';
+                await onTenderChange(selectedTender.id);
+                showAlert('✅ 採購單已刪除！', 'success');
+            } catch (error) {
+                showAlert('刪除失敗: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
         }
         
         function showAlert(message, type = 'info') { alert(`[${type.toUpperCase()}] ${message}`); }
@@ -215,21 +308,7 @@ function initProcurementPage() {
         function showMainContent(shouldShow) { document.getElementById('mainContent').style.display = shouldShow ? 'block' : 'none'; document.getElementById('emptyState').style.display = shouldShow ? 'none' : 'flex'; }
         function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length - pB.length; }
 
-        initializePage();
+        // --- 執行核心邏輯 ---
+        runPageLogic();
     });
-    
-    function waitForElement(selector, callback) {
-        const element = document.querySelector(selector);
-        if (element) {
-            callback();
-        } else {
-            let interval = setInterval(() => {
-                const element = document.querySelector(selector);
-                if (element) {
-                    clearInterval(interval);
-                    callback();
-                }
-            }, 100);
-        }
-    }
 }
