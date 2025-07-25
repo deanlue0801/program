@@ -136,26 +136,60 @@ function initProcurementPage() {
 
         function renderProcurementTable(filterMajorItemId = '') {
             const tableBody = document.getElementById('tableBody');
-            const itemsToRender = filterMajorItemId ? detailItems.filter(item => item.majorItemId === filterMajorItemId) : detailItems;
-            if (itemsToRender.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding: 2rem;">此標單 (或大項目) 下沒有細項。</td></tr>`;
+            const majorItemsToRender = filterMajorItemId 
+                ? majorItems.filter(m => m.id === filterMajorItemId) 
+                : majorItems;
+
+            if (majorItemsToRender.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding: 2rem;">此標單 (或篩選條件) 下沒有大項目。</td></tr>`;
                 return;
             }
+
             let bodyHTML = '';
-            itemsToRender.forEach(item => {
-                const orders = purchaseOrders.filter(o => o.detailItemId === item.id);
-                const quotes = quotations.filter(q => q.detailItemId === item.id);
-                const totalPurchased = orders.reduce((sum, o) => sum + (o.purchaseQuantity || 0), 0);
-                const remainingQty = (item.totalQuantity || 0) - totalPurchased;
-                const statusClass = remainingQty <= 0 ? 'status-completed' : (totalPurchased > 0 ? 'status-active' : 'status-planning');
-                bodyHTML += `<tr class="item-row ${statusClass}"><td>${item.sequence || ''}</td><td>${item.name}</td><td class="text-right">${item.totalQuantity || 0}</td><td class="text-right">${totalPurchased}</td><td class="text-right">${remainingQty}</td><td><div class="order-list">${orders.map(o => `<div class="order-chip status-${o.status || '草稿'}" data-order-id="${o.id}"><span>${o.supplier}: ${o.purchaseQuantity} (${o.status})</span></div>`).join('')}${quotes.map(q => `<div class="quote-chip" title="報價 by ${q.supplier}"><span>${q.supplier}: ${formatCurrency(q.quotedUnitPrice)}</span></div>`).join('')}</div></td><td><button class="btn btn-sm btn-info btn-compare-price" data-item-id="${item.id}" title="比價">📊</button><button class="btn btn-sm btn-success btn-add-order" data-item-id="${item.id}" title="新增採購">+</button></td></tr>`;
+            majorItemsToRender.forEach(majorItem => {
+                bodyHTML += `<tr class="major-item-header"><td colspan="7">${majorItem.sequence || ''}. ${majorItem.name}</td></tr>`;
+                
+                const itemsToRender = detailItems.filter(item => item.majorItemId === majorItem.id);
+
+                if (itemsToRender.length === 0) {
+                    bodyHTML += `<tr><td colspan="7" class="text-center" style="padding: 1rem; font-style: italic;">此大項目下沒有細項。</td></tr>`;
+                } else {
+                    itemsToRender.forEach(item => {
+                        const orders = purchaseOrders.filter(o => o.detailItemId === item.id);
+                        const quotes = quotations.filter(q => q.detailItemId === item.id);
+                        const totalPurchased = orders.reduce((sum, o) => sum + (o.purchaseQuantity || 0), 0);
+                        const remainingQty = (item.totalQuantity || 0) - totalPurchased;
+                        const statusClass = remainingQty <= 0 ? 'status-completed' : (totalPurchased > 0 ? 'status-active' : 'status-planning');
+                        bodyHTML += `<tr class="item-row ${statusClass}">
+                            <td style="padding-left: 2em;">${item.sequence || ''}</td>
+                            <td>${item.name}</td>
+                            <td class="text-right">${item.totalQuantity || 0}</td>
+                            <td class="text-right">${totalPurchased}</td>
+                            <td class="text-right">${remainingQty}</td>
+                            <td><div class="order-list">${orders.map(o => `<div class="order-chip status-${o.status || '草稿'}" data-order-id="${o.id}"><span>${o.supplier}: ${o.purchaseQuantity} (${o.status})</span></div>`).join('')}${quotes.map(q => `<div class="quote-chip" title="報價 by ${q.supplier}"><span>${q.supplier}: ${formatCurrency(q.quotedUnitPrice)}</span></div>`).join('')}</div></td>
+                            <td><button class="btn btn-sm btn-info btn-compare-price" data-item-id="${item.id}" title="比價">📊</button><button class="btn btn-sm btn-success btn-add-order" data-item-id="${item.id}" title="新增採購">+</button></td>
+                        </tr>`;
+                    });
+                }
             });
             tableBody.innerHTML = bodyHTML;
         }
 
         function exportRfqExcel() {
             if (!selectedTender || detailItems.length === 0) { return showAlert('請先選擇一個標單以匯出詢價單。', 'warning'); }
-            const data = detailItems.map(item => ({'項次': item.sequence || '','項目名稱': item.name || '','單位': item.unit || '','預計數量': item.totalQuantity || 0,'報價單價': '','備註': ''}));
+            
+            const majorItemMap = new Map(majorItems.map(item => [item.id, `${item.sequence || ''}. ${item.name}`]));
+
+            const data = detailItems.map(item => ({
+                '大項目': majorItemMap.get(item.majorItemId) || '未分類',
+                '項次': item.sequence || '',
+                '項目名稱': item.name || '',
+                '單位': item.unit || '',
+                '預計數量': item.totalQuantity || 0,
+                '報價單價': '',
+                '備註': ''
+            }));
+
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "詢價單");
