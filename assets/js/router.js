@@ -15,6 +15,7 @@ const routes = {
     '/tenders/space-distribution': { html: 'pages/tenders/space-distribution.html', init: 'initSpaceDistributionPage', title: '空間分配' },
     '/tenders/progress-management': { html: 'pages/tenders/progress-management.html', init: 'initProgressManagementPage', title: '進度管理' },
     '/tenders/tracking-setup': { html: 'pages/tenders/tracking-setup.html', init: 'initTenderTrackingSetupPage', title: '追蹤設定' },
+    '/cost-management': { html: 'pages/cost-management.html', init: 'initCostManagementPage', title: '成本控管' }
     '/tenders/import': { html: 'pages/tenders/import.html', init: 'initImportPage', title: '匯入標單' },
     '/tenders/edit': { html: 'pages/tenders/edit.html', init: 'initTenderEditPage', title: '編輯標單' },
     '/tenders/procurement': { html: 'pages/tenders/procurement.html', init: 'initProcurementPage', title: '標單採購' }, 
