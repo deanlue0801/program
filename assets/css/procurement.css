@@ -1,0 +1,38 @@
+/* assets/css/procurement.css */
+.procurement-body .table-container {
+    margin-top: 1rem;
+}
+
+.item-row.status-completed { background-color: #e9f5e9; }
+.item-row.status-active { background-color: #fff8e1; }
+
+.order-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.order-chip {
+    display: inline-flex;
+    align-items: center;
+    background-color: #e9ecef;
+    border-radius: 12px;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+.order-chip.status-已下訂 { background-color: #cfe2ff; }
+.order-chip.status-已到貨 { background-color: #d1e7dd; }
+.order-chip.status-已付款 { background-color: #e2e3e5; }
+
+.btn-edit-order {
+    background: none;
+    border: none;
+    cursor: pointer;
+    margin-left: 4px;
+    padding: 0;
+    opacity: 0.5;
+}
+.btn-edit-order:hover {
+    opacity: 1;
+}
