@@ -1,5 +1,5 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v2.3 (執行時機最終修正版)
+ * 標單採購管理 (tenders-procurement.js) - v2.4 (修正大項目顯示)
  */
 function initProcurementPage() {
     console.log("🚀 [1/4] 初始化標單採購管理頁面...");
@@ -43,7 +43,7 @@ function initProcurementPage() {
         }
 
         // ===================================================================
-        // 以下是所有函數的完整定義，請直接複製全部內容
+        // 以下是所有函數的完整定義
         // ===================================================================
 
         function setupEventListeners() {
@@ -62,7 +62,12 @@ function initProcurementPage() {
             safeAddEventListener('#importQuotesBtn', 'click', () => document.getElementById('importQuotesInput').click());
             safeAddEventListener('#importQuotesInput', 'change', handleQuoteImport);
             safeAddEventListener('#cancelCompareModalBtn', 'click', () => closeModal('priceCompareModal'));
-            safeAddEventListener('#orderForm', 'submit', handleFormSubmit);
+            
+            // 確保 orderForm 存在時才綁定事件
+            const orderForm = document.getElementById('orderForm');
+            if(orderForm) {
+                orderForm.addEventListener('submit', handleFormSubmit);
+            }
 
             document.body.addEventListener('click', (e) => {
                 if (e.target.matches('.btn-compare-price')) {
@@ -147,6 +152,7 @@ function initProcurementPage() {
 
             let bodyHTML = '';
             majorItemsToRender.forEach(majorItem => {
+                // 為大項目建立一個橫跨整列的標題列
                 bodyHTML += `<tr class="major-item-header"><td colspan="7">${majorItem.sequence || ''}. ${majorItem.name}</td></tr>`;
                 
                 const itemsToRender = detailItems.filter(item => item.majorItemId === majorItem.id);
@@ -253,8 +259,10 @@ function initProcurementPage() {
             closeModal('priceCompareModal');
             openOrderModal(null, itemId);
             setTimeout(() => {
-                document.getElementById('supplier').value = supplier;
-                document.getElementById('unitPrice').value = price;
+                const supplierEl = document.getElementById('supplier');
+                const unitPriceEl = document.getElementById('unitPrice');
+                if (supplierEl) supplierEl.value = supplier;
+                if (unitPriceEl) unitPriceEl.value = price;
             }, 100);
         }
         
@@ -262,6 +270,7 @@ function initProcurementPage() {
             const modal = document.getElementById('orderModal');
             const form = document.getElementById('orderForm');
             const deleteBtn = document.getElementById('deleteOrderBtn');
+            if (!form) return;
             form.reset();
             if (orderData) {
                 document.getElementById('modalTitle').textContent = '編輯採購單';
@@ -275,16 +284,16 @@ function initProcurementPage() {
                 document.getElementById('status').value = orderData.status;
                 document.getElementById('orderDate').value = orderData.orderDate || '';
                 document.getElementById('notes').value = orderData.notes || '';
-                deleteBtn.style.display = 'inline-block';
+                if(deleteBtn) deleteBtn.style.display = 'inline-block';
             } else {
                 document.getElementById('modalTitle').textContent = '新增採購單';
                 document.getElementById('orderId').value = '';
                 const item = detailItems.find(i => i.id === detailItemId);
                 document.getElementById('detailItemId').value = item.id;
                 document.getElementById('itemNameDisplay').textContent = `${item.sequence}. ${item.name}`;
-                deleteBtn.style.display = 'none';
+                if(deleteBtn) deleteBtn.style.display = 'none';
             }
-            modal.style.display = 'flex';
+            if(modal) modal.style.display = 'flex';
         }
 
         async function handleFormSubmit(e) {
@@ -306,7 +315,7 @@ function initProcurementPage() {
                     data.itemSequence = item.sequence;
                     await db.collection('purchaseOrders').add(data);
                 }
-                document.getElementById('orderModal').style.display = 'none';
+                closeModal('orderModal');
                 await onTenderChange(selectedTender.id);
                 showAlert('✅ 儲存成功！', 'success');
             } catch (error) {
@@ -323,7 +332,7 @@ function initProcurementPage() {
             showLoading(true, '刪除中...');
             try {
                 await db.collection('purchaseOrders').doc(orderId).delete();
-                document.getElementById('orderModal').style.display = 'none';
+                closeModal('orderModal');
                 await onTenderChange(selectedTender.id);
                 showAlert('✅ 採購單已刪除！', 'success');
             } catch (error) {
