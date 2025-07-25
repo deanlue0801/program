@@ -1,64 +1,55 @@
-/**
- * 建立新專案頁面 (projects-create.js) - v1.0
- */
-function initProjectCreatePage() {
-    console.log("🚀 初始化建立新專案頁面 (v1.0)...");
+<div class="page-container">
+    <div class="page-header">
+        <h1 class="page-title">建立新專案</h1>
+        <a href="/program/projects/list" data-route class="btn btn-secondary">← 返回列表</a>
+    </div>
 
-    const form = document.getElementById('createProjectForm');
-    if (!form) {
-        console.error("Create Project Page: 找不到 #createProjectForm 元素。");
-        return;
-    }
-
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const saveBtn = form.querySelector('button[type="submit"]');
-        saveBtn.disabled = true;
-        saveBtn.textContent = '儲存中...';
-
-        try {
-            const currentUser = firebase.auth().currentUser;
-            if (!currentUser) {
-                throw new Error("使用者未登入");
-            }
-
-            const formData = new FormData(form);
-            const projectData = {
-                name: formData.get('projectName'),
-                code: formData.get('projectCode'),
-                budget: Number(formData.get('projectBudget')) || 0,
-                status: formData.get('projectStatus'),
-                startDate: formData.get('projectStartDate'),
-                endDate: formData.get('projectEndDate'),
-                description: formData.get('projectDescription'),
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                createdBy: currentUser.email,
-                // 自動將建立者設為擁有者
-                members: {
-                    [currentUser.email]: {
-                        role: 'owner',
-                        permissions: {} 
-                    }
-                },
-                memberEmails: [currentUser.email]
-            };
+    <div class="card">
+        <form id="createProjectForm" class="form-grid">
             
-            // 驗證必填欄位
-            if (!projectData.name) {
-                throw new Error("專案名稱為必填欄位。");
-            }
+            <div class="form-group form-span-2">
+                <label for="projectName">專案名稱 (必填)</label>
+                <input type="text" id="projectName" name="projectName" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="projectCode">專案代碼</label>
+                <input type="text" id="projectCode" name="projectCode" class="form-control">
+            </div>
 
-            await db.collection('projects').add(projectData);
+            <div class="form-group">
+                <label for="projectBudget">專案預算</label>
+                <input type="number" id="projectBudget" name="projectBudget" class="form-control" placeholder="例如：1000000">
+            </div>
 
-            showAlert('✅ 專案建立成功！', 'success');
-            navigateTo('/program/projects/list'); // 導航回專案列表
+            <div class="form-group">
+                <label for="projectStatus">專案狀態</label>
+                <select id="projectStatus" name="projectStatus" class="form-select">
+                    <option value="planning" selected>規劃中</option>
+                    <option value="active">進行中</option>
+                    <option value="completed">已完成</option>
+                    <option value="paused">暫停</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="projectStartDate">開始日期</label>
+                <input type="date" id="projectStartDate" name="projectStartDate" class="form-control">
+            </div>
+            
+            <div class="form-group">
+                <label for="projectEndDate">結束日期</label>
+                <input type="date" id="projectEndDate" name="projectEndDate" class="form-control">
+            </div>
 
-        } catch (error) {
-            console.error("❌ 建立專案失敗:", error);
-            showAlert(`建立專案失敗: ${error.message}`, 'error');
-        } finally {
-            saveBtn.disabled = false;
-            saveBtn.textContent = '建立專案';
-        }
-    });
-}
+            <div class="form-group form-span-2">
+                <label for="projectDescription">專案描述</label>
+                <textarea id="projectDescription" name="projectDescription" class="form-control" rows="4"></textarea>
+            </div>
+
+            <div class="form-actions form-span-2">
+                <button type="submit" class="btn btn-success">建立專案</button>
+            </div>
+        </form>
+    </div>
+</div>
