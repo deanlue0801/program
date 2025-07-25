@@ -1,28 +1,31 @@
 <div class="page-container">
     <style>
-        .major-item-header td {
-            background-color: #e9ecef !important;
-            font-weight: bold;
-            color: #495057;
+        /* --- 採購頁專屬樣式修正 --- */
+
+        /* * 【關鍵修正】
+         * 使用 ID 選擇器提高優先級，並直接針對大項目標題列的 <td> 進行樣式覆蓋。
+         * 這將確保此規則的優先級高於其他 CSS 檔案中的通用規則。
+         */
+        #procurementTable > tbody > .major-item-header > td {
+            background-color: #34495e !important; /* 深色背景 */
+            color: #ffffff !important;           /* 白色文字 */
+            font-weight: 600;
             text-align: left;
             padding: 0.8rem 1rem !important;
-            border-top: 2px solid #adb5bd;
-            border-bottom: 1px solid #adb5bd;
+            border-top: 2px solid #2c3e50;
+            border-bottom: 1px solid #2c3e50;
 
-            /* --- 以下是關鍵的修正 --- */
-            /* 覆蓋掉通用樣式中不正確的定位和寬度限制 */
+            /* 覆蓋掉來自 distribution.css 的 sticky 定位和寬度限制 */
             position: static;
-            min-width: 100%; 
+            min-width: 100%; /* 確保它能正常橫跨 */
+            left: auto;
             border-right: none;
         }
 
-        .item-row td {
-            background-color: #fff;
-        }
-        .item-row.status-completed td { 
+        .item-row.status-completed { 
             background-color: #f6fff8; 
         }
-        .item-row.status-active td { 
+        .item-row.status-active { 
             background-color: #fffbeb; 
         }
     </style>
