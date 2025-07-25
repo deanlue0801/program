@@ -30,7 +30,18 @@
         <div id="mainContent" style="display: none;">
             <div class="table-container">
                 <table class="data-table" id="procurementTable">
-                    <thead id="tableHeader"></thead>
+                    <thead>
+                        <tr>
+                            <th style="width: 8%;">項次</th>
+                            <th>項目名稱</th>
+                            <th style="width: 8%;">單位</th>
+                            <th class="text-right" style="width: 10%;">合約數量</th>
+                            <th class="text-right" style="width: 10%;">已採購</th>
+                            <th class="text-right" style="width: 10%;">剩餘</th>
+                            <th style="width: 25%;">採購單列表</th>
+                            <th style="width: 5%;">操作</th>
+                        </tr>
+                    </thead>
                     <tbody id="tableBody"></tbody>
                 </table>
             </div>
@@ -84,6 +95,7 @@
             <div class="modal-actions">
                 <button type="submit" class="btn btn-success">儲存</button>
                 <button type="button" id="cancelModalBtn" class="btn btn-secondary">取消</button>
+                <button type="button" id="deleteOrderBtn" class="btn btn-danger" style="display: none;">刪除</button>
             </div>
         </form>
     </div>
