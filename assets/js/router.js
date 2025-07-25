@@ -1,27 +1,29 @@
 /**
- * 簡易前端路由器 (SPA Router) - v17.0 (執行時機修正版)
- * 確保在動態載入 HTML 後，能穩定地找到並執行對應的初始化腳本。
+ * 簡易前端路由器 (SPA Router) - v15.0 (最終穩定版)
+ * 修正了腳本執行的競爭條件，確保初始化函數能被穩定呼叫。
  */
 
 const routes = {
-    '/program/': { html: '/program/pages/dashboard.html', init: 'initDashboardPage', title: '儀表板' },
-    '/program/dashboard': { html: '/program/pages/dashboard.html', init: 'initDashboardPage', title: '儀表板' },
-    '/program/projects/list': { html: '/program/pages/projects/list.html', init: 'initProjectsListPage', title: '專案管理' },
-    '/program/projects/create': { html: '/program/pages/projects/create.html', init: 'initProjectCreatePage', title: '新增專案' },
-    '/program/projects/edit': { html: '/program/pages/projects/edit.html', init: 'initProjectEditPage', title: '編輯專案' },
-    '/program/tenders/list': { html: '/program/pages/tenders/list.html', init: 'initTendersListPage', title: '標單列表' },
-    '/program/tenders/create': { html: '/program/pages/tenders/create.html', init: 'initTenderCreatePage', title: '新增標單' },
-    '/program/tenders/detail': { html: '/program/pages/tenders/detail.html', init: 'initTenderDetailPage', title: '標單詳情' },
-    '/program/tenders/edit': { html: '/program/pages/tenders/edit.html', init: 'initTenderEditPage', title: '編輯標單' },
-    '/program/tenders/distribution': { html: '/program/pages/tenders/distribution.html', init: 'initDistributionPage', title: '樓層分配' },
-    '/program/tenders/space-distribution': { html: '/program/pages/tenders/space-distribution.html', init: 'initSpaceDistributionPage', title: '空間分配' },
-    '/program/tenders/progress-management': { html: '/program/pages/tenders/progress-management.html', init: 'initProgressManagementPage', title: '進度管理' },
-    '/program/tenders/tracking-setup': { html: '/program/pages/tenders/tracking-setup.html', init: 'initTenderTrackingSetupPage', title: '追蹤設定' },
-    '/program/tenders/import': { html: '/program/pages/tenders/import.html', init: 'initImportPage', title: '匯入標單' },
-    '404': { html: '/program/pages/404.html', title: '找不到頁面' }
+    '/': { html: 'pages/dashboard.html', init: 'initDashboardPage', title: '首頁' },
+    '/dashboard': { html: 'pages/dashboard.html', init: 'initDashboardPage', title: '儀表板' },
+    '/projects/list': { html: 'pages/projects/list.html', init: 'initProjectsListPage', title: '專案管理' },
+    '/projects/create': { html: 'pages/projects/create.html', init: 'initProjectCreatePage', title: '新增專案' },
+    '/projects/edit': { html: 'pages/projects/edit.html', init: 'initProjectEditPage', title: '編輯專案' },
+    '/tenders/list': { html: 'pages/tenders/list.html', init: 'initTendersListPage', title: '標單列表' },
+    '/tenders/detail': { html: 'pages/tenders/detail.html', init: 'initTenderDetailPage', title: '標單詳情' },
+    '/tenders/distribution': { html: 'pages/tenders/distribution.html', init: 'initDistributionPage', title: '樓層分配' },
+    '/tenders/space-distribution': { html: 'pages/tenders/space-distribution.html', init: 'initSpaceDistributionPage', title: '空間分配' },
+    '/tenders/progress-management': { html: 'pages/tenders/progress-management.html', init: 'initProgressManagementPage', title: '進度管理' },
+    '/tenders/tracking-setup': { html: 'pages/tenders/tracking-setup.html', init: 'initTenderTrackingSetupPage', title: '追蹤設定' },
+    '/tenders/import': { html: 'pages/tenders/import.html', init: 'initImportPage', title: '匯入標單' },
+    '/tenders/edit': { html: 'pages/tenders/edit.html', init: 'initTenderEditPage', title: '編輯標單' },
+    '404': { html: 'pages/404.html', title: '找不到頁面' }
 };
 
-// 全域函數，用於導航
+function getBasePath() {
+    return window.location.hostname.includes('github.io') ? '/program' : '';
+}
+
 function navigateTo(url) {
     history.pushState(null, null, url);
     handleLocation();
@@ -29,38 +31,56 @@ function navigateTo(url) {
 
 async function handleLocation() {
     const appContainer = document.getElementById('app-content');
-    if (!appContainer) { 
-        console.error("Router Error: 'app-content' container not found!");
-        return; 
-    }
+    if (!appContainer) { return; }
 
     const path = window.location.pathname;
-    // 處理帶有查詢參數的路由
-    const baseRoute = path.split('?')[0];
-    const route = routes[baseRoute] || routes['404'];
+    const basePath = getBasePath();
+    let routeKey = path.startsWith(basePath) ? path.substring(basePath.length) || '/' : path;
     
+    // 確保路由鍵值不包含查詢參數
+    routeKey = routeKey.split('?')[0];
+
+    const route = routes[routeKey] || routes['404'];
+    if (!route) {
+        appContainer.innerHTML = `<h1>路由錯誤</h1>`;
+        return;
+    }
+
     document.title = route.title || '專案管理系統';
 
     try {
-        const response = await fetch(route.html);
-        if (!response.ok) throw new Error(`無法載入頁面: ${route.html}`);
+        const fetchPath = `${basePath}/${route.html}`;
+        const response = await fetch(fetchPath);
+        if (!response.ok) throw new Error(`無法載入頁面: ${fetchPath}`);
         
         const html = await response.text();
-        appContainer.innerHTML = html; // 將新頁面內容注入
+        
+        // 替換內容並手動執行腳本
+        appContainer.innerHTML = html;
+        const scripts = appContainer.querySelectorAll('script');
+        for (const script of scripts) {
+            const newScript = document.createElement('script');
+            // 複製所有屬性
+            for (const attr of script.attributes) {
+                newScript.setAttribute(attr.name, attr.value);
+            }
+            // 複製腳本內容
+            newScript.textContent = script.textContent;
+            // 替換舊腳本以觸發執行
+            script.parentNode.replaceChild(newScript, script);
+        }
 
-        // --- 【核心修正】---
-        // 使用 setTimeout 將初始化函數的執行推遲到下一個事件循環。
-        // 這給了瀏覽器足夠的時間來解析剛剛注入的 HTML，確保元素都已存在於 DOM 中。
+        // 使用 setTimeout 確保 DOM 更新後再執行初始化
         setTimeout(() => {
             if (route.init && typeof window[route.init] === 'function') {
-                console.log(`✅ Router: 執行初始化函數 -> ${route.init}`);
+                console.log(`✅ Router: 找到並成功執行初始化函數: ${route.init}`);
                 window[route.init]();
             } else if (route.init) {
-                console.error(`❌ Router: 找不到初始化函數: ${route.init}`);
+                console.error(`❌ Router: 路由需要函數 ${route.init}，但它在延遲後仍未被定義。請檢查 ${route.html} 中的腳本是否有誤。`);
             }
-        }, 0); // 延遲 0 毫秒就足以達成目的
+        }, 0);
 
-        updateSidebarActiveState(path);
+        updateSidebarActiveState();
 
     } catch (error) {
         console.error('Routing error:', error);
@@ -68,7 +88,8 @@ async function handleLocation() {
     }
 }
 
-function updateSidebarActiveState(currentPath) {
+function updateSidebarActiveState() {
+    const currentPath = window.location.pathname;
     document.querySelectorAll('#sidebar a[data-route]').forEach(link => {
         const linkPath = new URL(link.href).pathname;
         link.classList.toggle('active', linkPath === currentPath);
@@ -86,10 +107,8 @@ function setupRouter() {
     });
 }
 
-// --- 應用程式啟動點 ---
 document.addEventListener('DOMContentLoaded', () => {
     initFirebase(
-        // onAuthSuccess
         (user) => {
             const currentUserEl = document.getElementById('currentUser');
             if (currentUserEl) {
@@ -97,12 +116,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (document.getElementById('app-content')) {
                 setupRouter();
-                handleLocation(); 
+                handleLocation();
             }
         },
-        // onAuthFail
         () => {
-            const loginUrl = `/program/login_page.html`;
+            const loginUrl = `${getBasePath()}/login_page.html`;
             if (!window.location.pathname.endsWith('login_page.html')) {
                 window.location.href = loginUrl;
             }
