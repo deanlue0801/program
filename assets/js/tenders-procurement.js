@@ -1,12 +1,12 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v2.2 (最終完整版)
+ * 標單採購管理 (tenders-procurement.js) - v2.4 (診斷增強最終完整版)
  */
 function initProcurementPage() {
-    console.log("🚀 初始化標單採購管理頁面 (v2.2)...");
+    console.log("🚀 [1/5] 初始化標單採購管理頁面...");
 
     // 等待頁面主要元素出現後，才執行整個頁面的初始化邏輯
     waitForElement('#projectSelect', () => {
-        console.log("✅ 採購頁面主要元素已載入，開始執行初始化...");
+        console.log("✅ [2/5] 頁面主要元素已載入，準備執行核心邏輯...");
 
         let projects = [], tenders = [], majorItems = [], detailItems = [], purchaseOrders = [], quotations = [];
         let selectedProject = null, selectedTender = null;
@@ -22,11 +22,26 @@ function initProcurementPage() {
 
         async function loadProjectsWithPermission() {
             showLoading(true);
+            console.log("🔍 [3/5] 準備呼叫 loadProjects() 函數從資料庫讀取專案...");
             try {
-                const allMyProjects = await loadProjects();
+                const allMyProjects = await loadProjects(); // 呼叫 firebase-config.js 中的函數
+                console.log("📦 [4/5] 從資料庫收到的原始專案資料:", allMyProjects);
+
+                if (!allMyProjects || allMyProjects.length === 0) {
+                    console.warn("⚠️ [警告] loadProjects() 回傳了 0 筆專案，下拉選單將沒有內容。");
+                }
+
                 projects = allMyProjects.filter(p => p.members && p.members[currentUser.email]);
-                populateSelect(document.getElementById('projectSelect'), projects, '請選擇專案...');
+                console.log("✅ [5/5] 經過權限過濾後，最終可顯示的專案資料:", projects);
+                
+                populateSelect(document.getElementById('projectSelect'), projects, '請選擇專案...', '您沒有可存取的專案');
+                
+                if (projects.length === 0) {
+                    console.error("❌ [錯誤] 沒有任何專案可供選擇，流程無法繼續。請檢查資料庫中的 members 與 memberEmails 欄位設定。");
+                }
+
             } catch (error) {
+                console.error("❌ [錯誤] 載入專案時發生嚴重錯誤:", error);
                 showAlert('載入專案失敗', 'error');
             } finally {
                 showLoading(false);
@@ -74,16 +89,13 @@ function initProcurementPage() {
             renderProcurementTable(majorItemId);
         }
 
-        // --- 渲染邏輯 ---
         function renderProcurementTable(filterMajorItemId = '') {
             const tableBody = document.getElementById('tableBody');
             const itemsToRender = filterMajorItemId ? detailItems.filter(item => item.majorItemId === filterMajorItemId) : detailItems;
-            
             if (itemsToRender.length === 0) {
                 tableBody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding: 2rem;">此標單 (或大項目) 下沒有細項。</td></tr>`;
                 return;
             }
-
             let bodyHTML = '';
             itemsToRender.forEach(item => {
                 const orders = purchaseOrders.filter(o => o.detailItemId === item.id);
@@ -91,50 +103,14 @@ function initProcurementPage() {
                 const totalPurchased = orders.reduce((sum, o) => sum + (o.purchaseQuantity || 0), 0);
                 const remainingQty = (item.totalQuantity || 0) - totalPurchased;
                 const statusClass = remainingQty <= 0 ? 'status-completed' : (totalPurchased > 0 ? 'status-active' : 'status-planning');
-
-                bodyHTML += `
-                    <tr class="item-row ${statusClass}">
-                        <td>${item.sequence || ''}</td>
-                        <td>${item.name}</td>
-                        <td class="text-right">${item.totalQuantity || 0}</td>
-                        <td class="text-right">${totalPurchased}</td>
-                        <td class="text-right">${remainingQty}</td>
-                        <td>
-                            <div class="order-list">
-                                ${orders.map(o => `
-                                    <div class="order-chip status-${o.status || '草稿'}" data-order-id="${o.id}">
-                                        <span>${o.supplier}: ${o.purchaseQuantity} (${o.status})</span>
-                                    </div>
-                                `).join('')}
-                                ${quotes.map(q => `
-                                    <div class="quote-chip" title="報價 by ${q.supplier}">
-                                        <span>${q.supplier}: ${formatCurrency(q.quotedUnitPrice)}</span>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </td>
-                        <td>
-                            <button class="btn btn-sm btn-info btn-compare-price" data-item-id="${item.id}" title="比價">📊</button>
-                            <button class="btn btn-sm btn-success btn-add-order" data-item-id="${item.id}" title="新增採購">+</button>
-                        </td>
-                    </tr>`;
+                bodyHTML += `<tr class="item-row ${statusClass}"><td>${item.sequence || ''}</td><td>${item.name}</td><td class="text-right">${item.totalQuantity || 0}</td><td class="text-right">${totalPurchased}</td><td class="text-right">${remainingQty}</td><td><div class="order-list">${orders.map(o => `<div class="order-chip status-${o.status || '草稿'}" data-order-id="${o.id}"><span>${o.supplier}: ${o.purchaseQuantity} (${o.status})</span></div>`).join('')}${quotes.map(q => `<div class="quote-chip" title="報價 by ${q.supplier}"><span>${q.supplier}: ${formatCurrency(q.quotedUnitPrice)}</span></div>`).join('')}</div></td><td><button class="btn btn-sm btn-info btn-compare-price" data-item-id="${item.id}" title="比價">📊</button><button class="btn btn-sm btn-success btn-add-order" data-item-id="${item.id}" title="新增採購">+</button></td></tr>`;
             });
             tableBody.innerHTML = bodyHTML;
         }
 
-        // --- 功能函數 (詢價, 比價, 新增/編輯訂單) ---
         function exportRfqExcel() {
-            if (!selectedTender || detailItems.length === 0) {
-                return showAlert('請先選擇一個標單以匯出詢價單。', 'warning');
-            }
-            const data = detailItems.map(item => ({
-                '項次': item.sequence || '',
-                '項目名稱': item.name || '',
-                '單位': item.unit || '',
-                '預計數量': item.totalQuantity || 0,
-                '報價單價': '',
-                '備註': ''
-            }));
+            if (!selectedTender || detailItems.length === 0) { return showAlert('請先選擇一個標單以匯出詢價單。', 'warning'); }
+            const data = detailItems.map(item => ({'項次': item.sequence || '','項目名稱': item.name || '','單位': item.unit || '','預計數量': item.totalQuantity || 0,'報價單價': '','備註': ''}));
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "詢價單");
@@ -145,11 +121,7 @@ function initProcurementPage() {
             const file = event.target.files[0];
             if (!file || !selectedTender) return;
             const supplier = prompt("請輸入此報價單的「供應商名稱」：");
-            if (!supplier) {
-                showAlert('已取消匯入。', 'info');
-                event.target.value = '';
-                return;
-            }
+            if (!supplier) { showAlert('已取消匯入。', 'info'); event.target.value = ''; return; }
             const reader = new FileReader();
             reader.onload = async (e) => {
                 showLoading(true, '正在匯入報價單...');
@@ -172,12 +144,7 @@ function initProcurementPage() {
                     await batch.commit();
                     await onTenderChange(selectedTender.id);
                     showAlert('✅ 報價單匯入成功！', 'success');
-                } catch (error) {
-                    showAlert('匯入失敗: ' + error.message, 'error');
-                } finally {
-                    showLoading(false);
-                    event.target.value = '';
-                }
+                } catch (error) { showAlert('匯入失敗: ' + error.message, 'error'); } finally { showLoading(false); event.target.value = ''; }
             };
             reader.readAsArrayBuffer(file);
         }
@@ -209,89 +176,18 @@ function initProcurementPage() {
         }
         
         function openOrderModal(orderData = null, detailItemId = null) {
-            const modal = document.getElementById('orderModal');
-            const form = document.getElementById('orderForm');
-            const deleteBtn = document.getElementById('deleteOrderBtn');
-            form.reset();
-            if (orderData) {
-                document.getElementById('modalTitle').textContent = '編輯採購單';
-                document.getElementById('orderId').value = orderData.id;
-                document.getElementById('detailItemId').value = orderData.detailItemId;
-                const item = detailItems.find(i => i.id === orderData.detailItemId);
-                document.getElementById('itemNameDisplay').textContent = `${item.sequence}. ${item.name}`;
-                document.getElementById('supplier').value = orderData.supplier;
-                document.getElementById('purchaseQuantity').value = orderData.purchaseQuantity;
-                document.getElementById('unitPrice').value = orderData.unitPrice;
-                document.getElementById('status').value = orderData.status;
-                document.getElementById('orderDate').value = orderData.orderDate || '';
-                document.getElementById('notes').value = orderData.notes || '';
-                deleteBtn.style.display = 'inline-block';
-            } else {
-                document.getElementById('modalTitle').textContent = '新增採購單';
-                document.getElementById('orderId').value = '';
-                const item = detailItems.find(i => i.id === detailItemId);
-                document.getElementById('detailItemId').value = item.id;
-                document.getElementById('itemNameDisplay').textContent = `${item.sequence}. ${item.name}`;
-                deleteBtn.style.display = 'none';
-            }
-            modal.style.display = 'flex';
+            const modal = document.getElementById('orderModal'); const form = document.getElementById('orderForm'); const deleteBtn = document.getElementById('deleteOrderBtn'); form.reset(); if (orderData) { document.getElementById('modalTitle').textContent = '編輯採購單'; document.getElementById('orderId').value = orderData.id; document.getElementById('detailItemId').value = orderData.detailItemId; const item = detailItems.find(i => i.id === orderData.detailItemId); document.getElementById('itemNameDisplay').textContent = `${item.sequence}. ${item.name}`; document.getElementById('supplier').value = orderData.supplier; document.getElementById('purchaseQuantity').value = orderData.purchaseQuantity; document.getElementById('unitPrice').value = orderData.unitPrice; document.getElementById('status').value = orderData.status; document.getElementById('orderDate').value = orderData.orderDate || ''; document.getElementById('notes').value = orderData.notes || ''; deleteBtn.style.display = 'inline-block'; } else { document.getElementById('modalTitle').textContent = '新增採購單'; document.getElementById('orderId').value = ''; const item = detailItems.find(i => i.id === detailItemId); document.getElementById('detailItemId').value = item.id; document.getElementById('itemNameDisplay').textContent = `${item.sequence}. ${item.name}`; deleteBtn.style.display = 'none'; } modal.style.display = 'flex';
         }
 
-        async function handleFormSubmit(e) {
-            e.preventDefault();
-            const orderId = document.getElementById('orderId').value;
-            const detailItemId = document.getElementById('detailItemId').value;
-            const quantity = parseFloat(document.getElementById('purchaseQuantity').value);
-            const price = parseFloat(document.getElementById('unitPrice').value);
-            const data = { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: detailItemId, supplier: document.getElementById('supplier').value.trim(), purchaseQuantity: quantity, unitPrice: price, totalPrice: quantity * price, status: document.getElementById('status').value, orderDate: document.getElementById('orderDate').value, notes: document.getElementById('notes').value.trim(), updatedBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-            showLoading(true, '儲存中...');
-            try {
-                if (orderId) {
-                    await db.collection('purchaseOrders').doc(orderId).update(data);
-                } else {
-                    data.createdBy = currentUser.email;
-                    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-                    const item = detailItems.find(i => i.id === detailItemId);
-                    data.itemName = item.name;
-                    data.itemSequence = item.sequence;
-                    await db.collection('purchaseOrders').add(data);
-                }
-                document.getElementById('orderModal').style.display = 'none';
-                await onTenderChange(selectedTender.id);
-                showAlert('✅ 儲存成功！', 'success');
-            } catch (error) {
-                showAlert('儲存失敗: ' + error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        async function deleteOrder() {
-            const orderId = document.getElementById('orderId').value;
-            if (!orderId) return;
-            if (!confirm('您確定要刪除這筆採購單嗎？此操作無法復原。')) return;
-            showLoading(true, '刪除中...');
-            try {
-                await db.collection('purchaseOrders').doc(orderId).delete();
-                document.getElementById('orderModal').style.display = 'none';
-                await onTenderChange(selectedTender.id);
-                showAlert('✅ 採購單已刪除！', 'success');
-            } catch (error) {
-                showAlert('刪除失敗: ' + error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
+        async function handleFormSubmit(e) { e.preventDefault(); const orderId = document.getElementById('orderId').value; const detailItemId = document.getElementById('detailItemId').value; const quantity = parseFloat(document.getElementById('purchaseQuantity').value); const price = parseFloat(document.getElementById('unitPrice').value); const data = { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: detailItemId, supplier: document.getElementById('supplier').value.trim(), purchaseQuantity: quantity, unitPrice: price, totalPrice: quantity * price, status: document.getElementById('status').value, orderDate: document.getElementById('orderDate').value, notes: document.getElementById('notes').value.trim(), updatedBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }; showLoading(true, '儲存中...'); try { if (orderId) { await db.collection('purchaseOrders').doc(orderId).update(data); } else { data.createdBy = currentUser.email; data.createdAt = firebase.firestore.FieldValue.serverTimestamp(); const item = detailItems.find(i => i.id === detailItemId); data.itemName = item.name; data.itemSequence = item.sequence; await db.collection('purchaseOrders').add(data); } document.getElementById('orderModal').style.display = 'none'; await onTenderChange(selectedTender.id); showAlert('✅ 儲存成功！', 'success'); } catch (error) { showAlert('儲存失敗: ' + error.message, 'error'); } finally { showLoading(false); } }
+        async function deleteOrder() { const orderId = document.getElementById('orderId').value; if (!orderId) return; if (!confirm('您確定要刪除這筆採購單嗎？此操作無法復原。')) return; showLoading(true, '刪除中...'); try { await db.collection('purchaseOrders').doc(orderId).delete(); document.getElementById('orderModal').style.display = 'none'; await onTenderChange(selectedTender.id); showAlert('✅ 採購單已刪除！', 'success'); } catch (error) { showAlert('刪除失敗: ' + error.message, 'error'); } finally { showLoading(false); } }
         
-        // --- 事件監聽 ---
         function setupEventListeners() {
             const safeAddEventListener = (selector, event, handler) => {
                 const element = document.querySelector(selector);
                 if (element) {
                     element.addEventListener(event, handler);
-                } else {
-                    console.warn(`Event listener setup failed: Element with selector "${selector}" not found.`);
-                }
+                } else { console.warn(`Event listener setup failed: Element with selector "${selector}" not found.`); }
             };
             safeAddEventListener('#projectSelect', 'change', (e) => onProjectChange(e.target.value));
             safeAddEventListener('#tenderSelect', 'change', (e) => onTenderChange(e.target.value));
@@ -303,27 +199,18 @@ function initProcurementPage() {
             safeAddEventListener('#orderForm', 'submit', handleFormSubmit);
 
             document.body.addEventListener('click', (e) => {
-                if (e.target.matches('.btn-compare-price')) {
-                    showPriceComparisonModal(e.target.dataset.itemId);
-                } else if (e.target.matches('.btn-select-quote')) {
-                    const { itemId, supplier, price } = e.target.dataset;
-                    selectQuote(itemId, supplier, parseFloat(price));
-                } else if (e.target.closest('.order-chip')) {
-                    const orderChip = e.target.closest('.order-chip');
-                    const order = purchaseOrders.find(o => o.id === orderChip.dataset.orderId);
-                    if (order) openOrderModal(order);
-                } else if (e.target.matches('.btn-add-order')) {
-                    openOrderModal(null, e.target.dataset.itemId);
-                }
+                if (e.target.matches('.btn-compare-price')) { showPriceComparisonModal(e.target.dataset.itemId); } 
+                else if (e.target.matches('.btn-select-quote')) { const { itemId, supplier, price } = e.target.dataset; selectQuote(itemId, supplier, parseFloat(price)); } 
+                else if (e.target.closest('.order-chip')) { const orderChip = e.target.closest('.order-chip'); const order = purchaseOrders.find(o => o.id === orderChip.dataset.orderId); if (order) openOrderModal(order); } 
+                else if (e.target.matches('.btn-add-order')) { openOrderModal(null, e.target.dataset.itemId); }
             });
         }
         
-        // --- 輔助函數 ---
         function showAlert(message, type = 'info') { alert(`[${type.toUpperCase()}] ${message}`); }
         function closeModal(modalId) { const modal = document.getElementById(modalId); if(modal) modal.style.display = 'none'; }
         function formatCurrency(amount) { if (amount === null || amount === undefined || isNaN(amount)) return 'N/A'; return `NT$ ${parseInt(amount, 10).toLocaleString()}`; }
         function showLoading(isLoading, message='載入中...') { const loadingEl = document.getElementById('loading'); if(loadingEl) { loadingEl.style.display = isLoading ? 'flex' : 'none'; const p = loadingEl.querySelector('p'); if(p) p.textContent = message; } }
-        function populateSelect(selectEl, options, defaultText) { let html = `<option value="">${defaultText}</option>`; options.forEach(option => { html += `<option value="${option.id}">${option.name}</option>`; }); selectEl.innerHTML = html; selectEl.disabled = options.length === 0; }
+        function populateSelect(selectEl, options, defaultText, emptyText = '沒有可選項') { let html = `<option value="">${defaultText}</option>`; if (options.length === 0 && emptyText) { html += `<option value="" disabled>${emptyText}</option>`; } else { options.forEach(option => { html += `<option value="${option.id}">${option.name}</option>`; }); } selectEl.innerHTML = html; selectEl.disabled = options.length === 0; }
         function resetSelects(from = 'project') { const selects = ['tender', 'majorItem']; const startIdx = selects.indexOf(from); for (let i = startIdx; i < selects.length; i++) { const select = document.getElementById(`${selects[i]}Select`); if(select) { select.innerHTML = `<option value="">請先選擇上一個選項</option>`; select.disabled = true; } } showMainContent(false); }
         function showMainContent(shouldShow) { document.getElementById('mainContent').style.display = shouldShow ? 'block' : 'none'; document.getElementById('emptyState').style.display = shouldShow ? 'none' : 'flex'; }
         function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length - pB.length; }
