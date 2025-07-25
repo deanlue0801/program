@@ -1,6 +1,6 @@
 <div class="page-container">
     <div class="page-header">
-        <h1 class="page-title">標單採購管理</h1>
+        <h1 class="page-title">🛒 標單採購管理</h1>
         <div class="actions-panel" style="margin-top: 1rem;">
             <button id="exportRfqBtn" class="btn btn-primary">📄 匯出詢價單 (Excel)</button>
             <button id="importQuotesBtn" class="btn btn-info">📥 匯入報價單 (Excel)</button>
@@ -9,7 +9,36 @@
     </div>
 
     <section class="selection-panel card">
-        </section>
+        <div class="selection-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+            <div>
+                <label class="selection-label" for="projectSelect">📁 選擇專案</label>
+                <select class="form-select" id="projectSelect">
+                    <option value="">請選擇專案...</option>
+                </select>
+            </div>
+            <div>
+                <label class="selection-label" for="tenderSelect">📋 選擇標單</label>
+                <select class="form-select" id="tenderSelect" disabled>
+                    <option value="">請先選擇專案</option>
+                </select>
+            </div>
+            <div>
+                <label class="selection-label" for="majorItemSelect">🔧 篩選大項目 (可選)</label>
+                <select class="form-select" id="majorItemSelect" disabled>
+                    <option value="">所有大項目</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    <div id="loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>載入資料中...</p>
+    </div>
+
+    <div id="emptyState" class="empty-state" style="display: flex;">
+        <p>請從上方選擇「專案」與「標單」以載入採購管理資料。</p>
+    </div>
 
     <div class="procurement-body">
         <div id="mainContent" style="display: none;">
