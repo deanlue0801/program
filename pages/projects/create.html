@@ -5,56 +5,58 @@
     <title>新增專案</title>
 </head>
 <body>
-    <div class="page-header">
-        <h1 class="page-title" id="pageTitle">🚀 新增專案</h1>
-        <p class="page-subtitle" id="pageSubtitle">建立新的建築工程專案</p>
-    </div>
+    <div class="page-container">
+        <div class="page-header">
+            <h1 class="page-title" id="pageTitle">🚀 新增專案</h1>
+            <p class="page-subtitle" id="pageSubtitle">建立新的建築工程專案</p>
+        </div>
 
-    <div class="form-container">
-        <div id="message-area"></div>
+        <div class="form-container">
+            <div id="message-area"></div>
 
-        <form id="projectForm" action="javascript:void(0);">
-            <div class="form-section">
-                <h3 class="section-title"><span>📋</span> 基本資訊</h3>
-                <div class="form-group">
-                    <label for="projectName" class="form-label">專案名稱 <span class="required">*</span></label>
-                    <input type="text" id="projectName" class="form-control" required>
+            <form id="projectForm" action="javascript:void(0);">
+                <div class="form-section">
+                    <h3 class="section-title"><span>📋</span> 基本資訊</h3>
+                    <div class="form-group">
+                        <label for="projectName" class="form-label">專案名稱 <span class="required">*</span></label>
+                        <input type="text" id="projectName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="projectCode" class="form-label">專案編號 <span class="required">*</span></label>
+                        <input type="text" id="projectCode" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="projectStatus" class="form-label">專案狀態</label>
+                        <select id="projectStatus" class="form-control">
+                            <option value="planning" selected>規劃中</option>
+                            <option value="active">進行中</option>
+                            <option value="completed">已完成</option>
+                            <option value="paused">暫停</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="projectCode" class="form-label">專案編號 <span class="required">*</span></label>
-                    <input type="text" id="projectCode" class="form-control" required>
-                </div>
-                <div class="form-group">
-                    <label for="projectStatus" class="form-label">專案狀態</label>
-                    <select id="projectStatus" class="form-control">
-                        <option value="planning" selected>規劃中</option>
-                        <option value="active">進行中</option>
-                        <option value="completed">已完成</option>
-                        <option value="paused">暫停</option>
-                    </select>
-                </div>
-            </div>
 
-            <div class="form-section">
-                <h3 class="section-title"><span>💰</span> 專案規模</h3>
-                 <div class="form-group">
-                    <label for="projectBudget" class="form-label">專案預算</label>
-                    <input type="number" id="projectBudget" class="form-control" placeholder="0" min="0">
+                <div class="form-section">
+                    <h3 class="section-title"><span>💰</span> 專案規模</h3>
+                    <div class="form-group">
+                        <label for="projectBudget" class="form-label">專案預算</label>
+                        <input type="number" id="projectBudget" class="form-control" placeholder="0" min="0">
+                    </div>
                 </div>
-            </div>
 
-            <div class="form-section">
-                <h3 class="section-title"><span>📝</span> 專案描述</h3>
-                <div class="form-group">
-                    <textarea id="projectDescription" class="form-control" rows="4" placeholder="請輸入專案的詳細內容..."></textarea>
+                <div class="form-section">
+                    <h3 class="section-title"><span>📝</span> 專案描述</h3>
+                    <div class="form-group">
+                        <textarea id="projectDescription" class="form-control" rows="4" placeholder="請輸入專案的詳細內容..."></textarea>
+                    </div>
                 </div>
-            </div>
 
-            <div class="form-actions">
-                <button type="button" class="btn btn-secondary" onclick="navigateTo('/program/projects/list')">取消</button>
-                <button type="submit" class="btn btn-primary" id="submitBtn">建立專案</button>
-            </div>
-        </form>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="navigateTo('/program/projects/list')">取消</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">建立專案</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script>
@@ -76,7 +78,6 @@
             submitBtn.textContent = '建立中...';
 
             try {
-                // 【結構修正】members 欄位現在是 Map 物件
                 const projectData = {
                     name: document.getElementById('projectName').value.trim(),
                     code: document.getElementById('projectCode').value.trim(),
@@ -84,8 +85,8 @@
                     budget: parseFloat(document.getElementById('projectBudget').value) || 0,
                     description: document.getElementById('projectDescription').value.trim(),
                     createdBy: currentUser.email,
-                    memberEmails: [currentUser.email], // 用於高效查詢
-                    members: { // 以 Email 為鍵的 Map
+                    memberEmails: [currentUser.email],
+                    members: {
                         [currentUser.email]: { role: 'owner' }
                     },
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
