@@ -17,6 +17,7 @@ const routes = {
     '/tenders/tracking-setup': { html: 'pages/tenders/tracking-setup.html', init: 'initTenderTrackingSetupPage', title: '追蹤設定' },
     '/tenders/import': { html: 'pages/tenders/import.html', init: 'initImportPage', title: '匯入標單' },
     '/tenders/edit': { html: 'pages/tenders/edit.html', init: 'initTenderEditPage', title: '編輯標單' },
+    '/tenders/procurement': { html: 'pages/tenders/procurement.html', init: 'initProcurementPage', title: '標單採購' }, 
     '404': { html: 'pages/404.html', title: '找不到頁面' }
 };
 
