@@ -1,32 +1,17 @@
 <div class="page-container">
     <div class="page-header">
         <h1 class="page-title">標單採購管理</h1>
-        <p class="page-subtitle">在此建立、追蹤並管理標單項目的採購訂單。</p>
+        <div class="actions-panel" style="margin-top: 1rem;">
+            <button id="exportRfqBtn" class="btn btn-primary">📄 匯出詢價單 (Excel)</button>
+            <button id="importQuotesBtn" class="btn btn-info">📥 匯入報價單 (Excel)</button>
+            <input type="file" id="importQuotesInput" accept=".xlsx, .xls" style="display: none;">
+        </div>
     </div>
 
     <section class="selection-panel card">
-        <div class="selection-grid">
-            <div>
-                <label class="selection-label" for="projectSelect">📁 選擇專案</label>
-                <select class="form-select" id="projectSelect"></select>
-            </div>
-            <div>
-                <label class="selection-label" for="tenderSelect">📋 選擇標單</label>
-                <select class="form-select" id="tenderSelect" disabled></select>
-            </div>
-            <div>
-                <label class="selection-label" for="majorItemSelect">🔧 篩選大項目 (可選)</label>
-                <select class="form-select" id="majorItemSelect" disabled></select>
-            </div>
-        </div>
-    </section>
+        </section>
 
     <div class="procurement-body">
-        <div id="loading" class="loading" style="display: none;">
-            <div class="spinner"></div>
-            <p>載入資料中...</p>
-        </div>
-
         <div id="mainContent" style="display: none;">
             <div class="table-container">
                 <table class="data-table" id="procurementTable">
@@ -34,69 +19,42 @@
                         <tr>
                             <th style="width: 8%;">項次</th>
                             <th>項目名稱</th>
-                            <th style="width: 8%;">單位</th>
                             <th class="text-right" style="width: 10%;">合約數量</th>
                             <th class="text-right" style="width: 10%;">已採購</th>
                             <th class="text-right" style="width: 10%;">剩餘</th>
-                            <th style="width: 25%;">採購單列表</th>
-                            <th style="width: 5%;">操作</th>
+                            <th style="width: 25%;">採購單/報價</th>
+                            <th style="width: 10%;">操作</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody"></tbody>
                 </table>
             </div>
         </div>
-        
-        <div id="emptyState" class="empty-state" style="display: flex;">
-            <p>請從上方選擇「專案」與「標單」以載入採購項目。</p>
-        </div>
     </div>
 </div>
 
 <div id="orderModal" class="modal-overlay">
-    <div class="modal-content">
-        <h3 id="modalTitle">新增採購單</h3>
-        <form id="orderForm">
-            <input type="hidden" id="orderId">
-            <input type="hidden" id="detailItemId">
-            <div class="form-group">
-                <label>採購項目</label>
-                <p id="itemNameDisplay" style="font-weight: bold;"></p>
-            </div>
-            <div class="form-group">
-                <label for="supplier">供應商</label>
-                <input type="text" id="supplier" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="purchaseQuantity">採購數量</label>
-                <input type="number" id="purchaseQuantity" class="form-control" required min="0">
-            </div>
-            <div class="form-group">
-                <label for="unitPrice">採購單價</label>
-                <input type="number" id="unitPrice" class="form-control" required min="0">
-            </div>
-            <div class="form-group">
-                <label for="status">狀態</label>
-                <select id="status" class="form-select">
-                    <option value="草稿">草稿</option>
-                    <option value="已下訂">已下訂</option>
-                    <option value="已到貨">已到貨</option>
-                    <option value="已付款">已付款</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="orderDate">下訂日期</label>
-                <input type="date" id="orderDate" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="notes">備註</label>
-                <textarea id="notes" class="form-control" rows="3"></textarea>
-            </div>
-            <div class="modal-actions">
-                <button type="submit" class="btn btn-success">儲存</button>
-                <button type="button" id="cancelModalBtn" class="btn btn-secondary">取消</button>
-                <button type="button" id="deleteOrderBtn" class="btn btn-danger" style="display: none;">刪除</button>
-            </div>
-        </form>
+    </div>
+
+<div id="priceCompareModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 800px;">
+        <h3 id="compareModalTitle">廠商報價比價</h3>
+        <p id="compareItemName"></p>
+        <div class="table-container" style="margin-top: 1rem;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>供應商</th>
+                        <th class="text-right">報價單價</th>
+                        <th>備註</th>
+                        <th style="width: 15%;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="compareTableBody"></tbody>
+            </table>
+        </div>
+        <div class="modal-actions" style="justify-content: flex-end;">
+            <button type="button" id="cancelCompareModalBtn" class="btn btn-secondary">關閉</button>
+        </div>
     </div>
 </div>
