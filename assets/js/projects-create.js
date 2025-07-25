@@ -1,80 +1,78 @@
 /**
- * 建立新專案頁面 (projects-create.js) - v2.0 (帶等待機制的最終修正版)
+ * 建立新專案頁面 (projects-create.js) - v3.0 (診斷增強最終版)
  */
 function initProjectCreatePage() {
-    console.log("🚀 初始化建立新專案頁面 (v2.0)...");
+    console.log("🚀 [1/5] 初始化建立新專案頁面 (v3.0)...");
 
-    // 【核心修正】使用一個可靠的函數來等待元素出現
-    function waitForElement(selector, callback) {
-        const element = document.querySelector(selector);
-        if (element) {
-            // 如果元素已經存在，立刻執行回呼函數
-            callback(element);
-        } else {
-            // 如果元素不存在，設定一個短暫的計時器，每 100 毫秒檢查一次
-            let interval = setInterval(() => {
-                const element = document.querySelector(selector);
-                if (element) {
-                    // 找到元素後，清除計時器，並執行回呼函數
-                    clearInterval(interval);
-                    callback(element);
-                }
-            }, 100);
-        }
+    const form = document.getElementById('createProjectForm');
+
+    // 【核心修正】檢查 form 是否在第一時間就存在
+    if (!form) {
+        console.error("❌ [2/5] 錯誤：在初始化當下，找不到 #createProjectForm 表單元素。這不應該發生，請檢查 create.html 檔案的內容是否正確。");
+        return;
     }
+    
+    console.log("✅ [2/5] 成功找到 #createProjectForm 表單元素。");
 
-    // 使用上面的等待函數來確保 #createProjectForm 存在後，才執行後續操作
-    waitForElement('#createProjectForm', (form) => {
-        console.log("✅ 成功找到 #createProjectForm 元素，開始綁定事件...");
+    // 為了避免重複綁定，先移除舊的監聽器
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const saveBtn = form.querySelector('button[type="submit"]');
-            saveBtn.disabled = true;
-            saveBtn.textContent = '儲存中...';
+    console.log("🔍 [3/5] 準備綁定 'submit' 事件監聽器...");
 
-            try {
-                const currentUser = firebase.auth().currentUser;
-                if (!currentUser) {
-                    throw new Error("使用者未登入");
-                }
+    newForm.addEventListener('submit', async (e) => {
+        // 防止表單用傳統方式提交
+        e.preventDefault(); 
+        console.log("✅ [4/5] 'submit' 事件成功觸發！");
 
-                const formData = new FormData(form);
-                const projectData = {
-                    name: formData.get('projectName'),
-                    code: formData.get('projectCode'),
-                    budget: Number(formData.get('projectBudget')) || 0,
-                    status: formData.get('projectStatus'),
-                    startDate: formData.get('projectStartDate'),
-                    endDate: formData.get('projectEndDate'),
-                    description: formData.get('projectDescription'),
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    createdBy: currentUser.email,
-                    members: {
-                        [currentUser.email]: {
-                            role: 'owner',
-                            permissions: {} 
-                        }
-                    },
-                    memberEmails: [currentUser.email]
-                };
-                
-                if (!projectData.name) {
-                    throw new Error("專案名稱為必填欄位。");
-                }
+        const saveBtn = newForm.querySelector('button[type="submit"]');
+        saveBtn.disabled = true;
+        saveBtn.textContent = '儲存中...';
 
-                await db.collection('projects').add(projectData);
-
-                showAlert('✅ 專案建立成功！', 'success');
-                navigateTo('/program/projects/list');
-
-            } catch (error) {
-                console.error("❌ 建立專案失敗:", error);
-                showAlert(`建立專案失敗: ${error.message}`, 'error');
-            } finally {
-                saveBtn.disabled = false;
-                saveBtn.textContent = '建立專案';
+        try {
+            const currentUser = firebase.auth().currentUser;
+            if (!currentUser) {
+                throw new Error("使用者未登入");
             }
-        });
+
+            const formData = new FormData(newForm);
+            const projectData = {
+                name: formData.get('projectName'),
+                code: formData.get('projectCode'),
+                budget: Number(formData.get('projectBudget')) || 0,
+                status: formData.get('projectStatus'),
+                startDate: formData.get('projectStartDate'),
+                endDate: formData.get('projectEndDate'),
+                description: formData.get('projectDescription'),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdBy: currentUser.email,
+                members: {
+                    [currentUser.email]: {
+                        role: 'owner',
+                        permissions: {} 
+                    }
+                },
+                memberEmails: [currentUser.email]
+            };
+            
+            if (!projectData.name) {
+                throw new Error("專案名稱為必填欄位。");
+            }
+            
+            console.log("💾 [5/5] 準備寫入資料到 Firestore...", projectData);
+            await db.collection('projects').add(projectData);
+
+            showAlert('✅ 專案建立成功！', 'success');
+            navigateTo('/program/projects/list');
+
+        } catch (error) {
+            console.error("❌ 建立專案失敗:", error);
+            showAlert(`建立專案失敗: ${error.message}`, 'error');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = '建立專案';
+        }
     });
+    
+    console.log("✅ [3/5] 已成功綁定 'submit' 事件監聽器。");
 }
