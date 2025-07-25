@@ -9,79 +9,20 @@
     <link rel="stylesheet" href="/program/assets/css/layout.css">
     <link rel="stylesheet" href="/program/assets/css/components/buttons.css">
     <link rel="stylesheet" href="/program/assets/css/components/tables.css">
-    <link rel="stylesheet" href="/program/assets/css/components/cards.css">
-    <link rel="stylesheet" href="/program/assets/css/components/forms.css">
-    <link rel="stylesheet" href="/program/assets/css/components/modals.css">
-    <link rel="stylesheet" href="/program/assets/css/components/alerts.css">
-    <link rel="stylesheet" href="/program/assets/css/components/loading.css">
-    <link rel="stylesheet" href="/program/assets/css/components/navigation.css">
-    <link rel="stylesheet" href="/program/assets/css/dashboard.css">
-    <link rel="stylesheet" href="/program/assets/css/tenders-list.css">
-    <link rel="stylesheet" href="/program/assets/css/detail.css">
-    <link rel="stylesheet" href="/program/assets/css/distribution.css">
-    <link rel="stylesheet" href="/program/assets/css/import.css">
-    <link rel="stylesheet" href="/program/assets/css/edit.css">
-    <link rel="stylesheet" href="/program/assets/css/tenders-edit.css">
-    <link rel="stylesheet" href="/program/assets/css/tenders-tracking-setup.css">
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-
-<script>
-  // GitHub Pages SPA 重新導向處理
-  (function(){
-    var redirect = sessionStorage.redirect;
-    delete sessionStorage.redirect;
-    if (redirect && redirect != location.href) {
-      history.replaceState(null, null, redirect);
-    }
-  })();
-</script>
-</head>
+    </head>
 <body>
     <div class="app-layout">
         <nav class="sidebar" id="sidebar">
-            <div class="sidebar-header"><h3>🏗️ 專案管理</h3></div>
-            <ul class="nav-list">
-                <li><a href="/program/dashboard" data-route>📊 儀表板</a></li>
-                <li><a href="/program/projects/list" data-route>📁 專案管理</a></li>
-                <li>
-                    <a href="/program/tenders/list" data-route>📋 標單管理</a>
-                    <ul class="sub-nav">
-                        <li><a href="/program/tenders/distribution" data-route>🏢 分配管理</a></li>
-                        <li><a href="/program/tenders/space-distribution" data-route>🚪 空間分配管理</a></li>
-                        <li><a href="/program/tenders/progress-management" data-route>🚧 施工進度管理</a></li>
-                        <li><a href="/program/tenders/tracking-setup" data-route><i class="fas fa-list-check fa-fw me-2"></i> 追蹤項目設定</a></li>
-                        <li><a href="/program/tenders/import" data-route>📥 匯入細項</a></li>
-                    </ul>
-                </li>
-            </ul>
-            <div class="sidebar-footer">
-                <span id="currentUser"></span>
-                <button onclick="logout()">登出</button>
-            </div>
-        </nav>
+            </nav>
         <main class="main-content" id="app-content"></main>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    
     <script src="/program/assets/js/firebase-config.js"></script> 
     <script src="/program/assets/js/router.js"></script>
-    <script src="/program/assets/js/dashboard.js"></script>
-    <script src="/program/assets/js/projects-list.js"></script>
-    <script src="/program/assets/js/projects-edit.js"></script>
-    <script src="/program/assets/js/tenders-list.js"></script> 
-    <script src="/program/assets/js/tenders-detail.js"></script>
-    <script src="/program/assets/js/tenders-distribution.js"></script>
-    <script src="/program/assets/js/tenders-space-distribution.js"></script>
-    <script src="/program/assets/js/tenders-progress-management.js"></script>
-    <script src="/program/assets/js/tenders-import.js"></script>
-    <script src="/program/assets/js/tenders-edit.js"></script>
-    <script src="/program/assets/js/tenders-tracking-setup.js"></script>
-    <script src="/program/assets/js/projects-create.js"></script>
-</body>
+    
+    </body>
 </html>
