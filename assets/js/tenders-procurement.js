@@ -1,8 +1,8 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v1.0
+ * 標單採購管理 (tenders-procurement.js) - v1.1 (獨立頁面最終版)
  */
 function initProcurementPage() {
-    console.log("🚀 初始化標單採購管理頁面 (v1.0)...");
+    console.log("🚀 初始化標單採購管理頁面 (v1.1)...");
 
     let projects = [], tenders = [], majorItems = [], detailItems = [], purchaseOrders = [];
     let selectedProject = null, selectedTender = null;
@@ -49,7 +49,7 @@ function initProcurementPage() {
                 safeFirestoreQuery("detailItems", [{ field: "tenderId", operator: "==", value: tenderId }, { field: "projectId", operator: "==", value: selectedProject.id }]),
                 safeFirestoreQuery("purchaseOrders", [{ field: "tenderId", operator: "==", value: tenderId }, { field: "projectId", operator: "==", value: selectedProject.id }])
             ]);
-            majorItems = majorItemDocs.docs.sort((a,b) => (a.sequence || '').localeCompare(b.sequence || ''));
+            majorItems = majorItemDocs.docs.sort(naturalSequenceSort);
             detailItems = detailItemDocs.docs.sort(naturalSequenceSort);
             purchaseOrders = orderDocs.docs;
             populateSelect(document.getElementById('majorItemSelect'), majorItems, '所有大項目');
@@ -93,9 +93,8 @@ function initProcurementPage() {
                     <td>
                         <div class="order-list">
                             ${orders.map(o => `
-                                <div class="order-chip status-${o.status || '草稿'}">
+                                <div class="order-chip status-${o.status || '草稿'}" data-order-id="${o.id}">
                                     <span>${o.supplier}: ${o.purchaseQuantity} (${o.status})</span>
-                                    <button class="btn-edit-order" data-order-id="${o.id}">✏️</button>
                                 </div>
                             `).join('') || '<span class="text-secondary">無採購單</span>'}
                         </div>
@@ -109,9 +108,10 @@ function initProcurementPage() {
         tableBody.innerHTML = bodyHTML;
     }
 
-    function openOrderModal(orderData = null) {
+    function openOrderModal(orderData = null, detailItemId = null) {
         const modal = document.getElementById('orderModal');
         const form = document.getElementById('orderForm');
+        const deleteBtn = document.getElementById('deleteOrderBtn');
         form.reset();
         
         if (orderData) { // 編輯模式
@@ -126,12 +126,14 @@ function initProcurementPage() {
             document.getElementById('status').value = orderData.status;
             document.getElementById('orderDate').value = orderData.orderDate || '';
             document.getElementById('notes').value = orderData.notes || '';
-        } else { // 新增模式 (需要 detailItemId)
+            deleteBtn.style.display = 'inline-block';
+        } else { // 新增模式
             document.getElementById('modalTitle').textContent = '新增採購單';
             document.getElementById('orderId').value = '';
-            const item = detailItems.find(i => i.id === event.target.dataset.itemId);
+            const item = detailItems.find(i => i.id === detailItemId);
             document.getElementById('detailItemId').value = item.id;
             document.getElementById('itemNameDisplay').textContent = `${item.sequence}. ${item.name}`;
+            deleteBtn.style.display = 'none';
         }
         modal.style.display = 'flex';
     }
@@ -154,14 +156,16 @@ function initProcurementPage() {
             status: document.getElementById('status').value,
             orderDate: document.getElementById('orderDate').value,
             notes: document.getElementById('notes').value.trim(),
-            createdBy: currentUser.email
+            updatedBy: currentUser.email,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
         showLoading(true, '儲存中...');
         try {
-            if (orderId) { // 更新
+            if (orderId) {
                 await db.collection('purchaseOrders').doc(orderId).update(data);
-            } else { // 新增
+            } else {
+                data.createdBy = currentUser.email;
                 data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 const item = detailItems.find(i => i.id === detailItemId);
                 data.itemName = item.name;
@@ -169,7 +173,7 @@ function initProcurementPage() {
                 await db.collection('purchaseOrders').add(data);
             }
             document.getElementById('orderModal').style.display = 'none';
-            await onTenderChange(selectedTender.id); // 重新載入資料
+            await onTenderChange(selectedTender.id);
             showAlert('✅ 儲存成功！', 'success');
         } catch (error) {
             showAlert('儲存失敗: ' + error.message, 'error');
@@ -178,28 +182,48 @@ function initProcurementPage() {
         }
     }
     
+    async function deleteOrder() {
+        const orderId = document.getElementById('orderId').value;
+        if (!orderId) return;
+        if (!confirm('您確定要刪除這筆採購單嗎？此操作無法復原。')) return;
+
+        showLoading(true, '刪除中...');
+        try {
+            await db.collection('purchaseOrders').doc(orderId).delete();
+            document.getElementById('orderModal').style.display = 'none';
+            await onTenderChange(selectedTender.id);
+            showAlert('✅ 採購單已刪除！', 'success');
+        } catch (error) {
+            showAlert('刪除失敗: ' + error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
     function setupEventListeners() {
         document.getElementById('projectSelect').addEventListener('change', (e) => onProjectChange(e.target.value));
         document.getElementById('tenderSelect').addEventListener('change', (e) => onTenderChange(e.target.value));
         document.getElementById('majorItemSelect').addEventListener('change', (e) => onMajorItemChange(e.target.value));
         document.getElementById('tableBody').addEventListener('click', (e) => {
-            if (e.target.classList.contains('btn-add-order')) {
-                openOrderModal();
-            } else if (e.target.classList.contains('btn-edit-order')) {
-                const order = purchaseOrders.find(o => o.id === e.target.dataset.orderId);
-                openOrderModal(order);
+            const addBtn = e.target.closest('.btn-add-order');
+            const orderChip = e.target.closest('.order-chip');
+            if (addBtn) {
+                openOrderModal(null, addBtn.dataset.itemId);
+            } else if (orderChip) {
+                const order = purchaseOrders.find(o => o.id === orderChip.dataset.orderId);
+                if (order) openOrderModal(order);
             }
         });
         document.getElementById('orderForm').addEventListener('submit', handleFormSubmit);
         document.getElementById('cancelModalBtn').addEventListener('click', () => document.getElementById('orderModal').style.display = 'none');
+        document.getElementById('deleteOrderBtn').addEventListener('click', deleteOrder);
     }
     
-    // --- Helper Functions ---
-    function showLoading(isLoading, message='載入中...') { /* ... */ }
-    function populateSelect(selectEl, options, defaultText) { /* ... */ }
-    function resetSelects(from = 'project') { /* ... */ }
-    function showMainContent(shouldShow) { /* ... */ }
-    function naturalSequenceSort(a, b) { /* ... */ }
+    function showLoading(isLoading, message='載入中...') { const loadingEl = document.getElementById('loading'); if(loadingEl) { loadingEl.style.display = isLoading ? 'flex' : 'none'; loadingEl.querySelector('p').textContent = message; } }
+    function populateSelect(selectEl, options, defaultText) { let html = `<option value="">${defaultText}</option>`; options.forEach(option => { html += `<option value="${option.id}">${option.name}</option>`; }); selectEl.innerHTML = html; selectEl.disabled = options.length === 0; }
+    function resetSelects(from = 'project') { const selects = ['tender', 'majorItem']; const startIdx = selects.indexOf(from); for (let i = startIdx; i < selects.length; i++) { const select = document.getElementById(`${selects[i]}Select`); if(select) { select.innerHTML = `<option value="">請先選擇上一個選項</option>`; select.disabled = true; } } showMainContent(false); }
+    function showMainContent(shouldShow) { document.getElementById('mainContent').style.display = shouldShow ? 'block' : 'none'; document.getElementById('emptyState').style.display = shouldShow ? 'none' : 'flex'; }
+    function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length - pB.length; }
     
     initializePage();
 }
