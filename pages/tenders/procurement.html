@@ -1,15 +1,21 @@
 <div class="page-container">
     <style>
         .major-item-header td {
-            background-color: #e9ecef;
+            background-color: #e9ecef !important;
             font-weight: bold;
             color: #495057;
-            padding-top: 0.8rem;
-            padding-bottom: 0.8rem;
-            border-top: 2px solid #adb5bd;
             text-align: left;
-            padding-left: 1em;
+            padding: 0.8rem 1rem !important;
+            border-top: 2px solid #adb5bd;
+            border-bottom: 1px solid #adb5bd;
+
+            /* --- 以下是關鍵的修正 --- */
+            /* 覆蓋掉通用樣式中不正確的定位和寬度限制 */
+            position: static;
+            min-width: 100%; 
+            border-right: none;
         }
+
         .item-row td {
             background-color: #fff;
         }
