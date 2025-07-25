@@ -1,5 +1,5 @@
 /**
- * 空間分配管理系統 (space-distribution.js) - v3.3 (UI 邏輯修正版)
+ * 空間分配管理系統 (space-distribution.js) - v3.4 (表格欄位最終修正版)
  */
 function initSpaceDistributionPage() {
     
@@ -9,7 +9,7 @@ function initSpaceDistributionPage() {
     let detailItems = [], floorDistributions = [], spaceDistributions = [], spaces = []; 
 
     async function initializePage() {
-        console.log("🚀 初始化獨立空間分配頁面 (v3.3)...");
+        console.log("🚀 初始化獨立空間分配頁面 (v3.4)...");
         if (!auth.currentUser) return showAlert("無法獲取用戶資訊", "error");
         setupEventListeners();
         await loadProjectsWithPermission();
@@ -162,48 +162,6 @@ function initSpaceDistributionPage() {
             showLoading(false);
         }
     }
-
-    async function saveAllSpaceDistributions() {
-        const canAccess = currentUserRole === 'owner' || (currentUserRole === 'editor' && currentUserPermissions.canAccessDistribution);
-        if (!canAccess) return showAlert('權限不足，無法儲存', 'error');
-        if (spaces.length === 0) return showAlert('尚未建立任何空間，無法儲存分配。', 'warning');
-        
-        showLoading(true, '儲存空間分配中...');
-        try {
-            const batch = db.batch();
-            const existingDocs = await safeFirestoreQuery("spaceDistribution", [
-                { field: "majorItemId", operator: "==", value: selectedMajorItem.id },
-                { field: "floorName", operator: "==", value: selectedFloor },
-                { field: "projectId", operator: "==", value: selectedProject.id }
-            ]);
-            existingDocs.docs.forEach(doc => batch.delete(db.collection("spaceDistribution").doc(doc.id)));
-
-            document.querySelectorAll('.quantity-input').forEach(input => {
-                const quantity = parseInt(input.value) || 0;
-                if (quantity > 0) {
-                    const docRef = db.collection("spaceDistribution").doc();
-                    batch.set(docRef, {
-                        projectId: selectedProject.id,
-                        tenderId: selectedTender.id,
-                        majorItemId: selectedMajorItem.id,
-                        detailItemId: input.dataset.itemId,
-                        floorName: selectedFloor,
-                        spaceName: input.dataset.space,
-                        quantity: quantity,
-                        createdBy: auth.currentUser.email,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                }
-            });
-            await batch.commit();
-            await onFloorChange(selectedFloor);
-            showAlert('✅ 空間分配已儲存成功！', 'success');
-        } catch (error) {
-            showAlert('儲存失敗: ' + error.message, 'error');
-        } finally {
-            showLoading(false);
-        }
-    }
     
     // --- 【核心修正】重寫表格渲染邏輯 ---
     function buildSpaceDistributionTable() {
@@ -212,26 +170,21 @@ function initSpaceDistributionPage() {
         const noSpacesState = document.getElementById('noSpacesState');
         const tableContainer = document.querySelector('.table-container');
 
-        if (!tableHeader || !tableBody || !tableContainer || !noSpacesState) return;
-
-        // 篩選出在此樓層有被分配數量的細項
+        if (!tableHeader || !tableBody) return;
+        
         const itemsForThisFloor = detailItems.filter(item => {
             const floorDist = floorDistributions.find(d => d.detailItemId === item.id);
             return floorDist && floorDist.quantity > 0;
         });
 
-        // 如果該樓層沒有任何被分配的項目，則顯示提示訊息並隱藏表格
         if (itemsForThisFloor.length === 0) {
-            tableContainer.style.display = 'none';
             noSpacesState.querySelector('p').textContent = '此樓層無任何已設定數量的細項。';
             noSpacesState.style.display = 'flex';
+            tableContainer.style.display = 'none';
             return;
         }
 
-        // 如果有項目，則一定顯示表格
         tableContainer.style.display = '';
-        
-        // 根據是否有空間，決定是否顯示「無空間」的提示
         if (spaces.length === 0) {
             noSpacesState.querySelector('p').textContent = '尚未建立任何空間。請點擊「管理空間」按鈕來新增。';
             noSpacesState.style.display = 'flex';
@@ -239,25 +192,27 @@ function initSpaceDistributionPage() {
             noSpacesState.style.display = 'none';
         }
 
-        // 建立表頭
-        let headerHTML = '<tr><th style="width: 300px;">細項名稱</th><th class="total-column">樓層總量</th>';
+        // 步驟 1: 修改表頭，將「項次」和「細項名稱」分開
+        let headerHTML = '<tr><th style="width: 80px;">項次</th><th style="width: 250px;">細項名稱</th><th class="total-column">樓層總量</th>';
         if (spaces.length > 0) {
             spaces.forEach(space => headerHTML += `<th class="floor-header">${space}</th>`);
             headerHTML += '<th class="total-column">已分配(空間)</th>';
         }
         headerHTML += '</tr>';
         tableHeader.innerHTML = headerHTML;
-
-        // 建立表格內容
+        
         let bodyHTML = '';
-        itemsForThisFloor.forEach((item, index) => {
+        itemsForThisFloor.forEach(item => {
             const floorDist = floorDistributions.find(d => d.detailItemId === item.id);
             const floorTotalQuantity = floorDist ? floorDist.quantity : 0;
-
+            
             let rowHTML = `<tr class="item-row" data-total-quantity="${floorTotalQuantity}" data-item-id="${item.id}">`;
-            rowHTML += `<td><div class="item-info"><div class="item-name">${item.sequence || `#${index + 1}`}. ${item.name || '未命名'}</div><div class="item-details">單位: ${item.unit || '-'}</div></div></td>`;
+            
+            // 步驟 2: 修改表格內容，將項次和名稱放入不同的 <td>
+            rowHTML += `<td>${item.sequence || ''}</td>`;
+            rowHTML += `<td><div class="item-info"><div class="item-name">${item.name || '未命名'}</div><div class="item-details">單位: ${item.unit || '-'}</div></div></td>`;
             rowHTML += `<td class="total-column" id="total-qty-${item.id}"><strong>${floorTotalQuantity}</strong></td>`;
-
+            
             if (spaces.length > 0) {
                 let distributedInSpaces = 0;
                 spaces.forEach(space => {
@@ -280,6 +235,7 @@ function initSpaceDistributionPage() {
     }
     
     // --- 其他所有函式維持不變 ---
+    async function saveAllSpaceDistributions() { const canAccess = currentUserRole === 'owner' || (currentUserRole === 'editor' && currentUserPermissions.canAccessDistribution); if (!canAccess) return showAlert('權限不足，無法儲存', 'error'); if (spaces.length === 0) return showAlert('尚未建立任何空間，無法儲存分配。', 'warning'); showLoading(true, '儲存空間分配中...'); try { const batch = db.batch(); const existingDocs = await safeFirestoreQuery("spaceDistribution", [{ field: "majorItemId", operator: "==", value: selectedMajorItem.id }, { field: "floorName", operator: "==", value: selectedFloor }, { field: "projectId", operator: "==", value: selectedProject.id }]); existingDocs.docs.forEach(doc => batch.delete(db.collection("spaceDistribution").doc(doc.id))); document.querySelectorAll('.quantity-input').forEach(input => { const quantity = parseInt(input.value) || 0; if (quantity > 0) { const docRef = db.collection("spaceDistribution").doc(); batch.set(docRef, { projectId: selectedProject.id, tenderId: selectedTender.id, majorItemId: selectedMajorItem.id, detailItemId: input.dataset.itemId, floorName: selectedFloor, spaceName: input.dataset.space, quantity: quantity, createdBy: auth.currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); } }); await batch.commit(); await onFloorChange(selectedFloor); showAlert('✅ 空間分配已儲存成功！', 'success'); } catch (error) { showAlert('儲存失敗: ' + error.message, 'error'); } finally { showLoading(false); } }
     function onQuantityChange(inputElement) { const itemId = inputElement.dataset.itemId; const allInputsForRow = document.querySelectorAll(`input[data-item-id="${itemId}"]`); const distributedCell = document.getElementById(`distributed-${itemId}`); const itemRow = distributedCell.closest('tr'); const totalQuantity = parseFloat(itemRow.dataset.totalQuantity) || 0; let currentDistributed = 0; allInputsForRow.forEach(input => { currentDistributed += (Number(input.value) || 0); }); if (currentDistributed > totalQuantity) { inputElement.value = (Number(inputElement.value) || 0) - (currentDistributed - totalQuantity); showAlert(`分配總數 (${currentDistributed}) 已超過此樓層總量 (${totalQuantity})，已自動修正。`, 'warning'); currentDistributed = totalQuantity; } const strongTag = distributedCell.querySelector('strong'); if(strongTag) strongTag.textContent = currentDistributed; distributedCell.classList.toggle('error', currentDistributed > totalQuantity); }
     function setupEventListeners() { document.getElementById('projectSelect')?.addEventListener('change', (e) => onProjectChange(e.target.value)); document.getElementById('tenderSelect')?.addEventListener('change', (e) => onTenderChange(e.target.value)); document.getElementById('majorItemSelect')?.addEventListener('change', (e) => onMajorItemChange(e.target.value)); document.getElementById('floorSelect')?.addEventListener('change', (e) => onFloorChange(e.target.value)); document.getElementById('saveSpaceDistributionsBtn')?.addEventListener('click', saveAllSpaceDistributions); document.getElementById('spaceManagerBtn')?.addEventListener('click', showSpaceManager); document.getElementById('addCustomSpaceBtn')?.addEventListener('click', addCustomSpace); document.getElementById('clearAllSpacesBtn')?.addEventListener('click', clearAllSpaces); document.getElementById('saveSpaceSettingsBtn')?.addEventListener('click', saveSpaceSettings); document.getElementById('cancelSpaceModalBtn')?.addEventListener('click', () => closeModal('spaceModal')); document.getElementById('importBtn')?.addEventListener('click', () => document.getElementById('importInput').click()); document.getElementById('importInput')?.addEventListener('change', handleFileImport); document.getElementById('exportBtn')?.addEventListener('click', exportToExcel); }
     function exportToExcel() { if (!selectedFloor || detailItems.length === 0) { return showAlert('沒有資料可匯出', 'error'); } const header = ['項次', '項目名稱', '單位', '樓層總量', ...spaces]; const data = [header]; detailItems.forEach(item => { const row = document.querySelector(`tr[data-item-id="${item.id}"]`); if (!row) return; const floorTotal = row.querySelector(`#total-qty-${item.id} strong`)?.textContent || '0'; const rowData = [item.sequence || '', item.name || '', item.unit || '', floorTotal]; if (spaces.length > 0) { spaces.forEach(space => { const input = row.querySelector(`input[data-space="${space}"]`); rowData.push(input ? input.value : '0'); }); } data.push(rowData); }); const worksheet = XLSX.utils.aoa_to_sheet(data); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, `${selectedFloor}空間分配`); const fileName = `${selectedProject.name}_${selectedTender.name}_${selectedFloor}_空間分配表.xlsx`; XLSX.writeFile(workbook, fileName); }
