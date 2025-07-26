@@ -23,27 +23,30 @@
 </head>
 <body>
     <div class="app-layout">
+        <!-- 【關鍵修正】更新側邊欄的 HTML 結構 -->
         <nav class="sidebar" id="sidebar">
-            <div class="sidebar-header"><h3>🏗️ 專案管理</h3></div>
+            <div class="sidebar-header">
+                <h3><i class="fas fa-drafting-compass"></i> 專案管理</h3>
+            </div>
             <ul class="nav-list">
-                <li><a href="/program/dashboard" data-route>📊 儀表板</a></li>
-                <li><a href="/program/projects/list" data-route>📁 專案管理</a></li>
-                <li><a href="/program/tenders/procurement" data-route>🛒 採購管理</a></li>
-                <li><a href="/program/cost-management" data-route>💰 成本控管分析</a></li>
-                <li>
-                    <a href="/program/tenders/list" data-route>📋 標單管理</a>
+                <li><a href="/program/dashboard" data-route><i class="fas fa-chart-pie fa-fw"></i> 儀表板</a></li>
+                <li><a href="/program/projects/list" data-route><i class="fas fa-folder fa-fw"></i> 專案管理</a></li>
+                <li><a href="/program/tenders/procurement" data-route><i class="fas fa-shopping-cart fa-fw"></i> 採購管理</a></li>
+                <li><a href="/program/cost-management" data-route><i class="fas fa-coins fa-fw"></i> 成本控管分析</a></li>
+                <li class="nav-item-has-children">
+                    <a href="/program/tenders/list" data-route><i class="fas fa-clipboard-list fa-fw"></i> 標單管理</a>
                     <ul class="sub-nav">
-                        <li><a href="/program/tenders/distribution" data-route>🏢 分配管理</a></li>
-                        <li><a href="/program/tenders/space-distribution" data-route>🚪 空間分配管理</a></li>
-                        <li><a href="/program/tenders/progress-management" data-route>🚧 施工進度管理</a></li>
-                        <li><a href="/program/tenders/tracking-setup" data-route><i class="fas fa-list-check fa-fw me-2"></i> 追蹤項目設定</a></li>
-                        <li><a href="/program/tenders/import" data-route>📥 匯入細項</a></li>
+                        <li><a href="/program/tenders/distribution" data-route><i class="fas fa-sitemap fa-fw"></i> 分配管理</a></li>
+                        <li><a href="/program/tenders/space-distribution" data-route><i class="fas fa-vector-square fa-fw"></i> 空間分配管理</a></li>
+                        <li><a href="/program/tenders/progress-management" data-route><i class="fas fa-tasks fa-fw"></i> 施工進度管理</a></li>
+                        <li><a href="/program/tenders/tracking-setup" data-route><i class="fas fa-list-check fa-fw"></i> 追蹤項目設定</a></li>
+                        <li><a href="/program/tenders/import" data-route><i class="fas fa-file-import fa-fw"></i> 匯入細項</a></li>
                     </ul>
                 </li>
             </ul>
             <div class="sidebar-footer">
                 <span id="currentUser"></span>
-                <button onclick="logout()">登出</button>
+                <button class="btn btn-logout" onclick="logout()">登出</button>
             </div>
         </nav>
         <main class="main-content" id="app-content"></main>
