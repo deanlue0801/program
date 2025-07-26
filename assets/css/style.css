@@ -264,7 +264,19 @@ body, html {
 .dashboard-page .activity-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; color: white; flex-shrink: 0; }
 .dashboard-page .activity-icon.project { background: var(--primary-color-start); }
 .dashboard-page .activity-icon.tender { background: var(--success-color); }
+.dashboard-columns {
+  display: grid;
+  grid-template-columns: 2fr 1fr; /* 維持 2:1 比例 */
+  gap: var(--spacing-lg);         /* 設定間距 */
+  align-items: stretch;           /* 關鍵：讓此容器內的子項目自動延伸至相同高度 */
+}
 
+/* 響應式調整：在螢幕寬度小於 992px 時，改為單欄堆疊 */
+@media (max-width: 992px) {
+  .dashboard-columns {
+    grid-template-columns: 1fr;
+  }
+}
 /* --- 採購管理頁面 --- */
 .procurement-page .procurement-table-container { overflow-x: auto; }
 .procurement-page #procurementTable { min-width: 1200px; }
