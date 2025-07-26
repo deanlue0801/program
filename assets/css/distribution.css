@@ -1,363 +1,53 @@
-/* --- 分配管理頁面專屬樣式 --- */
-.distribution-page-wrapper { display: flex; flex-direction: column; height: calc(100vh - 50px - 2rem); }
-.selection-panel { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); flex-shrink: 0; }
-.selection-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
-.distribution-body { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; background: white; border-radius: 15px; padding: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
-.actions-panel { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; flex-shrink: 0; }
-.action-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
-
-/* 【修復】基本按鈕樣式 */
-.btn {
-    padding: 10px 16px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
-    min-width: 120px;
-    white-space: nowrap;
+/* assets/css/distribution.css - v2.0 (已隔離) */
+.distribution-page-wrapper .selection-panel {
+    background: var(--white);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
 }
-
-.btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+.distribution-page-wrapper .distribution-table {
+    border-collapse: collapse;
+    min-width: 1200px;
 }
-
-.btn:active {
-    transform: translateY(0);
+.distribution-page-wrapper .distribution-table th, 
+.distribution-page-wrapper .distribution-table td {
+    padding: 12px 10px;
+    border: 1px solid var(--gray-200);
 }
-
-.btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-}
-
-/* 【修復】按鈕顏色樣式 */
-.btn-success {
-    background-color: #28a745 !important;
-    background: linear-gradient(135deg, #28a745, #20c997) !important;
-    color: white !important;
-}
-
-.btn-success:hover {
-    background-color: #218838 !important;
-    background: linear-gradient(135deg, #218838, #1ea080) !important;
-}
-
-.btn-primary {
-    background-color: #007bff !important;
-    background: linear-gradient(135deg, #007bff, #6610f2) !important;
-    color: white !important;
-}
-
-.btn-primary:hover {
-    background-color: #0056b3 !important;
-    background: linear-gradient(135deg, #0056b3, #520dc2) !important;
-}
-
-.btn-info {
-    background-color: #17a2b8 !important;
-    background: linear-gradient(135deg, #17a2b8, #6f42c1) !important;
-    color: white !important;
-}
-
-.btn-info:hover {
-    background-color: #138496 !important;
-    background: linear-gradient(135deg, #138496, #59359a) !important;
-}
-
-.btn-warning {
-    background-color: #ffc107 !important;
-    background: linear-gradient(135deg, #ffc107, #fd7e14) !important;
-    color: #212529 !important;
-}
-
-.btn-warning:hover {
-    background-color: #e0a800 !important;
-    background: linear-gradient(135deg, #e0a800, #e8590c) !important;
-}
-
-.btn-danger {
-    background-color: #dc3545 !important;
-    background: linear-gradient(135deg, #dc3545, #e83e8c) !important;
-    color: white !important;
-}
-
-.btn-danger:hover {
-    background-color: #c82333 !important;
-    background: linear-gradient(135deg, #c82333, #d91a72) !important;
-}
-
-.btn-secondary {
-    background-color: #6c757d !important;
-    background: linear-gradient(135deg, #6c757d, #adb5bd) !important;
-    color: white !important;
-}
-
-.btn-secondary:hover {
-    background-color: #5a6268 !important;
-    background: linear-gradient(135deg, #5a6268, #919ca6) !important;
-}
-
-/* 【修復】特殊按鈕樣式 */
-.action-buttons .btn {
-    min-width: 110px;
-    font-size: 13px;
-    padding: 8px 12px;
-}
-
-.template-buttons .btn {
-    min-width: 130px;
-    margin-bottom: 10px;
-    background-color: #f8f9fa !important;
-    background: linear-gradient(135deg, #f8f9fa, #e9ecef) !important;
-    color: #495057 !important;
-    border: 1px solid #dee2e6 !important;
-}
-
-.template-buttons .btn:hover {
-    background-color: #e9ecef !important;
-    background: linear-gradient(135deg, #e9ecef, #dee2e6) !important;
-    border-color: #adb5bd !important;
-}
-
-.table-container { flex-grow: 1; overflow: auto; border: 1px solid #dee2e6; border-radius: 12px; }
-.distribution-table { border-collapse: collapse; min-width: 1200px; }
-.distribution-table th, .distribution-table td { padding: 12px 10px; text-align: center; border: 1px solid #e9ecef; font-size: 13px; white-space: nowrap; }
-.distribution-table th { background: var(--sidebar-bg, #2c3e50); color: white; font-weight: 600; position: sticky; top: 0; z-index: 10; }
-.distribution-table th:first-child, .distribution-table td:first-child { position: sticky; left: 0; z-index: 6; min-width: 280px; text-align: left; padding-left: 15px; border-right: 2px solid #dee2e6; }
-.distribution-table th:nth-child(2), .distribution-table td:nth-child(2) { position: sticky; left: 280px; z-index: 5; border-right: 2px solid #dee2e6; }
-.distribution-table td:first-child { background-color: #f8f9fa; font-weight: 500; }
-.distribution-table td:nth-child(2) { background-color: rgba(102, 126, 234, 0.1); font-weight: bold; }
-.distribution-table thead th:first-child, .distribution-table thead th:nth-child(2) { background-color: var(--sidebar-bg, #2c3e50); }
-.distribution-table thead th:first-child { z-index: 11; }
-.distribution-table thead th:nth-child(2) { z-index: 10; }
-.item-info { text-align: left; }
-.item-name { font-weight: 500; white-space: normal; }
-.item-details { font-size: 12px; color: #6c757d; margin-top: 4px; }
-.quantity-input { width: 50px; text-align: center; padding: 4px; border: 1px solid #ddd; border-radius: 4px; }
-.quantity-input.has-value { background: #e8f5e8; border-color: #28a745; font-weight: bold; }
-/* 【關鍵修正】: 新增錯誤提示樣式 */
-.total-column.error { background-color: #f8d7da !important; color: #721c24; font-weight: bold; }
-.total-column.error strong { color: #721c24 !important; }
-
-/* Modal 相關樣式 */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-.modal-content { background: #f8f9fa; padding: 30px; border-radius: 15px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
-.modal-content h3 { margin-bottom: 10px; } 
-.modal-content p { color: #666; margin-bottom: 20px; font-size: 14px; }
-.modal-section { margin-bottom: 25px; } 
-.modal-section h4 { margin-bottom: 15px; color: #333; border-left: 4px solid var(--primary-color, #667eea); padding-left: 10px;}
-.modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 30px; }
-.template-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
-.custom-add-section { display: flex; gap: 10px; align-items: center; }
-.custom-add-section input { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ddd; }
-#currentFloorsList { display: flex; flex-wrap: wrap; gap: 10px; background: white; border: 1px solid #ddd; padding: 15px; border-radius: 8px; min-height: 50px; }
-.floor-tag { display: inline-flex; align-items: center; background: #e8f5e8; color: #155724; padding: 6px 12px; border-radius: 20px; font-weight: 500;}
-.floor-tag button { background: none; border: none; color: #721c24; cursor: pointer; font-size: 16px; margin-left: 8px; line-height: 1; }
-.sequence-list-container { max-height: 50vh; overflow-y: auto; background: white; border: 1px solid #ddd; padding: 10px; border-radius: 8px;}
-.sequence-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff; border-radius: 6px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-.drag-handle { cursor: grab; color: #999; padding: 5px; }
-.sequence-input { width: 60px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; margin-right: 15px; }
-.sequence-name { flex-grow: 1; }
-
-/* 【新增】選擇器樣式 */
-.selection-label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 500;
-    color: #333;
-}
-
-.form-select {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    background: white;
-    font-size: 14px;
-    transition: border-color 0.3s ease;
-}
-
-.form-select:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
-}
-
-.form-select:disabled {
-    background-color: #f8f9fa;
-    color: #6c757d;
-    opacity: 0.7;
-}
-
-/* 【新增】內容卡片樣式 */
-.content-card {
-    background: white;
-    border-radius: 15px;
-    padding: 20px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.empty-state {
-    text-align: center;
-    color: #6c757d;
-    padding: 60px 20px;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-.empty-state-icon {
-    font-size: 48px;
-    margin-bottom: 20px;
-}
-
-.empty-state p {
-    font-size: 16px;
-    margin: 0;
-}
-
-/* 【新增】查驗照片欄位樣式 */
-.photo-cell {
-    text-align: center;
-    vertical-align: middle;
-    min-width: 120px; /* 給予足夠寬度容納按鈕和圖示 */
-}
-
-.btn-upload-photo {
-    background-color: #6c757d;
-    color: white;
-    padding: 4px 8px;
-    font-size: 12px;
-    margin-right: 8px;
-    border-radius: 4px;
-    border: none;
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-
-.btn-upload-photo:hover {
-    background-color: #5a6268;
-}
-
-.photo-indicator {
-    font-size: 18px;
-    color: #cccccc; /* 預設為灰色，表示無照片 */
-    cursor: pointer;
-    transition: color 0.3s;
-    vertical-align: middle; /* 垂直置中 */
-}
-
-.photo-indicator.active {
-    color: #ffc107; /* 有照片時變為黃色 */
-}
-
-.photo-indicator:hover {
-    opacity: 0.8;
-}
-
-/* 【新增】查驗照片欄位樣式 (如果已存在，會被覆蓋更新) */
-.photo-cell {
-    text-align: center;
-    vertical-align: middle;
-    min-width: 120px;
-}
-.btn-upload-photo {
-    background-color: #6c757d;
-    color: white;
-    padding: 4px 8px;
-    font-size: 12px;
-    margin-right: 8px;
-    border-radius: 4px;
-    border: none;
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-.btn-upload-photo:hover {
-    background-color: #5a6268;
-}
-.photo-indicator {
-    font-size: 18px;
-    color: #cccccc;
-    cursor: pointer;
-    transition: color 0.3s;
-    vertical-align: middle;
-}
-.photo-indicator.active {
-    color: #ffc107;
-}
-.photo-indicator:hover {
-    opacity: 0.8;
-}
-
-/* 【新增】照片預覽 Modal 樣式 */
-.photo-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 15px;
-    padding: 15px 0;
-    max-height: 60vh;
-    overflow-y: auto;
-    background-color: #f1f3f5;
-    border-radius: 8px;
-    min-height: 100px;
-}
-
-.photo-thumbnail {
-    position: relative;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    overflow: hidden;
-    height: 120px;
-    background-color: #fff;
-}
-
-.photo-thumbnail a {
-    display: block;
-    width: 100%;
-    height: 100%;
-}
-
-.photo-thumbnail img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.3s;
-}
-
-.photo-thumbnail img:hover {
-    transform: scale(1.1);
-}
-
-.photo-delete-btn {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    background-color: rgba(220, 53, 69, 0.8);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    cursor: pointer;
-    font-size: 14px;
-    line-height: 24px;
-    text-align: center;
-    opacity: 0;
-    transition: opacity 0.3s;
+.distribution-page-wrapper .distribution-table th {
+    background: var(--sidebar-bg);
+    color: var(--white);
+    font-weight: var(--font-weight-semibold);
+    position: sticky;
+    top: 0;
     z-index: 10;
 }
-
-.photo-thumbnail:hover .photo-delete-btn {
-    opacity: 1;
+.distribution-page-wrapper .distribution-table th:first-child, 
+.distribution-page-wrapper .distribution-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 6;
+    min-width: 280px;
+    text-align: left;
+    border-right: 2px solid var(--gray-400);
+}
+.distribution-page-wrapper .distribution-table td:first-child {
+    background-color: var(--gray-50);
+}
+.distribution-page-wrapper .total-column.error {
+    background-color: rgba(230, 57, 70, 0.1) !important;
+    color: var(--danger-color);
+}
+.distribution-page-wrapper .quantity-input {
+    width: 60px;
+    text-align: center;
+    padding: 4px;
+    border: 1px solid var(--gray-400);
+    border-radius: 4px;
+}
+.distribution-page-wrapper .quantity-input.has-value {
+    background: rgba(32, 201, 151, 0.1);
+    border-color: var(--success-color);
+    font-weight: bold;
 }
