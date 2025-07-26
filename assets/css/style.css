@@ -652,3 +652,174 @@ body, html {
   border-top: 2px solid var(--primary-color-dark); /* 在新段落上方加上一條粗線 */
   background-color: var(--background-color-light);  /* 給予淡淡的背景色 */
 }
+
+/* --- 標單詳情頁面 --- */
+.detail-page .header-card .header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.detail-page .header-info h1 {
+  font-size: var(--font-size-display);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--spacing-sm);
+}
+
+.detail-page .header-meta {
+  display: flex;
+  gap: var(--spacing-lg);
+  color: var(--text-light);
+  font-size: var(--font-size-base);
+  flex-wrap: wrap;
+}
+
+.detail-page .header-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  align-items: flex-end;
+}
+
+.detail-page .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+.detail-page .stat-card {
+  background: var(--card-bg-glass);
+  backdrop-filter: var(--card-backdrop-filter);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  text-align: center;
+  box-shadow: var(--shadow-md);
+}
+
+.detail-page .stat-number {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--spacing-sm);
+}
+.detail-page .stat-number.amount { color: var(--success-color); }
+.detail-page .stat-number.progress { color: var(--primary-color-start); }
+
+.detail-page .stat-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-light);
+}
+
+.detail-page .tab-navigation {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xl);
+  border-bottom: 2px solid var(--gray-border);
+}
+
+.detail-page .tab-btn {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-light);
+  border-bottom: 3px solid transparent;
+  transition: all var(--transition-base);
+}
+
+.detail-page .tab-btn:hover {
+  color: var(--text-dark);
+}
+
+.detail-page .tab-btn.active {
+  color: var(--primary-color-start);
+  border-bottom-color: var(--primary-color-start);
+}
+
+.detail-page .tab-content { display: none; }
+.detail-page .tab-content.active { display: block; animation: fadeIn 0.5s; }
+
+.detail-page .info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.detail-page .info-card {
+  background: var(--white);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.detail-page .info-card h3 {
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--gray-border);
+}
+
+.detail-page .info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--spacing-sm) 0;
+  font-size: var(--font-size-base);
+}
+.detail-page .info-label { color: var(--text-light); }
+
+.detail-page .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+.detail-page .major-item-card {
+  background: var(--white);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-md);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.detail-page .major-item-header {
+  padding: var(--spacing-md) var(--spacing-lg);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--gray-light);
+}
+.detail-page .major-item-header:hover { background-color: var(--gray-border); }
+
+.detail-page .major-item-header h4 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.detail-page .detail-items-summary {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease-in-out;
+}
+.detail-page .detail-items-summary.expanded {
+  max-height: 2000px; /* 一個足夠大的值 */
+}
+
+.detail-page .data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.detail-page .data-table th, .detail-page .data-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--gray-border);
+}
+.detail-page .data-table th {
+  background-color: var(--gray-light);
+}
