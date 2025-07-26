@@ -1,18 +1,63 @@
-/* --- 主控台頁面專屬樣式 (dashboard.css) --- */
-.welcome-section { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 15px; margin-bottom: 25px; box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3); }
-.welcome-section h1 { font-size: 2rem; margin-bottom: 5px; }
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 25px; }
-.stats-card { background-color: var(--header-bg); padding: 20px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; flex-direction: column; }
-.stats-icon { font-size: 2rem; margin-bottom: 10px; }
-.stats-value { font-size: 2.2rem; font-weight: bold; color: var(--text-primary); }
-.stats-label { font-size: 0.9rem; color: var(--text-secondary); margin-top: 5px; flex-grow: 1; }
-.stats-change { font-size: 0.8rem; margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0f0f0; }
-.quick-actions, .recent-activity { background-color: var(--header-bg); padding: 25px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); margin-bottom: 25px; }
-.actions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
-.action-card { background-color: #f8f9fa; padding: 20px; border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.3s ease; border: 1px solid #f0f0f0; }
-.action-card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08); border-color: var(--sidebar-active-border); }
-.action-icon { font-size: 2.5rem; display: block; margin-bottom: 15px; }
-.activity-list { list-style-type: none; }
-.activity-item { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #f0f0f0; }
-.activity-item:last-child { border-bottom: none; }
-.activity-icon { font-size: 1.5rem; margin-right: 15px; padding: 10px; border-radius: 50%; background-color: #f0f0f0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+/* assets/css/dashboard.css - v2.0 (已隔離) */
+.dashboard-page .dashboard-header {
+    background: var(--gradient-primary);
+    color: var(--white);
+    padding: var(--spacing-xl);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    margin-bottom: var(--spacing-xl);
+}
+.dashboard-page .dashboard-header .page-subtitle {
+    color: rgba(255, 255, 255, 0.8);
+}
+.dashboard-page .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+}
+.dashboard-page .stat-card {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    text-align: center;
+}
+.dashboard-page .stat-icon {
+    font-size: var(--font-size-xxl);
+    margin-bottom: var(--spacing-sm);
+}
+.dashboard-page .stat-value {
+    font-size: var(--font-size-display);
+    font-weight: var(--font-weight-bold);
+}
+.dashboard-page .stat-label {
+    font-size: var(--font-size-sm);
+    opacity: 0.8;
+}
+
+.dashboard-page .activity-list {
+    list-style-type: none;
+    margin-top: var(--spacing-lg);
+}
+.dashboard-page .activity-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) 0;
+    border-bottom: 1px solid var(--gray-200);
+}
+.dashboard-page .activity-item:last-child {
+    border-bottom: none;
+}
+.dashboard-page .activity-icon {
+    font-size: var(--font-size-xl);
+    background: var(--gray-100);
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
