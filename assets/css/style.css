@@ -263,3 +263,23 @@ body, html {
 .dashboard-page .activity-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; color: white; flex-shrink: 0; }
 .dashboard-page .activity-icon.project { background: var(--primary-color-start); }
 .dashboard-page .activity-icon.tender { background: var(--success-color); }
+
+/* --- 採購管理頁面 --- */
+.procurement-page .filter-section { background: var(--gray-light); border-radius: var(--radius-md); padding: var(--spacing-lg); margin-bottom: var(--spacing-xl); }
+.procurement-page .filter-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--spacing-md); align-items: end; }
+.procurement-page .procurement-table-container { overflow-x: auto; } /* 讓表格可以水平滾動 */
+.procurement-page #procurementTable { min-width: 1200px; /* 給表格一個最小寬度以觸發滾動 */ }
+.procurement-page #procurementTable .major-item-header > td {
+    background-color: var(--header-dark-bg) !important;
+    color: var(--white) !important;
+    font-weight: var(--font-weight-semibold);
+    position: sticky; /* 讓大項目標題在水平滾動時固定 */
+    left: 0;
+    z-index: 2;
+}
+.procurement-page #procurementTable thead th {
+    position: sticky; /* 讓表頭在垂直滾動時固定 */
+    top: 0;
+    z-index: 3;
+    background-color: var(--gray-light); /* 確保固定時有背景色 */
+}
