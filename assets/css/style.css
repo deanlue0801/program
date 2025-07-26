@@ -823,3 +823,61 @@ body, html {
 .detail-page .data-table th {
   background-color: var(--gray-light);
 }
+/* --- 編輯頁面 --- */
+.edit-page .summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.edit-page .summary-card {
+  background-color: var(--gray-light);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  text-align: center;
+  border-left: 4px solid;
+}
+
+.edit-page .summary-card .summary-label {
+  font-size: var(--font-size-base);
+  color: var(--text-light);
+  margin-bottom: var(--spacing-sm);
+}
+
+.edit-page .summary-card .summary-value {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+}
+
+/* --- 編輯頁面 Modal --- */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--gray-border);
+  padding-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.modal-close {
+  border: none;
+  background: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-light);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  border-top: 1px solid var(--gray-border);
+  padding-top: var(--spacing-lg);
+  margin-top: var(--spacing-lg);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-lg);
+}
