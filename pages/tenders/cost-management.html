@@ -1,68 +1,73 @@
-<div class="page-container">
+<!-- pages/tenders/cost-management.html -->
+<div class="cost-management-page">
     <div class="page-header">
-        <h1 class="page-title">成本控管分析</h1>
+        <h1 class="page-title">💰 成本控管分析</h1>
         <p class="page-subtitle">分析標單的原始合約、追加項目與總金額的變化。</p>
     </div>
 
-    <section class="selection-panel card">
-        <div class="selection-grid">
-            <div>
-                <label class="selection-label" for="projectSelect">📁 選擇專案</label>
-                <select class="form-select" id="projectSelect"></select>
+    <!-- 篩選區域 -->
+    <div class="content-card filter-section">
+        <div class="filter-row">
+            <div class="form-group">
+                <label for="projectSelect">📁 選擇專案</label>
+                <select id="projectSelect" class="form-control"></select>
             </div>
-            <div>
-                <label class="selection-label" for="tenderSelect">📋 選擇標單</label>
-                <select class="form-select" id="tenderSelect" disabled></select>
+            <div class="form-group">
+                <label for="tenderSelect">📋 選擇標單</label>
+                <select id="tenderSelect" class="form-control" disabled></select>
             </div>
         </div>
-    </section>
+    </div>
 
+    <!-- 載入中動畫 -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>載入成本分析資料中...</p>
+    </div>
+
+    <!-- 主要報表內容區 -->
     <div id="mainContent" style="display: none;">
-        <div id="loading" class="loading" style="display: none;">
-            <div class="spinner"></div>
-            <p>載入資料中...</p>
-        </div>
-
+        <!-- 主要統計卡片 -->
         <div class="stats-grid-4">
-            <div class="stat-card-lg">
+            <div class="stat-card-lg original">
                 <div class="stat-label">原始合約金額</div>
                 <div class="stat-value" id="originalAmount">NT$ 0</div>
             </div>
-            <div class="stat-card-lg">
+            <div class="stat-card-lg addition">
                 <div class="stat-label">追加項目總金額</div>
                 <div class="stat-value" id="additionAmount">NT$ 0</div>
             </div>
-            <div class="stat-card-lg">
+            <div class="stat-card-lg total">
                 <div class="stat-label">目前總金額</div>
                 <div class="stat-value" id="totalAmount">NT$ 0</div>
             </div>
-            <div class="stat-card-lg">
+            <div class="stat-card-lg percentage">
                 <div class="stat-label">增幅比例</div>
                 <div class="stat-value increase" id="increasePercentage">0%</div>
             </div>
         </div>
 
-        <div class="card" style="margin-bottom: 2rem; padding: 1.5rem;">
-             <div style="display: flex; justify-content: space-around; text-align: center;">
-                <div>
-                    <div class="stat-label">大項目總數</div>
-                    <div class="stat-value" style="font-size: 1.5rem;" id="majorItemsCount">0</div>
-                </div>
-                 <div>
-                    <div class="stat-label">細項總數</div>
-                    <div class="stat-value" style="font-size: 1.5rem;" id="detailItemsCount">0</div>
-                </div>
-                 <div>
-                    <div class="stat-label">追加項目數</div>
-                    <div class="stat-value" style="font-size: 1.5rem;" id="additionItemsCount">0</div>
-                </div>
+        <!-- 次要統計卡片 -->
+        <div class="content-card secondary-stats">
+            <div>
+                <div class="stat-label">大項目總數</div>
+                <div class="stat-value" id="majorItemsCount">0</div>
+            </div>
+            <div>
+                <div class="stat-label">細項總數</div>
+                <div class="stat-value" id="detailItemsCount">0</div>
+            </div>
+            <div>
+                <div class="stat-label">追加項目數</div>
+                <div class="stat-value" id="additionItemsCount">0</div>
             </div>
         </div>
 
-        <div class="card">
-            <h3 style="padding: 1rem 1.5rem 0; margin: 0;">追加/追減項目明細</h3>
+        <!-- 追加項目明細表 -->
+        <div class="content-card">
+            <h3 class="content-subtitle">追加/追減項目明細</h3>
             <div class="table-container">
-                <table class="data-table">
+                <table class="table">
                     <thead>
                         <tr>
                             <th style="width: 10%;">項次</th>
@@ -74,13 +79,16 @@
                         </tr>
                     </thead>
                     <tbody id="additionItemsTableBody">
-                        </tbody>
+                    </tbody>
                 </table>
             </div>
         </div>
     </div>
     
-    <div id="emptyState" class="empty-state" style="display: flex;">
+    <!-- 預設提示訊息 -->
+    <div class="empty-state" id="emptyState" style="display: flex;">
+        <div class="empty-state-icon">📊</div>
+        <h3>請選擇專案與標單</h3>
         <p>請從上方選擇「專案」與「標單」以載入成本分析報告。</p>
     </div>
 </div>
