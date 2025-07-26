@@ -1,61 +1,67 @@
-<div class="distribution-page-wrapper">
-    <section class="selection-panel">
-        <div class="selection-grid">
-            <div>
-                <label class="selection-label" for="projectSelect">📁 選擇專案</label>
-                <select class="form-select" id="projectSelect">
-                    <option value="">載入中...</option>
-                </select>
+<!-- pages/tenders/distribution.html -->
+<div class="distribution-page">
+    <div class="page-header">
+        <h1 class="page-title">🏢 分配管理</h1>
+    </div>
+
+    <!-- 篩選區域 -->
+    <div class="content-card filter-section">
+        <div class="filter-row">
+            <div class="form-group">
+                <label for="projectSelect">📁 選擇專案</label>
+                <select id="projectSelect" class="form-control"></select>
             </div>
-            <div>
-                <label class="selection-label" for="tenderSelect">📋 選擇標單</label>
-                <select class="form-select" id="tenderSelect" disabled>
-                    <option value="">請先選擇專案</option>
-                </select>
+            <div class="form-group">
+                <label for="tenderSelect">📋 選擇標單</label>
+                <select id="tenderSelect" class="form-control" disabled></select>
             </div>
-            <div>
-                <label class="selection-label" for="majorItemSelect">🔧 選擇大項目</label>
-                <select class="form-select" id="majorItemSelect" disabled>
-                    <option value="">請先選擇標單</option>
-                </select>
+            <div class="form-group">
+                <label for="majorItemSelect">🔧 選擇大項目</label>
+                <select id="majorItemSelect" class="form-control" disabled></select>
             </div>
         </div>
-    </section>
+    </div>
 
-    <div class="distribution-body">
-        <div class="loading" style="display: none;">
+    <!-- 主要內容區 -->
+    <div class="content-card" id="distribution-body">
+        <!-- 載入中動畫 -->
+        <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p>載入資料中...</p>
+            <p>載入分配資料中...</p>
         </div>
 
+        <!-- 主要內容 -->
         <div id="mainContent" style="display: none;">
             <div class="actions-panel">
-                <h2 style="color: #333; font-size: 20px;">樓層數量分配</h2>
+                <h2 class="content-subtitle">樓層數量分配</h2>
                 <div class="action-buttons">
-                    <button id="saveDistributionsBtn" class="btn btn-success">💾 儲存所有分配</button>
-                    <button id="clearDistributionsBtn" class="btn btn-danger">🗑️ 清空此大項分配</button>
+                    <button id="saveDistributionsBtn" class="btn btn-success">💾 儲存</button>
+                    <button id="clearDistributionsBtn" class="btn btn-danger">🗑️ 清空</button>
                     <button id="floorManagerBtn" class="btn btn-info">🏢 管理樓層</button>
                     <button id="sequenceManagerBtn" class="btn btn-primary">🔄 管理項次</button>
-                    <button id="importBtn" class="btn btn-primary">📥 匯入 Excel</button>
+                    <button id="importBtn" class="btn btn-primary">📥 匯入</button>
                     <input type="file" id="importInput" accept=".xlsx, .xls" style="display: none;">
-                    <button id="exportBtn" class="btn btn-warning">📤 匯出 Excel</button>
+                    <button id="exportBtn" class="btn btn-warning">📤 匯出</button>
                 </div>
             </div>
-            <div class="table-container">
-                <table class="distribution-table">
+            <div class="table-container distribution-table-container">
+                <table class="table distribution-table">
                     <thead id="tableHeader"></thead>
                     <tbody id="tableBody"></tbody>
                 </table>
             </div>
         </div>
         
-        <div id="emptyState" class="empty-state" style="display: flex;">
+        <!-- 預設提示訊息 -->
+        <div class="empty-state" id="emptyState" style="display: flex;">
             <div class="empty-state-icon">↖️</div>
-            <p>請從上方的下拉選單選擇「專案」、「標單」及「大項目」以開始作業</p>
+            <h3>請選擇專案、標單及大項目</h3>
+            <p>請從上方的下拉選單選擇以開始作業</p>
         </div>
     </div>
 </div>
 
+<!-- 樓層管理 Modal -->
 <div id="floorModal" class="modal-overlay">
     <div class="modal-content">
         <h3>🏢 樓層設定管理</h3>
@@ -63,9 +69,9 @@
         <div class="modal-section">
             <h4>樣板快速新增</h4>
             <div class="template-buttons" id="templateButtons">
-                <button class="btn" data-template="B1-10F">B1 ~ 10F</button>
-                <button class="btn" data-template="1F-20F">1F ~ 20F</button>
-                <button class="btn" data-template="B3-15F_R">B3 ~ 15F + R</button>
+                <button class="btn btn-secondary btn-sm" data-template="B1-10F">B1 ~ 10F</button>
+                <button class="btn btn-secondary btn-sm" data-template="1F-20F">1F ~ 20F</button>
+                <button class="btn btn-secondary btn-sm" data-template="B3-15F_R">B3 ~ 15F + R</button>
             </div>
         </div>
         <div class="modal-section">
@@ -77,7 +83,7 @@
         </div>
         <div class="modal-section">
             <h4>🎯 目前樓層設定 (可拖曳排序)</h4>
-            <div id="currentFloorsList"></div>
+            <div id="currentFloorsList" class="sortable-list"></div>
         </div>
         <div class="modal-actions">
             <button id="clearAllFloorsBtn" class="btn btn-danger">🗑️ 清空所有</button>
@@ -89,12 +95,13 @@
     </div>
 </div>
 
+<!-- 項次排序 Modal -->
 <div id="sequenceModal" class="modal-overlay">
     <div class="modal-content">
-         <h3>🔄 細項排序管理</h3>
+        <h3>🔄 細項排序管理</h3>
         <p>拖曳項目調整順序，或直接修改項次編號。此順序將會影響分配表的顯示。</p>
-        <div class="sequence-list-container" id="sequenceList">
-            </div>
+        <div class="sequence-list-container sortable-list" id="sequenceList">
+        </div>
         <div class="modal-actions">
             <button id="resetOrderBtn" class="btn btn-warning">🔄 重置為原始順序</button>
             <div>
