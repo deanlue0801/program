@@ -19,9 +19,9 @@
   --gray-light: #f8f9fa;
   --gray-border: #dee2e6;
 
-  /* 背景 */
-  --app-bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  --card-bg-glass: rgba(255, 255, 255, 0.85);
+  /* 背景 - 【關鍵修正】恢復您原始的藍紫色漸層背景 */
+  --app-bg-gradient: linear-gradient(135deg, #66eac0 0%, #4b6ba2 100%);
+  --card-bg-glass: rgba(255, 255, 255, 0.9);
   --card-backdrop-filter: blur(10px);
 
   /* 字體 */
