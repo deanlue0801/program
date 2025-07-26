@@ -632,3 +632,23 @@ body, html {
 .tracking-setup-page input:checked + .slider:before {
   transform: translateX(26px);
 }
+/* --- 採購頁面表格優化 --- */
+#mainContent.content-card {
+  padding: var(--spacing-md);
+}
+
+.table-container .table {
+  border-spacing: 0; /* 移除單元格間距，讓 border-collapse 生效 */
+}
+
+.table-container .table th,
+.table-container .table td {
+  vertical-align: middle; /* 垂直置中 */
+  padding: var(--spacing-sm) var(--spacing-md); /* 調整內間距 */
+}
+
+/* 【關鍵】大項目分隔樣式 */
+.table-container .table tr.major-item-start td {
+  border-top: 2px solid var(--primary-color-dark); /* 在新段落上方加上一條粗線 */
+  background-color: var(--background-color-light);  /* 給予淡淡的背景色 */
+}
