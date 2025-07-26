@@ -1,59 +1,25 @@
-/* assets/css/procurement.css */
-
-/* --- 原有樣式 --- */
-.procurement-body .table-container {
-    margin-top: 1rem;
+/* assets/css/procurement.css - v2.0 (已隔離) */
+.procurement-page .table-container {
+    margin-top: var(--spacing-md);
 }
-
-.item-row.status-completed { background-color: #e9f5e9; }
-.item-row.status-active { background-color: #fff8e1; }
-
-.order-list {
+.procurement-page .order-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--spacing-sm);
 }
-
-.order-chip {
-    display: inline-flex;
-    align-items: center;
-    background-color: #e9ecef;
-    border-radius: 12px;
-    padding: 4px 8px;
-    font-size: 12px;
+.procurement-page .order-chip {
+    background-color: var(--gray-200);
+    border-radius: var(--radius-full);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
 }
-
-.order-chip.status-已下訂 { background-color: #cfe2ff; }
-.order-chip.status-已到貨 { background-color: #d1e7dd; }
-.order-chip.status-已付款 { background-color: #e2e3e5; }
-
-.btn-edit-order {
-    background: none;
-    border: none;
-    cursor: pointer;
-    margin-left: 4px;
-    padding: 0;
-    opacity: 0.5;
-}
-.btn-edit-order:hover {
-    opacity: 1;
-}
-
-/* --- 【關鍵修正】新增以下高優先級規則以解決顯示問題 --- */
-#procurementTable > tbody > .major-item-header > td {
-    /* 樣式設定 */
+/* 關鍵修正：確保此規則只在採購頁生效 */
+.procurement-page #procurementTable > tbody > .major-item-header > td {
     background-color: #34495e !important;
-    color: #ffffff !important;
-    font-weight: 600 !important;
-    text-align: left !important;
-    padding: 0.8rem 1rem !important;
-    border-top: 2px solid #2c3e50 !important;
-    border-bottom: 1px solid #2c3e50 !important;
-
-    /* 關鍵覆蓋規則 */
-    position: static !important;
+    color: var(--white) !important;
+    font-weight: var(--font-weight-semibold);
+    position: static !important; /* 取消固定 */
     min-width: 100% !important;
     left: auto !important;
     z-index: auto !important;
-    border-right: none !important;
 }
