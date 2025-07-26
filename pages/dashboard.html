@@ -1,59 +1,49 @@
-<!-- pages/dashboard.html -->
-<div class="dashboard-page">
-
-    <!-- 歡迎區域 -->
-    <div class="welcome-section">
-        <h1 id="welcomeMessage">歡迎回來！</h1>
-        <p>這裡是您的專案管理主控台，可以快速查看專案狀態和執行各種操作。</p>
-    </div>
-
-    <!-- 統計數據 -->
-    <div class="stats-grid">
-        <div class="stats-card">
-            <div class="stats-icon">📂</div>
-            <div class="stats-value" id="totalProjects">-</div>
-            <div class="stats-label">進行中專案</div>
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <div id="welcomeMessage">
+            <h1 class="page-title">歡迎回來！</h1>
+            <p class="page-subtitle">這是您所有專案的即時總覽。</p>
         </div>
-        <div class="stats-card">
-            <div class="stats-icon">📋</div>
-            <div class="stats-value" id="totalTenders">-</div>
-            <div class="stats-label">標單總數</div>
-        </div>
-        <div class="stats-card">
-            <div class="stats-icon">💰</div>
-            <div class="stats-value" id="totalAmount">-</div>
-            <div class="stats-label">總金額</div>
-        </div>
-    </div>
-
-    <!-- 快速操作 -->
-    <div class="quick-actions">
-        <h2>🚀 快速操作</h2>
-        <div class="actions-grid">
-            <a href="/program/projects/create" data-route class="action-card">
-                <span class="action-icon">➕</span>
-                <div class="action-title">建立專案</div>
-                <div class="action-desc">開始一個新的建設專案</div>
-            </a>
-            <a href="/program/tenders/import" data-route class="action-card">
-                <span class="action-icon">📊</span>
-                <div class="action-title">匯入標單</div>
-                <div class="action-desc">從 EXCEL 快速匯入資料</div>
-            </a>
-            <a href="/program/tenders/list" data-route class="action-card">
-                <span class="action-icon">📋</span>
-                <div class="action-title">標單管理</div>
-                <div class="action-desc">查看和管理所有標單</div>
-            </a>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon project">📁</div>
+                <div class="stat-value" id="projectCount">0</div>
+                <div class="stat-label">進行中專案</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon tender">📋</div>
+                <div class="stat-value" id="tenderCount">0</div>
+                <div class="stat-label">標單總數</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon amount">💰</div>
+                <div class="stat-value" id="totalAmount">NT$ 0</div>
+                <div class="stat-label">合約總金額</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon time">⏰</div>
+                <div class="stat-value" id="lastUpdate">--:--</div>
+                <div class="stat-label">最後更新</div>
+            </div>
         </div>
     </div>
 
-    <!-- 最近活動 -->
-    <div class="recent-activity">
-        <h2>📝 最近活動</h2>
-        <ul class="activity-list" id="recentActivity">
-            <!-- 活動項目將由 JS 動態載入 -->
-        </ul>
+    <div class="dashboard-main-content">
+        <div class="content-card recent-activity">
+            <h3 class="card-title">最近活動</h3>
+            <ul class="activity-list" id="activityList">
+                <li class="activity-item">
+                    <div class="activity-icon">ℹ️</div>
+                    <div class="activity-content">
+                        <div class="activity-title">載入活動中...</div>
+                    </div>
+                </li>
+            </ul>
+        </div>
     </div>
+</div>
 
+<div id="loading" class="loading" style="display: flex;">
+    <div class="spinner"></div>
+    <p>載入儀表板資料中...</p>
 </div>
