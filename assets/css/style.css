@@ -1,96 +1,170 @@
 /* =================================================================
-   1. 核心設計系統 (Design Tokens) - 美化升級
+   1. 核心設計系統 (Design Tokens) - 參考您的原始風格
    ================================================================= */
 :root {
-  --primary-color: #6a5acd; --primary-hover: #594ab7; --secondary-color: #adb5bd;
-  --accent-color: #fd7e14;
-  --success-color: #20c997; --warning-color: #ffc107; --danger-color: #e63946; --info-color: #17a2b8;
-  --white: #ffffff; --gray-50: #f8f9fa; --gray-100: #f1f3f5; --gray-200: #e9ecef; --gray-400: #ced4da; --gray-600: #6c757d; --gray-800: #343a40;
-  --text-primary: var(--gray-800); --text-secondary: var(--gray-600);
-  --app-bg: #f4f7f9; --sidebar-bg: #2c3e50; --sidebar-text: #ecf0f1; --card-bg: var(--white);
-  --gradient-primary: linear-gradient(135deg, #6a5acd, #9370db);
-  --gradient-success: linear-gradient(135deg, #28a745, #20c997);
+  /* 顏色 */
+  --primary-color-start: #667eea;
+  --primary-color-end: #764ba2;
+  --success-color: #28a745;
+  --info-color: #17a2b8;
+  --warning-color: #ffc107;
+  --danger-color: #dc3545;
+  --text-dark: #333;
+  --text-light: #666;
+  --white: #ffffff;
+  --gray-light: #f8f9fa;
+  --gray-border: #dee2e6;
+
+  /* 背景 */
+  --app-bg-gradient: linear-gradient(135deg, var(--primary-color-start) 0%, var(--primary-color-end) 100%);
+  --card-bg-glass: rgba(255, 255, 255, 0.9);
+  --card-backdrop-filter: blur(10px);
+
+  /* 字體 */
   --font-family-base: 'Microsoft JhengHei', 'Segoe UI', system-ui, sans-serif;
-  --font-size-xs: 0.75rem; --font-size-sm: 0.875rem; --font-size-base: 1rem; --font-size-lg: 1.125rem; --font-size-xl: 1.25rem; --font-size-xxl: 1.5rem; --font-size-display: 2.25rem;
-  --font-weight-medium: 500; --font-weight-semibold: 600; --font-weight-bold: 700;
-  --spacing-xs: 0.25rem; --spacing-sm: 0.5rem; --spacing-md: 1rem; --spacing-lg: 1.5rem; --spacing-xl: 2rem;
-  --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px; --radius-full: 9999px;
-  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05); --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08); --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
-  --shadow-focus: 0 0 0 3px rgba(106, 90, 205, 0.2);
-  --transition-base: 0.2s ease-in-out;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 24px;
+  --font-size-display: 28px;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* 間距與圓角 */
+  --spacing-sm: 8px;
+  --spacing-md: 15px;
+  --spacing-lg: 20px;
+  --spacing-xl: 30px;
+  --radius-md: 8px;
+  --radius-lg: 15px;
+
+  /* 陰影 */
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
+
+  /* 過渡效果 */
+  --transition-base: 0.3s ease;
 }
 
 /* =================================================================
-   2. 全局佈局 (Layout)
+   2. 全局與佈局樣式
    ================================================================= */
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body, html { font-family: var(--font-family-base); background-color: var(--app-bg); height: 100%; color: var(--text-primary); }
-.app-layout { display: flex; height: 100vh; }
-.sidebar { width: 250px; background-color: var(--sidebar-bg); color: var(--sidebar-text); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; height: 100%; z-index: 1000; box-shadow: var(--shadow-lg); }
-.nav-list { list-style-type: none; flex-grow: 1; overflow-y: auto; padding: var(--spacing-sm) 0; }
-.nav-list li a { display: block; color: var(--sidebar-text); text-decoration: none; padding: var(--spacing-sm) var(--spacing-lg); margin: var(--spacing-xs) var(--spacing-sm); border-radius: var(--radius-md); transition: all 0.2s ease; }
-.nav-list li a:hover { background-color: rgba(255, 255, 255, 0.1); }
-.nav-list li a.active { background-color: var(--primary-color); font-weight: var(--font-weight-semibold); }
-.main-content { flex-grow: 1; margin-left: 250px; padding: var(--spacing-xl); width: calc(100% - 250px); overflow: auto; }
-.content-card { background: var(--card-bg); border-radius: var(--radius-xl); padding: var(--spacing-xl); box-shadow: var(--shadow-lg); margin-bottom: var(--spacing-lg); }
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-lg); flex-wrap: wrap; gap: var(--spacing-md); }
-.page-title { font-size: var(--font-size-display); font-weight: var(--font-weight-bold); margin: 0; }
-
-/* =================================================================
-   3. 通用組件 (Components) - 美化升級
-   ================================================================= */
-.btn { padding: var(--spacing-sm) var(--spacing-lg); border: 1px solid transparent; border-radius: var(--radius-md); cursor: pointer; font-size: var(--font-size-base); font-weight: var(--font-weight-medium); transition: all var(--transition-base); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: var(--spacing-sm); }
-.btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-.btn-primary { background: var(--gradient-primary); color: var(--white); border: none; }
-.btn-success { background: var(--gradient-success); color: var(--white); border: none; }
-/* 【升級】讓次要按鈕不再是灰色，而是有設計感的輪廓按鈕 */
-.btn-secondary { background-color: var(--white); color: var(--text-secondary); border-color: var(--gray-400); }
-.btn-secondary:hover { background-color: var(--gray-100); border-color: var(--gray-600); color: var(--text-primary); }
-/* 【新增】更多有意義的按鈕顏色 */
-.btn-info { background-color: var(--info-color); color: var(--white); border: none; }
-.btn-warning { background-color: var(--warning-color); color: var(--text-primary); border: none; }
-.btn-danger { background-color: var(--danger-color); color: var(--white); border: none; }
-/* 【新增】更小的按鈕，用於表格內 */
-.btn-sm { padding: var(--spacing-xs) var(--spacing-sm); font-size: var(--font-size-sm); }
-
-.form-group { margin-bottom: var(--spacing-lg); }
-.form-label { display: block; margin-bottom: var(--spacing-sm); font-weight: var(--font-weight-medium); }
-.form-control { width: 100%; padding: var(--spacing-sm) var(--spacing-md); border: 1px solid var(--gray-400); border-radius: var(--radius-md); font-size: var(--font-size-base); }
-.table-container { background: var(--white); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-md); border: 1px solid var(--gray-200); }
-.table { width: 100%; border-collapse: collapse; }
-.table thead th { background: var(--gray-50); padding: var(--spacing-md); text-align: left; font-weight: var(--font-weight-semibold); }
-.table tbody td { padding: var(--spacing-md); border-bottom: 1px solid var(--gray-100); }
-/* 【升級】為表格加上斑馬條紋 */
-.table tbody tr:nth-child(even) { background-color: var(--gray-50); }
-.table tbody tr:hover { background-color: var(--gray-200); }
-
-/* =================================================================
-   4. 頁面專屬樣式 (Scoped Page Styles) - 美化升級
-   ================================================================= */
-
-/* --- 標單列表頁面 (tenders-list-page) --- */
-.tenders-list-page .filter-section { background-color: var(--white); padding: var(--spacing-lg); border-radius: var(--radius-lg); margin-bottom: var(--spacing-xl); border: 1px solid var(--gray-200); }
-.tenders-list-page .filter-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-lg); align-items: flex-end; }
-.tenders-list-page .filter-row .form-group { margin-bottom: 0; }
-.tenders-list-page .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--spacing-lg); margin-bottom: var(--spacing-xl); }
-/* 【升級】讓摘要卡片更有設計感 */
-.tenders-list-page .summary-card {
-    background-color: var(--white);
-    padding: var(--spacing-lg);
-    border-radius: var(--radius-lg);
-    text-align: center;
-    border: 1px solid var(--gray-200);
-    box-shadow: var(--shadow-sm);
-    transition: all var(--transition-base);
-    border-top: 4px solid var(--primary-color);
+body, html {
+  font-family: var(--font-family-base);
+  background: var(--app-bg-gradient);
+  min-height: 100vh;
+  color: var(--text-dark);
 }
-.tenders-list-page .summary-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
-.tenders-list-page .summary-value { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); color: var(--primary-color); }
-.tenders-list-page .summary-label { font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: var(--spacing-xs); }
-.tenders-list-page .project-group-header td { background-color: var(--gray-200); font-weight: var(--font-weight-semibold); border-top: 2px solid var(--gray-400); }
-.tenders-list-page .empty-state { text-align: center; padding: var(--spacing-xl) 0; }
-.tenders-list-page .loading { display: flex; justify-content: center; align-items: center; padding: var(--spacing-xl); gap: var(--spacing-md); color: var(--text-secondary); }
-.tenders-list-page .spinner { width: 24px; height: 24px; border: 3px solid var(--gray-200); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
+.main-content {
+  flex-grow: 1;
+  margin-left: 0; /* 在此設計中，我們讓內容區填滿，側邊欄覆蓋其上 */
+  padding: var(--spacing-lg);
+  width: 100%;
+  overflow: auto;
+}
+.sidebar {
+  width: 250px;
+  background: rgba(44, 62, 80, 0.9); /* 讓側邊欄也帶有玻璃質感 */
+  backdrop-filter: var(--card-backdrop-filter);
+  color: var(--white);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100%;
+  z-index: 1000;
+  transition: transform 0.3s ease-in-out;
+}
+.nav-list li a:hover { background-color: rgba(255, 255, 255, 0.1); }
+.nav-list li a.active { background: var(--primary-color-start); }
+
+/* 主要內容卡片，採用玻璃擬態效果 */
+.content-card {
+  background: var(--card-bg-glass);
+  backdrop-filter: var(--card-backdrop-filter);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  box-shadow: var(--shadow-lg);
+  margin-bottom: var(--spacing-lg);
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xl);
+}
+.page-title {
+  font-size: var(--font-size-display);
+  font-weight: var(--font-weight-bold);
+  background: linear-gradient(135deg, #4a63e2 0%, #603894 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* =================================================================
+   3. 通用組件 (Components)
+   ================================================================= */
+.btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  transition: all var(--transition-base);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+.btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
+.btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: var(--white); }
+.btn-success { background: var(--success-color); color: var(--white); }
+.btn-secondary { background: #6c757d; color: var(--white); }
+.btn-view { background: var(--info-color); color: var(--white); }
+.btn-edit { background: var(--warning-color); color: var(--text-dark); }
+.btn-delete { background: var(--danger-color); color: var(--white); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+.form-group { display: flex; flex-direction: column; }
+.form-group label { margin-bottom: 5px; font-weight: var(--font-weight-medium); font-size: var(--font-size-base); }
+.form-control { padding: 10px 15px; border: 1px solid var(--gray-border); border-radius: var(--radius-md); font-size: var(--font-size-base); }
+.form-control:focus { outline: none; border-color: var(--primary-color-start); box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+
+.table-container { background: var(--white); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-md); }
+.table { width: 100%; border-collapse: collapse; }
+.table thead th { background: var(--gray-light); padding: var(--spacing-md); text-align: left; font-weight: var(--font-weight-semibold); border-bottom: 2px solid var(--gray-border); }
+.table tbody td { padding: var(--spacing-md); border-bottom: 1px solid #f0f0f0; }
+.table tbody tr:hover { background: var(--gray-light); }
+.table tbody tr:last-child td { border-bottom: none; }
+
+.status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
+.status-badge.planning { background: #fff3cd; color: #856404; }
+.status-badge.active { background: #d1ecf1; color: #0c5460; }
+.status-badge.completed { background: #d4edda; color: #155724; }
+.status-badge.paused { background: #f8d7da; color: #721c24; }
+
+.loading { display: none; text-align: center; padding: 40px; }
+.spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color-start); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-/* 【新增】表格內操作按鈕的間距 */
-.tenders-list-page .table-actions { display: flex; gap: var(--spacing-sm); }
+
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-light); }
+.empty-state-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.5; }
+
+/* =================================================================
+   5. 頁面專屬樣式 (Scoped Page Styles)
+   ================================================================= */
+.tenders-list-page .filter-section { background: var(--gray-light); border-radius: var(--radius-md); padding: var(--spacing-lg); margin-bottom: var(--spacing-xl); }
+.tenders-list-page .filter-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-md); align-items: end; }
+.tenders-list-page .filter-row .form-group { margin-bottom: 0; }
+.tenders-list-page .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-lg); margin-bottom: var(--spacing-xl); }
+.tenders-list-page .summary-card { background: var(--white); border-radius: var(--radius-md); padding: var(--spacing-lg); box-shadow: var(--shadow-md); border-left: 4px solid var(--primary-color-start); }
+.tenders-list-page .summary-value { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); margin-bottom: 5px; }
+.tenders-list-page .summary-label { color: var(--text-light); font-size: var(--font-size-base); }
+.tenders-list-page .action-buttons { display: flex; gap: var(--spacing-sm); }
+.tenders-list-page .project-group-header td { background-color: var(--gray-light); font-weight: var(--font-weight-semibold); border-top: 2px solid var(--gray-border); }
