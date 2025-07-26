@@ -1,5 +1,5 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v2.4 (修正大項目顯示)
+ * 標單採購管理 (tenders-procurement.js) - v2.5 (優化段落色彩)
  */
 function initProcurementPage() {
     console.log("🚀 [1/4] 初始化標單採購管理頁面...");
@@ -139,6 +139,9 @@ function initProcurementPage() {
             renderProcurementTable(majorItemId);
         }
 
+        /**
+         * 【核心修改】渲染採購表格，並加入段落色彩邏輯
+         */
         function renderProcurementTable(filterMajorItemId = '') {
             const tableBody = document.getElementById('tableBody');
             const majorItemsToRender = filterMajorItemId 
@@ -151,6 +154,9 @@ function initProcurementPage() {
             }
 
             let bodyHTML = '';
+            // 【新增】用於追蹤奇偶數群組的計數器
+            let groupIndex = 0;
+
             majorItemsToRender.forEach(majorItem => {
                 // 為大項目建立一個橫跨整列的標題列
                 bodyHTML += `<tr class="major-item-header"><td colspan="7">${majorItem.sequence || ''}. ${majorItem.name}</td></tr>`;
@@ -160,13 +166,18 @@ function initProcurementPage() {
                 if (itemsToRender.length === 0) {
                     bodyHTML += `<tr><td colspan="7" class="text-center" style="padding: 1rem; font-style: italic;">此大項目下沒有細項。</td></tr>`;
                 } else {
+                    // 【修改】決定目前群組的 CSS class (奇數或偶數)
+                    const groupClass = (groupIndex % 2 === 0) ? 'group-even' : 'group-odd';
+
                     itemsToRender.forEach(item => {
                         const orders = purchaseOrders.filter(o => o.detailItemId === item.id);
                         const quotes = quotations.filter(q => q.detailItemId === item.id);
                         const totalPurchased = orders.reduce((sum, o) => sum + (o.purchaseQuantity || 0), 0);
                         const remainingQty = (item.totalQuantity || 0) - totalPurchased;
                         const statusClass = remainingQty <= 0 ? 'status-completed' : (totalPurchased > 0 ? 'status-active' : 'status-planning');
-                        bodyHTML += `<tr class="item-row ${statusClass}">
+                        
+                        // 【修改】在 <tr> 中加入 groupClass
+                        bodyHTML += `<tr class="item-row ${statusClass} ${groupClass}">
                             <td style="padding-left: 2em;">${item.sequence || ''}</td>
                             <td>${item.name}</td>
                             <td class="text-right">${item.totalQuantity || 0}</td>
@@ -176,6 +187,9 @@ function initProcurementPage() {
                             <td><button class="btn btn-sm btn-info btn-compare-price" data-item-id="${item.id}" title="比價">📊</button><button class="btn btn-sm btn-success btn-add-order" data-item-id="${item.id}" title="新增採購">+</button></td>
                         </tr>`;
                     });
+
+                    // 【新增】處理完一個大項後，計數器加一
+                    groupIndex++;
                 }
             });
             tableBody.innerHTML = bodyHTML;
