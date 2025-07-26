@@ -1,49 +1,31 @@
-<div class="dashboard-container">
+<!-- pages/dashboard.html -->
+<div class="dashboard-page">
     <div class="dashboard-header">
-        <div id="welcomeMessage">
-            <h1 class="page-title">歡迎回來！</h1>
-            <p class="page-subtitle">這是您所有專案的即時總覽。</p>
-        </div>
+        <h1 class="page-title" id="welcomeMessage">歡迎回來！</h1>
+        <p class="page-subtitle">這是您所有專案的即時總覽。</p>
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-icon project">📁</div>
-                <div class="stat-value" id="projectCount">0</div>
+                <div class="stat-icon">📁</div>
+                <div class="stat-value" id="totalProjects">0</div>
                 <div class="stat-label">進行中專案</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon tender">📋</div>
-                <div class="stat-value" id="tenderCount">0</div>
+                <div class="stat-icon">📋</div>
+                <div class="stat-value" id="totalTenders">0</div>
                 <div class="stat-label">標單總數</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon amount">💰</div>
+                <div class="stat-icon">💰</div>
                 <div class="stat-value" id="totalAmount">NT$ 0</div>
                 <div class="stat-label">合約總金額</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-icon time">⏰</div>
-                <div class="stat-value" id="lastUpdate">--:--</div>
-                <div class="stat-label">最後更新</div>
-            </div>
         </div>
     </div>
 
-    <div class="dashboard-main-content">
-        <div class="content-card recent-activity">
-            <h3 class="card-title">最近活動</h3>
-            <ul class="activity-list" id="activityList">
-                <li class="activity-item">
-                    <div class="activity-icon">ℹ️</div>
-                    <div class="activity-content">
-                        <div class="activity-title">載入活動中...</div>
-                    </div>
-                </li>
-            </ul>
-        </div>
+    <div class="content-card">
+        <h2>近期活動</h2>
+        <ul class="activity-list" id="recentActivity">
+            <!-- 活動項目將由 JS 動態載入 -->
+        </ul>
     </div>
-</div>
-
-<div id="loading" class="loading" style="display: flex;">
-    <div class="spinner"></div>
-    <p>載入儀表板資料中...</p>
 </div>
