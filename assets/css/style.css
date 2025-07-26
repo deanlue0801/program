@@ -528,3 +528,36 @@ body, html {
   cursor: pointer;
   color: var(--danger-color);
 }
+/* --- 空間分配管理頁面 --- */
+.space-distribution-page .tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  background-color: var(--white);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--gray-border);
+  min-height: 80px;
+}
+
+.space-distribution-page .tag-item {
+  background-color: var(--primary-color-start);
+  color: var(--white);
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.space-distribution-page .tag-item:hover {
+  background-color: var(--danger-color);
+  transform: scale(1.05);
+}
+
+.space-distribution-page .tag-item .delete-tag {
+  font-weight: bold;
+}
