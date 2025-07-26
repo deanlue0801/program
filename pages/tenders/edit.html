@@ -1,23 +1,30 @@
-<!DOCTYPE html>
-<div id="loading" class="loading">
-    <div class="spinner"></div>
-    <p>載入編輯資料中...</p>
-</div>
+<!-- pages/tenders/edit.html -->
+<div class="edit-page">
+    <div id="loading" class="loading" style="display: flex;">
+        <div class="spinner"></div>
+        <p>載入編輯資料中...</p>
+    </div>
 
-<div id="editTenderContent" class="content" style="display: none;">
-    <div id="tender-header-container"></div>
+    <div id="editTenderContent" style="display: none;">
+        <!-- 標單標頭將由 JS 動態載入 -->
+        <div id="tender-header-container"></div>
 
-    <div id="items-list-container" class="content-card"></div>
+        <!-- 項目列表將由 JS 動態載入 -->
+        <div id="items-list-container" class="content-card"></div>
 
-    <div id="addition-details-container" class="content-card"></div>
-    
-    <div class="content-card">
-        <h3>📊 數量統計總覽</h3>
-        <div id="summaryGrid" class="summary-grid"></div>
+        <!-- 追加/追減項目將由 JS 動態載入 -->
+        <div id="addition-details-container" class="content-card"></div>
+        
+        <!-- 數量統計總覽 -->
+        <div class="content-card">
+            <h3 class="content-subtitle">📊 數量統計總覽</h3>
+            <div id="summaryGrid" class="summary-grid"></div>
+        </div>
     </div>
 </div>
 
-<div id="additionModal" class="modal">
+<!-- 數量變更 Modal -->
+<div id="additionModal" class="modal-overlay">
     <div class="modal-content">
         <div class="modal-header">
             <h3 class="modal-title" id="modalTitle">項目數量變更</h3>
