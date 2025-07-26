@@ -1,69 +1,78 @@
-<section class="selection-panel">
-    <div class="selection-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-        <div>
-            <label class="selection-label" for="projectSelect">📁 專案</label>
-            <select class="form-select" id="projectSelect"></select>
-        </div>
-        <div>
-            <label class="selection-label" for="tenderSelect">📋 標單</label>
-            <select class="form-select" id="tenderSelect" disabled></select>
-        </div>
-        <div>
-            <label class="selection-label" for="majorItemSelect">🔧 大項</label>
-            <select class="form-select" id="majorItemSelect" disabled></select>
-        </div>
-        <div>
-            <label class="selection-label" for="floorSelect">🏢 樓層</label>
-            <select class="form-select" id="floorSelect" disabled></select>
-        </div>
-        <div>
-            <label class="selection-label" for="spaceSelect">🚪 空間 (可選，以檢視單一空間)</label>
-            <select class="form-select" id="spaceSelect" disabled></select>
-        </div>
-    </div>
-</section>
-
-<div class="content-card" id="contentCard">
-    <div id="loading" class="loading" style="display: none;">
-        <div class="spinner"></div>
-        <p>載入進度資料中...</p>
+<!-- pages/tenders/progress-management.html -->
+<div class="progress-management-page">
+    <div class="page-header">
+        <h1 class="page-title">🚧 施工進度管理</h1>
     </div>
 
-    <div id="mainContent" style="display: none;">
-        <div class="actions-panel">
-            <h2 id="currentLocation" style="color: #333; font-size: 20px;"></h2>
-            <div class="action-buttons">
-                 <button id="importBtn" class="btn btn-primary">📥 匯入 Excel</button>
-                 <input type="file" id="importInput" accept=".xlsx, .xls" style="display: none;">
-                 <button id="exportBtn" class="btn btn-warning">📤 匯出 Excel</button>
-                 <button id="workItemsManagerBtn" class="btn btn-info">⚙️ 管理工項</button>
+    <!-- 篩選區域 -->
+    <div class="content-card filter-section">
+        <div class="filter-row" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+            <div class="form-group">
+                <label for="projectSelect">📁 專案</label>
+                <select id="projectSelect" class="form-control"></select>
+            </div>
+            <div class="form-group">
+                <label for="tenderSelect">📋 標單</label>
+                <select id="tenderSelect" class="form-control" disabled></select>
+            </div>
+            <div class="form-group">
+                <label for="majorItemSelect">🔧 大項</label>
+                <select id="majorItemSelect" class="form-control" disabled></select>
+            </div>
+            <div class="form-group">
+                <label for="floorSelect">🏢 樓層</label>
+                <select id="floorSelect" class="form-control" disabled></select>
+            </div>
+            <div class="form-group">
+                <label for="spaceSelect">🚪 空間 (可選)</label>
+                <select id="spaceSelect" class="form-control" disabled></select>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主要內容區 -->
+    <div class="content-card" id="contentCard">
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>載入進度資料中...</p>
+        </div>
+
+        <div id="mainContent" style="display: none;">
+            <div class="actions-panel">
+                <h2 id="currentLocation" class="content-subtitle"></h2>
+                <div class="action-buttons">
+                    <button id="importBtn" class="btn btn-primary">📥 匯入 Excel</button>
+                    <input type="file" id="importInput" accept=".xlsx, .xls" style="display: none;">
+                    <button id="exportBtn" class="btn btn-warning">📤 匯出 Excel</button>
+                    <button id="workItemsManagerBtn" class="btn btn-info">⚙️ 管理工項</button>
+                </div>
+            </div>
+            
+            <div id="spaceFilterContainer" class="space-filter-container" style="display: none;">
+                <h4>空間篩選</h4>
+                <div id="spaceFilterCheckboxes" class="checkbox-group"></div>
+            </div>
+            
+            <div class="table-container progress-table-container">
+                <table class="table progress-table" id="progressTable">
+                    <thead id="tableHeader"></thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
             </div>
         </div>
         
-        <div id="spaceFilterContainer" class="space-filter-container" style="display: none;">
-            <h4>空間篩選</h4>
-            <div id="spaceFilterCheckboxes" class="checkbox-group">
-            </div>
+        <div id="initialEmptyState" class="empty-state" style="display: flex;">
+            <div class="empty-state-icon">↖️</div>
+            <h3>請選擇完整的篩選條件</h3>
+            <p>請從上方的下拉選單選擇「專案」、「標單」、「大項」及「樓層」以開始作業</p>
         </div>
-        
-        <div class="table-container">
-            <table class="distribution-table" id="progressTable">
-                <thead id="tableHeader"></thead>
-                <tbody id="tableBody"></tbody>
-            </table>
-        </div>
-    </div>
-    
-    <div id="initialEmptyState" class="empty-state" style="display: flex;">
-        <div class="empty-state-icon">↖️</div>
-        <p>請從上方的下拉選單選擇「專案」、「標單」、「大項」及「樓層」以開始作業</p>
-    </div>
 
-    <input type="file" id="photoUploadInput" accept="image/jpeg,image/png" style="display: none;" multiple>
-
+        <input type="file" id="photoUploadInput" accept="image/jpeg,image/png" style="display: none;" multiple>
+    </div>
 </div>
 
-<div id="workItemsModal" class="modal-overlay" style="display: none;">
+<!-- 工項管理 Modal -->
+<div id="workItemsModal" class="modal-overlay">
     <div class="modal-content" style="max-width: 500px;">
         <h3>⚙️ 工項設定管理</h3>
         <p>為此標單設定全域的施工工項，設定將套用於所有項目。</p>
@@ -83,11 +92,11 @@
     </div>
 </div>
 
-<div id="photoViewerModal" class="modal-overlay" style="display: none;">
+<!-- 照片預覽 Modal -->
+<div id="photoViewerModal" class="modal-overlay">
     <div class="modal-content" style="max-width: 800px;">
         <h3 id="photoViewerTitle">查驗照片預覽</h3>
-        <div id="photoGrid" class="photo-grid">
-            </div>
+        <div id="photoGrid" class="photo-grid"></div>
         <div class="modal-actions">
             <div></div>
             <div>
