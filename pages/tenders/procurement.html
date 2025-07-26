@@ -1,120 +1,53 @@
-<div class="page-container procurement-page">
-    <div class="page-header">
-    <style>
-        /* --- 採購頁專屬樣式修正 --- */
-
-        /* * 【關鍵修正】
-         * 使用 ID 選擇器提高優先級，並直接針對大項目標題列的 <td> 進行樣式覆蓋。
-         * 這將確保此規則的優先級高於其他 CSS 檔案中的通用規則。
-         */
-        #procurementTable > tbody > .major-item-header > td {
-            background-color: #34495e !important; /* 深色背景 */
-            color: #ffffff !important;           /* 白色文字 */
-            font-weight: 600;
-            text-align: left;
-            padding: 0.8rem 1rem !important;
-            border-top: 2px solid #2c3e50;
-            border-bottom: 1px solid #2c3e50;
-
-            /* 覆蓋掉來自 distribution.css 的 sticky 定位和寬度限制 */
-            position: static;
-            min-width: 100%; /* 確保它能正常橫跨 */
-            left: auto;
-            border-right: none;
-        }
-
-        .item-row.status-completed { 
-            background-color: #f6fff8; 
-        }
-        .item-row.status-active { 
-            background-color: #fffbeb; 
-        }
-    </style>
+<!-- pages/tenders/procurement.html -->
+<div class="procurement-page">
     <div class="page-header">
         <h1 class="page-title">🛒 標單採購管理</h1>
-        <div class="actions-panel" style="margin-top: 1rem;">
-            <button id="exportRfqBtn" class="btn btn-primary">📄 匯出詢價單 (Excel)</button>
-            <button id="importQuotesBtn" class="btn btn-info">📥 匯入報價單 (Excel)</button>
-            <input type="file" id="importQuotesInput" accept=".xlsx, .xls" style="display: none;">
+        <div class="action-buttons">
+            <button id="exportProcurementBtn" class="btn btn-secondary">匯出詢價單 (Excel)</button>
+            <button id="importProcurementBtn" class="btn btn-success">匯入報價單 (Excel)</button>
         </div>
     </div>
 
-    <section class="selection-panel card">
-        <div class="selection-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
-            <div>
-                <label class="selection-label" for="projectSelect">📁 選擇專案</label>
-                <select class="form-select" id="projectSelect">
-                    <option value="">請選擇專案...</option>
-                </select>
-            </div>
-            <div>
-                <label class="selection-label" for="tenderSelect">📋 選擇標單</label>
-                <select class="form-select" id="tenderSelect" disabled>
-                    <option value="">請先選擇專案</option>
-                </select>
-            </div>
-            <div>
-                <label class="selection-label" for="majorItemSelect">🔧 篩選大項目 (可選)</label>
-                <select class="form-select" id="majorItemSelect" disabled>
-                    <option value="">所有大項目</option>
-                </select>
+    <div class="content-card">
+        <!-- 篩選區域 -->
+        <div class="filter-section">
+            <div class="filter-row">
+                <div class="form-group">
+                    <label for="procurementProjectSelector">選擇專案</label>
+                    <select id="procurementProjectSelector" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                    <label for="procurementTenderSelector">選擇標單</label>
+                    <select id="procurementTenderSelector" class="form-control" disabled></select>
+                </div>
+                <div class="form-group">
+                    <label for="procurementMajorItemSelector">篩選大項目 (可選)</label>
+                    <select id="procurementMajorItemSelector" class="form-control" disabled></select>
+                </div>
             </div>
         </div>
-    </section>
 
-    <div id="loading" class="loading" style="display: none;">
-        <div class="spinner"></div>
-        <p>載入資料中...</p>
-    </div>
-
-    <div id="emptyState" class="empty-state" style="display: flex;">
-        <p>請從上方選擇「專案」與「標單」以載入採購管理資料。</p>
-    </div>
-
-    <div class="procurement-body">
-        <div id="mainContent" style="display: none;">
-            <div class="table-container">
-                <table class="data-table" id="procurementTable">
-                    <thead>
-                        <tr>
-                            <th style="width: 8%;">項次</th>
-                            <th>項目名稱</th>
-                            <th class="text-right" style="width: 10%;">合約數量</th>
-                            <th class="text-right" style="width: 10%;">已採購</th>
-                            <th class="text-right" style="width: 10%;">剩餘</th>
-                            <th style="width: 25%;">採購單/報價</th>
-                            <th style="width: 10%;">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody"></tbody>
+        <!-- 載入中動畫 -->
+        <div class="loading" id="procurementLoading">
+            <div class="spinner"></div>
+            <p>載入採購資料中...</p>
+        </div>
+        
+        <!-- 主要內容區 -->
+        <div id="procurementContent" style="display: none;">
+            <h2 class="content-subtitle">廠商報價比價</h2>
+            <div class="table-container procurement-table-container">
+                <table class="table" id="procurementTable">
+                    <!-- 表格內容將由 JS 動態載入 -->
                 </table>
             </div>
         </div>
-    </div>
-</div>
 
-<div id="orderModal" class="modal-overlay">
-    </div>
-
-<div id="priceCompareModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 800px;">
-        <h3 id="compareModalTitle">廠商報價比價</h3>
-        <p id="compareItemName"></p>
-        <div class="table-container" style="margin-top: 1rem;">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>供應商</th>
-                        <th class="text-right">報價單價</th>
-                        <th>備註</th>
-                        <th style="width: 15%;">操作</th>
-                    </tr>
-                </thead>
-                <tbody id="compareTableBody"></tbody>
-            </table>
-        </div>
-        <div class="modal-actions" style="justify-content: flex-end;">
-            <button type="button" id="cancelCompareModalBtn" class="btn btn-secondary">關閉</button>
+        <!-- 預設提示訊息 -->
+        <div class="empty-state" id="procurementEmptyState">
+            <div class="empty-state-icon">🛒</div>
+            <h3>請選擇專案與標單</h3>
+            <p>請從上方選擇「專案」與「標單」以載入採購管理資料。</p>
         </div>
     </div>
 </div>
