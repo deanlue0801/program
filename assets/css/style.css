@@ -78,7 +78,19 @@ body, html { font-family: var(--font-family-base); background-color: var(--app-b
 .dashboard-page .stat-value { font-size: var(--font-size-display); font-weight: var(--font-weight-bold); }
 
 /* --- 標單列表頁面 --- */
+.tenders-list-page .filter-section { background-color: var(--gray-50); padding: var(--spacing-lg); border-radius: var(--radius-lg); margin-bottom: var(--spacing-xl); }
+.tenders-list-page .filter-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-lg); align-items: flex-end; }
+.tenders-list-page .filter-row .form-group { margin-bottom: 0; }
+.tenders-list-page .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--spacing-lg); margin-bottom: var(--spacing-xl); }
+.tenders-list-page .summary-card { background-color: var(--gray-50); padding: var(--spacing-lg); border-radius: var(--radius-lg); text-align: center; border: 1px solid var(--gray-200); }
+.tenders-list-page .summary-value { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); color: var(--primary-color); }
+.tenders-list-page .summary-label { font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: var(--spacing-xs); }
 .tenders-list-page .project-group-header td { background-color: var(--gray-100); font-weight: var(--font-weight-semibold); border-top: 2px solid var(--gray-400); }
+.tenders-list-page .empty-state { text-align: center; padding: var(--spacing-xl) 0; }
+.tenders-list-page .empty-state-icon { font-size: 3rem; margin-bottom: var(--spacing-md); }
+.tenders-list-page .loading { display: flex; justify-content: center; align-items: center; padding: var(--spacing-xl); gap: var(--spacing-md); color: var(--text-secondary); }
+.tenders-list-page .spinner { width: 24px; height: 24px; border: 3px solid var(--gray-200); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* --- 採購管理頁面 --- */
 .procurement-page #procurementTable > tbody > .major-item-header > td { background-color: #34495e !important; color: var(--white) !important; font-weight: var(--font-weight-semibold); }
