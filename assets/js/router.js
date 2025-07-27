@@ -2,7 +2,20 @@
  * 簡易前端路由器 (SPA Router) - v15.0 (最終穩定版)
  * 修正了腳本執行的競爭條件，確保初始化函數能被穩定呼叫。
  */
-
+// 【新增此段】處理從 404 頁面重新導向的邏輯
+(function() {
+    // 檢查 sessionStorage 中是否有 'redirect' 這個值
+    const redirect = sessionStorage.redirect;
+    // 無論有無，都將它刪除，避免下次重複執行
+    delete sessionStorage.redirect;
+    
+    // 如果有值，且不是首頁，就更新 URL
+    if (redirect && redirect !== location.pathname) {
+        // 使用 history.replaceState 可以更新瀏覽器的網址列
+        // 而不會真的重新整理頁面，讓後續的路由邏輯可以接手
+        history.replaceState(null, null, '/program' + redirect);
+    }
+})();
 const routes = {
     '/': { html: 'pages/dashboard.html', init: 'initDashboardPage', title: '首頁' },
     '/dashboard': { html: 'pages/dashboard.html', init: 'initDashboardPage', title: '儀表板' },
