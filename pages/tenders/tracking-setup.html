@@ -1,57 +1,47 @@
-<div class="page-container tracking-setup-page">
-    <div class="page-header">
-        <h1 class="page-title">✔️ 施工追蹤項目設定</h1>
+<section class="selection-panel">
+    <div class="selection-grid">
+        <div>
+            <label class="selection-label" for="projectSelect">📁 選擇專案</label>
+            <select class="form-select" id="projectSelect">
+                <option value="">載入中...</option>
+            </select>
+        </div>
+        <div>
+            <label class="selection-label" for="tenderSelect">📋 選擇標單</label>
+            <select class="form-select" id="tenderSelect" disabled>
+                <option value="">請先選擇專案</option>
+            </select>
+        </div>
+        <div>
+            <label class="selection-label" for="majorItemSelect">🔧 選擇大項目</label>
+            <select class="form-select" id="majorItemSelect" disabled>
+                <option value="">請先選擇標單</option>
+            </select>
+        </div>
+    </div>
+</section>
+
+<div class="content-card" id="mainContent" style="display: none;">
+    <div class="actions-panel">
+        <h2 style="color: #333; font-size: 20px;" id="items-list-header">📊 標單項目列表</h2>
         <div class="action-buttons">
-            <button id="saveTrackingItemsBtn" class="btn btn-primary">💾 儲存設定</button>
+            <button id="check-all-btn" class="btn btn-primary">✅ 全部追蹤</button>
+            <button id="uncheck-all-btn" class="btn btn-secondary">⬜️ 全部不追蹤</button>
+            <button id="save-settings-btn" class="btn btn-success">💾 儲存設定</button>
         </div>
     </div>
 
-    <div class="content-card">
-        <div class="filter-row">
-            <div class="form-group">
-                <label for="projectSelect">📁 選擇專案</label>
-                <select class="form-control" id="projectSelect">
-                    <option value="">請選擇專案...</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="tenderSelect">📋 選擇標單</label>
-                <select class="form-control" id="tenderSelect" disabled>
-                    <option value="">請先選擇專案</option>
-                </select>
-            </div>
-             <div class="form-group">
-                <label for="majorItemSelect">🔧 篩選大項 (可選)</label>
-                <select class="form-control" id="majorItemSelect" disabled>
-                    <option value="">所有大項目</option>
-                </select>
-            </div>
-        </div>
-    </div>
-    
-    <div id="loading" class="loading" style="display: none;">
-        <div class="spinner"></div>
-        <p>載入資料中...</p>
-    </div>
-    <div id="emptyState" class="empty-state" style="display: flex;">
-        <p>請從上方選擇「專案」與「標單」以設定追蹤項目。</p>
-    </div>
-
-    <div id="mainContent" class="content-card" style="display: none; margin-top: 20px;">
-        <div class="table-container">
-            <table class="table" id="trackingItemsTable">
-                <thead>
-                    <tr>
-                        <th style="width: 5%;">追蹤</th>
-                        <th style="width: 10%;">項次</th>
-                        <th>項目名稱</th>
-                        <th style="width: 15%;">單位</th>
-                        <th style="width: 15%;" class="text-right">數量</th>
-                    </tr>
+    <div class="table-container">
+        <table class="distribution-table" id="trackingSetupTable">
+            <thead id="tableHeader">
                 </thead>
-                <tbody id="tableBody">
-                    </tbody>
-            </table>
-        </div>
+            <tbody id="tableBody">
+                </tbody>
+        </table>
     </div>
+</div>
+ 
+<div id="emptyState" class="empty-state" style="display: flex;">
+    <div class="empty-state-icon">↖️</div>
+    <p>請從上方的下拉選單選擇「專案」、「標單」及「大項目」以開始作業</p>
 </div>
