@@ -211,9 +211,9 @@ function initTenderTrackingSetupPage() {
         }
         
         function renderItemsTable() {
-            const tableHeader = document.querySelector('#trackingItemsTable thead'); // 修正選擇器
-            if(tableHeader) tableHeader.innerHTML = `<tr><th style="width: 10%;">項次</th><th>項目名稱</th><th style="width: 15%;">單位</th><th class="text-right" style="width: 15%;">數量</th><th style="width: 5%;">追蹤</th></tr>`;
-            
+            const tableHeader = document.querySelector('#trackingItemsTable thead');
+            if(tableHeader) tableHeader.innerHTML = `<tr><th style="width: 10%;">項次</th><th>項目名稱</th><th style="width: 15%;">單位</th><th class="text-right" style="width: 15%;">數量</th><th style="width: 8%;">追蹤</th></tr>`;
+        
             ui.tableBody.innerHTML = '';
             if (detailItems.length === 0) {
                 ui.tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;">此大項目下沒有可設定的施工細項。</td></tr>';
@@ -227,7 +227,7 @@ function initTenderTrackingSetupPage() {
                     <td style="text-align: center;">${item.unit || ''}</td>
                     <td style="text-align: right;">${item.totalQuantity || 0}</td>
                     <td style="text-align: center;">
-                        <label class="toggle-switch" style="display: inline-block; vertical-align: middle;">
+                        <label class="toggle-switch">
                             <input type="checkbox" role="switch" data-item-id="${item.id}" ${!item.excludeFromProgress ? 'checked' : ''}>
                             <span class="slider"></span>
                         </label>
