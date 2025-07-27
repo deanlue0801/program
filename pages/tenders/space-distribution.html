@@ -2,66 +2,53 @@
     <div class="page-header">
         <h1 class="page-title">🏗️ 空間分配管理</h1>
         <div class="action-buttons">
-            <button id="saveChangesBtn" class="btn btn-primary">💾 儲存變更</button>
+            <button id="saveAllBtn" class="btn btn-primary">💾 儲存所有變更</button>
+            <button id="manageSpacesBtn" class="btn btn-secondary">管理空間</button>
         </div>
     </div>
 
     <div class="content-card">
-        <div class="filter-row" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
-            <div class="form-group">
-                <label for="projectSelect">📁 選擇專案</label>
-                <select class="form-control" id="projectSelect">
-                    <option value="">請選擇專案...</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="tenderSelect">📋 選擇標單</label>
-                <select class="form-control" id="tenderSelect" disabled>
-                    <option value="">請先選擇專案</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="floorSelect">🏢 選擇樓層</label>
-                <select class="form-control" id="floorSelect" disabled>
-                    <option value="">請先選擇標單</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="spaceSelect">🚪 選擇空間</label>
-                <select class="form-control" id="spaceSelect" disabled>
-                    <option value="">請先選擇樓層</option>
-                </select>
-            </div>
+        <div class="filter-row" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+            <div class="form-group"><label for="projectSelect">📁 專案</label><select id="projectSelect" class="form-control"></select></div>
+            <div class="form-group"><label for="tenderSelect">📋 標單</label><select id="tenderSelect" class="form-control" disabled></select></div>
+            <div class="form-group"><label for="majorItemSelect">📦 大項</label><select id="majorItemSelect" class="form-control" disabled></select></div>
+            <div class="form-group"><label for="floorSelect">🏢 樓層</label><select id="floorSelect" class="form-control" disabled></select></div>
         </div>
     </div>
     
-    <div id="loading" class="loading" style="display: none;">
-        <div class="spinner"></div><p>載入資料中...</p>
-    </div>
-    <div id="emptyState" class="empty-state" style="display: flex;">
-        <p>請從上方選擇「專案」與「標單」以載入空間分配資料。</p>
-    </div>
-
-    <div id="mainContent" style="display: none; margin-top: 20px;">
+    <div id="loading" class="loading" style="display: none;"><div class="spinner"></div><p>載入資料中...</p></div>
+    <div id="emptyState" class="empty-state" style="display: flex;"><p>請從上方選擇「專案」、「標單」、「大項」與「樓層」以載入資料。</p></div>
+    <div id="mainContent" style="display: none; margin-top: var(--spacing-lg);">
+        <h3 id="currentLocation" style="margin-bottom: var(--spacing-md);"></h3>
         <div class="content-card">
-            <h3 id="distributionTitle">未選擇分配項目</h3>
-            <div id="itemSelectorContainer">
-                <div class="form-group">
-                    <label for="majorItemSelect">選擇大項</label>
-                    <select id="majorItemSelect" class="form-control" disabled></select>
-                </div>
-                <div class="form-group">
-                    <label for="detailItemSelect">選擇細項</label>
-                    <select id="detailItemSelect" class="form-control" disabled></select>
-                </div>
-                <div class="form-group">
-                    <label for="quantityInput">分配數量</label>
-                    <input type="number" id="quantityInput" class="form-control" min="1" value="1" disabled>
-                </div>
-                <button id="assignItemBtn" class="btn btn-success" disabled>分配至此空間</button>
+            <div class="table-container">
+                <table class="table" id="distributionTable">
+                    <thead id="tableHeader"></thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
             </div>
-            <div class="tag-container" id="assignedItemsContainer" style="margin-top: 20px;">
-                </div>
+            <div id="noSpacesState" class="empty-state" style="display: none; min-height: 100px;"><p></p></div>
+        </div>
+    </div>
+</div>
+
+<div id="spaceManagerModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">管理空間 - <span id="floorNameInModal"></span></h3>
+            <button class="close-modal-btn" onclick="closeModal('spaceManagerModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="currentSpacesContainer"></div>
+            <div class="form-inline" style="margin-top: var(--spacing-lg);">
+                <input type="text" id="customSpaceInput" class="form-control" placeholder="輸入自訂空間名稱">
+                <button id="addCustomSpaceBtn" class="btn btn-info">新增</button>
+                <button id="clearAllSpacesBtn" class="btn btn-danger">全部清除</button>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('spaceManagerModal')">取消</button>
+            <button id="saveSpaceSettingsBtn" class="btn btn-primary">儲存空間設定</button>
         </div>
     </div>
 </div>
