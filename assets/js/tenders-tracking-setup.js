@@ -212,13 +212,43 @@ function initTenderTrackingSetupPage() {
         
         function renderItemsTable() {
             const tableHeader = document.querySelector('#trackingItemsTable thead');
-            if(tableHeader) tableHeader.innerHTML = `<tr><th style="width: 10%;">項次</th><th>項目名稱</th><th style="width: 15%;">單位</th><th class="text-right" style="width: 15%;">數量</th><th style="width: 8%;">追蹤</th></tr>`;
+            if(tableHeader) tableHeader.innerHTML = `
+                <tr>
+                    <th class="text-center" style="width: 10%;">項次</th>
+                    <th>項目名稱</th>
+                    <th class="text-center" style="width: 15%;">單位</th>
+                    <th class="text-right" style="width: 15%;">數量</th>
+                    <th class="text-center" style="width: 8%;">追蹤</th>
+                </tr>`;
         
-            ui.tableBody.innerHTML = '';
+            const uiTableBody = document.getElementById('tableBody'); // 確保使用唯一的變數名
+            if (!uiTableBody) return;
+        
+            uiTableBody.innerHTML = '';
             if (detailItems.length === 0) {
-                ui.tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;">此大項目下沒有可設定的施工細項。</td></tr>';
+                uiTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;">此大項目下沒有可設定的施工細項。</td></tr>';
                 return;
             }
+        
+            let rowsHTML = '';
+            detailItems.forEach(item => {
+                // 【核心修改】將 style="..." 改為 class="..."
+                rowsHTML += `
+                    <tr>
+                        <td class="text-center">${item.sequence || ''}</td>
+                        <td>${item.name || ''}</td>
+                        <td class="text-center">${item.unit || ''}</td>
+                        <td class="text-right">${item.totalQuantity || 0}</td>
+                        <td class="text-center">
+                            <label class="toggle-switch">
+                                <input type="checkbox" role="switch" data-item-id="${item.id}" ${!item.excludeFromProgress ? 'checked' : ''}>
+                                <span class="slider"></span>
+                            </label>
+                        </td>
+                    </tr>`;
+            });
+            uiTableBody.innerHTML = rowsHTML;
+        }
             detailItems.forEach(item => {
                 const row = ui.tableBody.insertRow();
                 row.innerHTML = `
