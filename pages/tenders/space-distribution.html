@@ -1,13 +1,13 @@
-<div class="page-container">
+<div class="page-container space-distribution-page">
     <div class="page-header">
-        <h1 class="page-title">🏗️ 樓層/空間分配</h1>
+        <h1 class="page-title">🏗️ 空間分配管理</h1>
         <div class="action-buttons">
             <button id="saveChangesBtn" class="btn btn-primary">💾 儲存變更</button>
         </div>
     </div>
 
     <div class="content-card">
-        <div class="filter-row">
+        <div class="filter-row" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
             <div class="form-group">
                 <label for="projectSelect">📁 選擇專案</label>
                 <select class="form-control" id="projectSelect">
@@ -20,25 +20,48 @@
                     <option value="">請先選擇專案</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label for="floorSelect">🏢 選擇樓層</label>
+                <select class="form-control" id="floorSelect" disabled>
+                    <option value="">請先選擇標單</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="spaceSelect">🚪 選擇空間</label>
+                <select class="form-control" id="spaceSelect" disabled>
+                    <option value="">請先選擇樓層</option>
+                </select>
+            </div>
         </div>
     </div>
     
     <div id="loading" class="loading" style="display: none;">
-        <div class="spinner"></div>
-        <p>載入資料中...</p>
+        <div class="spinner"></div><p>載入資料中...</p>
     </div>
     <div id="emptyState" class="empty-state" style="display: flex;">
-        <p>請從上方選擇「專案」與「標單」以載入樓層分配資料。</p>
+        <p>請從上方選擇「專案」與「標單」以載入空間分配資料。</p>
     </div>
 
-    <div id="mainContent" class="content-card" style="display: none; margin-top: 20px;">
-        <div class="table-container">
-            <table class="table" id="distributionTable">
-                <thead>
-                    </thead>
-                <tbody id="tableBody">
-                    </tbody>
-            </table>
+    <div id="mainContent" style="display: none; margin-top: 20px;">
+        <div class="content-card">
+            <h3 id="distributionTitle">未選擇分配項目</h3>
+            <div id="itemSelectorContainer">
+                <div class="form-group">
+                    <label for="majorItemSelect">選擇大項</label>
+                    <select id="majorItemSelect" class="form-control" disabled></select>
+                </div>
+                <div class="form-group">
+                    <label for="detailItemSelect">選擇細項</label>
+                    <select id="detailItemSelect" class="form-control" disabled></select>
+                </div>
+                <div class="form-group">
+                    <label for="quantityInput">分配數量</label>
+                    <input type="number" id="quantityInput" class="form-control" min="1" value="1" disabled>
+                </div>
+                <button id="assignItemBtn" class="btn btn-success" disabled>分配至此空間</button>
+            </div>
+            <div class="tag-container" id="assignedItemsContainer" style="margin-top: 20px;">
+                </div>
         </div>
     </div>
 </div>
