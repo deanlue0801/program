@@ -654,6 +654,14 @@ body, html {
   content: 'ON';
   left: 30%; /* 'ON' 文字位置 */
 }
+/* 【新增此段】針對 tracking-setup 頁面表格的文字對齊 */
+.tracking-setup-page .table td.text-center {
+    text-align: center;
+}
+
+.tracking-setup-page .table td.text-right {
+    text-align: right;
+}
 /* --- 採購頁面表格優化 --- */
 #mainContent.content-card {
   padding: var(--spacing-md);
