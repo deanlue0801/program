@@ -588,11 +588,13 @@ body, html {
     vertical-align: middle;
 }
 
+/* 【核心修改】將這裡的樣式替換為新版 */
 .tracking-setup-page .toggle-switch {
   position: relative;
   display: inline-block;
-  width: 50px;
-  height: 24px;
+  width: 60px; /* 加寬以容納文字 */
+  height: 28px;
+  vertical-align: middle;
 }
 
 .tracking-setup-page .toggle-switch input { 
@@ -608,29 +610,49 @@ body, html {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--gray-border);
+  background-color: var(--text-light); /* 關閉時的顏色 */
   transition: var(--transition-base);
-  border-radius: 24px;
+  border-radius: 28px;
 }
 
 .tracking-setup-page .slider:before {
   position: absolute;
   content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
   background-color: white;
   transition: var(--transition-base);
   border-radius: 50%;
 }
 
+/* 【新增】ON/OFF 文字樣式 */
+.tracking-setup-page .slider:after {
+    content: 'OFF';
+    color: white;
+    display: block;
+    position: absolute;
+    transform: translate(-50%,-50%);
+    top: 50%;
+    left: 70%; /* 'OFF' 文字位置 */
+    font-size: 10px;
+    font-family: var(--font-family-base);
+    font-weight: bold;
+}
+
 .tracking-setup-page input:checked + .slider {
-  background-color: var(--success-color);
+  background-color: var(--success-color); /* 開啟時的顏色 */
 }
 
 .tracking-setup-page input:checked + .slider:before {
-  transform: translateX(26px);
+  transform: translateX(32px); /* 滑塊移動距離 */
+}
+
+/* 【新增】切換到 'ON' 文字 */
+.tracking-setup-page input:checked + .slider:after {
+  content: 'ON';
+  left: 30%; /* 'ON' 文字位置 */
 }
 /* --- 採購頁面表格優化 --- */
 #mainContent.content-card {
