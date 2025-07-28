@@ -1,5 +1,5 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v2.5 (優化段落色彩)
+ * 標單採購管理 (tenders-procurement.js) - v2.6 (修正匯出排序)
  */
 function initProcurementPage() {
     console.log("🚀 [1/4] 初始化標單採購管理頁面...");
@@ -61,14 +61,8 @@ function initProcurementPage() {
             safeAddEventListener('#exportRfqBtn', 'click', exportRfqExcel);
             safeAddEventListener('#importQuotesBtn', 'click', () => document.getElementById('importQuotesInput').click());
             safeAddEventListener('#importQuotesInput', 'change', handleQuoteImport);
-            safeAddEventListener('#cancelCompareModalBtn', 'click', () => closeModal('priceCompareModal'));
             
-            // 確保 orderForm 存在時才綁定事件
-            const orderForm = document.getElementById('orderForm');
-            if(orderForm) {
-                orderForm.addEventListener('submit', handleFormSubmit);
-            }
-
+            // 由於 modal 是動態載入的，改用事件代理
             document.body.addEventListener('click', (e) => {
                 if (e.target.matches('.btn-compare-price')) {
                     showPriceComparisonModal(e.target.dataset.itemId);
@@ -81,6 +75,15 @@ function initProcurementPage() {
                     if (order) openOrderModal(order);
                 } else if (e.target.matches('.btn-add-order')) {
                     openOrderModal(null, e.target.dataset.itemId);
+                } else if(e.target.id === 'cancelCompareModalBtn') {
+                    closeModal('priceCompareModal');
+                }
+            });
+
+            // 表單提交也使用事件代理
+            document.body.addEventListener('submit', (e) => {
+                if (e.target.id === 'orderForm') {
+                    handleFormSubmit(e);
                 }
             });
         }
@@ -139,9 +142,6 @@ function initProcurementPage() {
             renderProcurementTable(majorItemId);
         }
 
-        /**
-         * 【核心修改】渲染採購表格，並加入段落色彩邏輯
-         */
         function renderProcurementTable(filterMajorItemId = '') {
             const tableBody = document.getElementById('tableBody');
             const majorItemsToRender = filterMajorItemId 
@@ -154,11 +154,9 @@ function initProcurementPage() {
             }
 
             let bodyHTML = '';
-            // 【新增】用於追蹤奇偶數群組的計數器
             let groupIndex = 0;
 
             majorItemsToRender.forEach(majorItem => {
-                // 為大項目建立一個橫跨整列的標題列
                 bodyHTML += `<tr class="major-item-header"><td colspan="7">${majorItem.sequence || ''}. ${majorItem.name}</td></tr>`;
                 
                 const itemsToRender = detailItems.filter(item => item.majorItemId === majorItem.id);
@@ -166,7 +164,6 @@ function initProcurementPage() {
                 if (itemsToRender.length === 0) {
                     bodyHTML += `<tr><td colspan="7" class="text-center" style="padding: 1rem; font-style: italic;">此大項目下沒有細項。</td></tr>`;
                 } else {
-                    // 【修改】決定目前群組的 CSS class (奇數或偶數)
                     const groupClass = (groupIndex % 2 === 0) ? 'group-even' : 'group-odd';
 
                     itemsToRender.forEach(item => {
@@ -176,7 +173,6 @@ function initProcurementPage() {
                         const remainingQty = (item.totalQuantity || 0) - totalPurchased;
                         const statusClass = remainingQty <= 0 ? 'status-completed' : (totalPurchased > 0 ? 'status-active' : 'status-planning');
                         
-                        // 【修改】在 <tr> 中加入 groupClass
                         bodyHTML += `<tr class="item-row ${statusClass} ${groupClass}">
                             <td style="padding-left: 2em;">${item.sequence || ''}</td>
                             <td>${item.name}</td>
@@ -187,29 +183,46 @@ function initProcurementPage() {
                             <td><button class="btn btn-sm btn-info btn-compare-price" data-item-id="${item.id}" title="比價">📊</button><button class="btn btn-sm btn-success btn-add-order" data-item-id="${item.id}" title="新增採購">+</button></td>
                         </tr>`;
                     });
-
-                    // 【新增】處理完一個大項後，計數器加一
                     groupIndex++;
                 }
             });
             tableBody.innerHTML = bodyHTML;
         }
 
+        /**
+         * 【核心修正】修正匯出 Excel 的排序邏輯
+         */
         function exportRfqExcel() {
-            if (!selectedTender || detailItems.length === 0) { return showAlert('請先選擇一個標單以匯出詢價單。', 'warning'); }
+            if (!selectedTender || detailItems.length === 0) {
+                return showAlert('請先選擇一個標單以匯出詢價單。', 'warning');
+            }
             
+            // 建立一個空的 data 陣列來存放最終結果
+            const data = [];
+            // 建立大項目的 Map 供快速查找名稱
             const majorItemMap = new Map(majorItems.map(item => [item.id, `${item.sequence || ''}. ${item.name}`]));
 
-            const data = detailItems.map(item => ({
-                '大項目': majorItemMap.get(item.majorItemId) || '未分類',
-                '項次': item.sequence || '',
-                '項目名稱': item.name || '',
-                '單位': item.unit || '',
-                '預計數量': item.totalQuantity || 0,
-                '報價單價': '',
-                '備註': ''
-            }));
+            // 1. 先遍歷已經排序好的 majorItems
+            majorItems.forEach(majorItem => {
+                // 2. 對於每個大項，從所有細項中篩選出屬於該大項的細項
+                // 因為 detailItems 本身已經排序過，所以篩選出來的 itemsInMajor 會維持正確的項次順序
+                const itemsInMajor = detailItems.filter(detail => detail.majorItemId === majorItem.id);
+                
+                // 3. 遍歷屬於這個大項的細項，並將它們推入 data 陣列
+                itemsInMajor.forEach(item => {
+                    data.push({
+                        '大項目': majorItemMap.get(item.majorItemId) || '未分類',
+                        '項次': item.sequence || '',
+                        '項目名稱': item.name || '',
+                        '單位': item.unit || '',
+                        '預計數量': item.totalQuantity || 0,
+                        '報價單價': '', // 留空給廠商填寫
+                        '備註': ''      // 留空給廠商填寫
+                    });
+                });
+            });
 
+            // 4. 使用重新排序好的 data 陣列來產生 Excel
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "詢價單");
