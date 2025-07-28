@@ -1,5 +1,5 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v2.8 (修正畫面與Excel匯出邏輯)
+ * 標單採購管理 (tenders-procurement.js) - v2.9 (修正Excel匯出排序與格式)
  */
 function initProcurementPage() {
     console.log("🚀 [1/4] 初始化標單採購管理頁面...");
@@ -35,6 +35,34 @@ function initProcurementPage() {
             setupEventListeners();
             await loadProjectsWithPermission();
             console.log("✅ [4/4] 頁面初始化完成。");
+        }
+        
+        // ===================================================================
+        // 【核心修正 1/2】引入更強大的自然排序函數
+        // ===================================================================
+        function naturalSequenceSort(a, b) {
+            const CHINESE_NUM_MAP = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'甲':1,'乙':2,'丙':3,'丁':4,'戊':5,'己':6,'庚':7,'辛':8,'壬':9,'癸':10};
+            const re = /(\d+(\.\d+)?)|([一二三四五六七八九十甲乙丙丁戊己庚辛壬癸])|(\D+)/g;
+            const seqA = String(a.sequence || '');
+            const seqB = String(b.sequence || '');
+            const partsA = seqA.match(re) || [];
+            const partsB = seqB.match(re) || [];
+            const len = Math.min(partsA.length, partsB.length);
+            for(let i=0; i<len; i++) {
+                const partA = partsA[i];
+                const partB = partsB[i];
+                let numA = parseFloat(partA);
+                let numB = parseFloat(partB);
+                if(isNaN(numA)) numA = CHINESE_NUM_MAP[partA];
+                if(isNaN(numB)) numB = CHINESE_NUM_MAP[partB];
+                if(numA !== undefined && numB !== undefined) {
+                    if(numA !== numB) return numA - numB;
+                } else {
+                    const comparison = partA.localeCompare(partB);
+                    if(comparison !== 0) return comparison;
+                }
+            }
+            return partsA.length - partsB.length;
         }
 
         function setupEventListeners() {
@@ -132,9 +160,6 @@ function initProcurementPage() {
             renderProcurementTable(majorItemId);
         }
 
-        /**
-         * 【核心修正】修正表格渲染邏輯，確保大項標題只顯示一次
-         */
         function renderProcurementTable(filterMajorItemId = '') {
             const tableBody = document.getElementById('tableBody');
             const majorItemsToRender = filterMajorItemId 
@@ -149,7 +174,6 @@ function initProcurementPage() {
             let bodyHTML = '';
 
             majorItemsToRender.forEach(majorItem => {
-                // 為每個大項只建立一列標題
                 bodyHTML += `<tr class="major-item-header"><td colspan="7">${majorItem.sequence || ''}. ${majorItem.name}</td></tr>`;
                 
                 const itemsToRender = detailItems.filter(item => item.majorItemId === majorItem.id);
@@ -179,37 +203,57 @@ function initProcurementPage() {
             tableBody.innerHTML = bodyHTML;
         }
 
-        /**
-         * 【核心修正】優化 Excel 匯出邏輯，讓大項目只在群組第一列顯示
-         */
+        // ===================================================================
+        // 【核心修正 2/2】重寫 Excel 匯出函數以符合新的格式需求
+        // ===================================================================
         function exportRfqExcel() {
             if (!selectedTender || detailItems.length === 0) {
                 return showAlert('請先選擇一個標單以匯出詢價單。', 'warning');
             }
             
             const data = [];
-            const majorItemMap = new Map(majorItems.map(item => [item.id, `${item.sequence || ''}. ${item.name}`]));
+            // 1. 定義新的欄位標題
+            const headers = ['項目', '單位', '預計數量', '報價單價', '備註'];
+            data.push(headers);
 
+            // 2. 遍歷正確排序後的大項目
             majorItems.forEach(majorItem => {
+                // 3. 為每個大項新增一列，只在第一欄顯示名稱
+                data.push([
+                    `${majorItem.sequence || ''}. ${majorItem.name}`,
+                    '', // 單位留空
+                    '', // 預計數量留空
+                    '', // 報價單價留空
+                    ''  // 備註留空
+                ]);
+
+                // 4. 篩選並遍歷屬於此大項的細項
                 const itemsInMajor = detailItems.filter(detail => detail.majorItemId === majorItem.id);
                 
-                let isFirstInGroup = true; 
-
                 itemsInMajor.forEach(item => {
-                    data.push({
-                        '大項目': isFirstInGroup ? (majorItemMap.get(item.majorItemId) || '未分類') : '',
-                        '項次': item.sequence || '',
-                        '項目名稱': item.name || '',
-                        '單位': item.unit || '',
-                        '預計數量': item.totalQuantity || 0,
-                        '報價單價': '',
-                        '備註': ''
-                    });
-                    isFirstInGroup = false; 
+                    // 5. 為每個細項新增一列，填入對應資料
+                    data.push([
+                        `  ${item.sequence || ''}. ${item.name}`, // 細項名稱前加上縮排以區分
+                        item.unit || '',
+                        item.totalQuantity || 0,
+                        '', // 報價單價留空
+                        ''  // 備註留空
+                    ]);
                 });
             });
 
-            const ws = XLSX.utils.json_to_sheet(data);
+            // 6. 使用 array-of-arrays 的方式產生 worksheet，這樣才能確保欄位順序
+            const ws = XLSX.utils.aoa_to_sheet(data);
+
+            // (可選) 設定欄寬，讓報表更好看
+            ws['!cols'] = [
+                { wch: 60 }, // 項目
+                { wch: 10 }, // 單位
+                { wch: 15 }, // 預計數量
+                { wch: 15 }, // 報價單價
+                { wch: 30 }  // 備註
+            ];
+            
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "詢價單");
             XLSX.writeFile(wb, `${selectedTender.name}_詢價單.xlsx`);
@@ -231,14 +275,26 @@ function initProcurementPage() {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    // 從第二行開始讀取，因為第一行是標題
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1, range: 1}); 
+
                     const batch = db.batch();
                     jsonData.forEach(row => {
-                        const sequence = row['項次'];
-                        const unitPrice = parseFloat(row['報價單價']);
-                        const notes = row['備註'] || '';
-                        const targetItem = detailItems.find(item => String(item.sequence) === String(sequence));
-                        if (targetItem && !isNaN(unitPrice)) {
+                        // 假設格式為 [項目, 單位, 預計數量, 報價單價, 備註]
+                        const itemNameWithSeq = String(row[0] || '').trim();
+                        const unitPrice = parseFloat(row[3]);
+                        const notes = row[4] || '';
+
+                        // 忽略大項目列
+                        if (!itemNameWithSeq || isNaN(unitPrice)) return;
+                        
+                        // 嘗試從 detailItems 中找到最匹配的項目
+                        const targetItem = detailItems.find(item => {
+                            const fullItemName = `  ${item.sequence || ''}. ${item.name}`.trim();
+                            return fullItemName === itemNameWithSeq;
+                        });
+
+                        if (targetItem) {
                             const docRef = db.collection('quotations').doc();
                             batch.set(docRef, { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: targetItem.id, supplier: supplier, quotedUnitPrice: unitPrice, notes: notes, quotedDate: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                         }
@@ -368,7 +424,6 @@ function initProcurementPage() {
         function populateSelect(selectEl, options, defaultText, emptyText = '沒有可選項') { let html = `<option value="">${defaultText}</option>`; if (options.length === 0 && emptyText) { html += `<option value="" disabled>${emptyText}</option>`; } else { options.forEach(option => { html += `<option value="${option.id}">${option.name}</option>`; }); } selectEl.innerHTML = html; selectEl.disabled = options.length === 0; }
         function resetSelects(from = 'project') { const selects = ['tender', 'majorItem']; const startIdx = selects.indexOf(from); for (let i = startIdx; i < selects.length; i++) { const select = document.getElementById(`${selects[i]}Select`); if(select) { select.innerHTML = `<option value="">請先選擇上一個選項</option>`; select.disabled = true; } } showMainContent(false); }
         function showMainContent(shouldShow) { document.getElementById('mainContent').style.display = shouldShow ? 'block' : 'none'; document.getElementById('emptyState').style.display = shouldShow ? 'none' : 'flex'; }
-        function naturalSequenceSort(a, b) { const re = /(\d+(\.\d+)?)|(\D+)/g; const pA = String(a.sequence||'').match(re)||[], pB = String(b.sequence||'').match(re)||[]; for(let i=0; i<Math.min(pA.length, pB.length); i++) { const nA=parseFloat(pA[i]), nB=parseFloat(pB[i]); if(!isNaN(nA)&&!isNaN(nB)){if(nA!==nB)return nA-nB;} else if(pA[i]!==pB[i])return pA[i].localeCompare(pB[i]); } return pA.length - pB.length; }
 
         runPageLogic();
     });
