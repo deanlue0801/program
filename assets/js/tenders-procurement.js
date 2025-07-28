@@ -1,5 +1,5 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v3.0 (修正匯出邏輯以對應篩選條件)
+ * 標單採購管理 (tenders-procurement.js) - v3.1 (修正UI按鈕無反應問題)
  */
 function initProcurementPage() {
     console.log("🚀 [1/4] 初始化標單採購管理頁面...");
@@ -71,6 +71,7 @@ function initProcurementPage() {
                     console.warn(`Event listener setup failed: Element with selector "${selector}" not found.`);
                 }
             };
+
             safeAddEventListener('#projectSelect', 'change', (e) => onProjectChange(e.target.value));
             safeAddEventListener('#tenderSelect', 'change', (e) => onTenderChange(e.target.value));
             safeAddEventListener('#majorItemSelect', 'change', (e) => onMajorItemChange(e.target.value));
@@ -79,20 +80,30 @@ function initProcurementPage() {
             safeAddEventListener('#importQuotesInput', 'change', handleQuoteImport);
             
             document.body.addEventListener('click', (e) => {
-                if (e.target.matches('.btn-compare-price')) {
-                    showPriceComparisonModal(e.target.dataset.itemId);
-                } else if (e.target.matches('.btn-select-quote')) {
-                    const { itemId, supplier, price } = e.target.dataset;
+                const compareBtn = e.target.closest('.btn-compare-price');
+                const addBtn = e.target.closest('.btn-add-order');
+                const selectQuoteBtn = e.target.closest('.btn-select-quote');
+                const orderChip = e.target.closest('.order-chip');
+                const closeModalBtn = e.target.closest('.modal-close, #cancelCompareModalBtn, #cancelOrderModalBtn');
+
+                if (compareBtn) {
+                    e.preventDefault();
+                    showPriceComparisonModal(compareBtn.dataset.itemId);
+                } else if (addBtn) {
+                    e.preventDefault();
+                    openOrderModal(null, addBtn.dataset.itemId);
+                } else if (selectQuoteBtn) {
+                    e.preventDefault();
+                    const { itemId, supplier, price } = selectQuoteBtn.dataset;
                     selectQuote(itemId, supplier, parseFloat(price));
-                } else if (e.target.closest('.order-chip')) {
-                    const orderChip = e.target.closest('.order-chip');
+                } else if (orderChip) {
+                    e.preventDefault();
                     const order = purchaseOrders.find(o => o.id === orderChip.dataset.orderId);
                     if (order) openOrderModal(order);
-                } else if (e.target.matches('.btn-add-order')) {
-                    openOrderModal(null, e.target.dataset.itemId);
-                } else if(e.target.matches('#cancelCompareModalBtn, .modal-close')) {
-                     const modal = e.target.closest('.modal-overlay');
-                     if(modal) closeModal(modal.id);
+                } else if (closeModalBtn) {
+                    e.preventDefault();
+                    const modal = closeModalBtn.closest('.modal-overlay');
+                    if(modal) closeModal(modal.id);
                 }
             });
 
@@ -101,6 +112,7 @@ function initProcurementPage() {
                     handleFormSubmit(e);
                 }
             });
+            safeAddEventListener('#deleteOrderBtn', 'click', deleteOrder);
         }
         
         async function loadProjectsWithPermission() {
@@ -159,6 +171,7 @@ function initProcurementPage() {
 
         function renderProcurementTable(filterMajorItemId = '') {
             const tableBody = document.getElementById('tableBody');
+            if (!tableBody) return;
             const majorItemsToRender = filterMajorItemId 
                 ? majorItems.filter(m => m.id === filterMajorItemId) 
                 : majorItems;
@@ -200,17 +213,12 @@ function initProcurementPage() {
             tableBody.innerHTML = bodyHTML;
         }
 
-        /**
-         * 【核心修正】匯出 Excel 時，會根據下拉選單的篩選條件來決定匯出範圍
-         */
         function exportRfqExcel() {
             if (!selectedTender || detailItems.length === 0) {
                 return showAlert('請先選擇一個標單以匯出詢價單。', 'warning');
             }
 
             const filterMajorItemId = document.getElementById('majorItemSelect').value;
-            
-            // 1. 決定要匯出的大項目範圍
             const majorItemsToExport = filterMajorItemId
                 ? majorItems.filter(m => m.id === filterMajorItemId)
                 : majorItems;
@@ -223,29 +231,16 @@ function initProcurementPage() {
             const headers = ['項目', '單位', '預計數量', '報價單價', '備註'];
             data.push(headers);
 
-            // 2. 遍歷要匯出的大項目
             majorItemsToExport.forEach(majorItem => {
-                data.push([
-                    `${majorItem.sequence || ''}. ${majorItem.name}`,
-                    '','','',''
-                ]);
-
+                data.push([ `${majorItem.sequence || ''}. ${majorItem.name}`, '', '', '', '' ]);
                 const itemsInMajor = detailItems.filter(detail => detail.majorItemId === majorItem.id);
-                
                 itemsInMajor.forEach(item => {
-                    data.push([
-                        `  ${item.sequence || ''}. ${item.name}`,
-                        item.unit || '',
-                        item.totalQuantity || 0,
-                        '',
-                        ''
-                    ]);
+                    data.push([ `  ${item.sequence || ''}. ${item.name}`, item.unit || '', item.totalQuantity || 0, '', '' ]);
                 });
             });
 
             const ws = XLSX.utils.aoa_to_sheet(data);
             ws['!cols'] = [ { wch: 60 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 30 } ];
-            
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "詢價單");
             XLSX.writeFile(wb, `${selectedTender.name}_詢價單.xlsx`);
@@ -297,11 +292,13 @@ function initProcurementPage() {
 
         function showPriceComparisonModal(itemId) {
             const item = detailItems.find(i => i.id === itemId);
+            if (!item) return showAlert('找不到項目資料', 'error');
             const itemQuotes = quotations.filter(q => q.detailItemId === itemId);
+            const modal = document.getElementById('priceCompareModal');
             const compareItemName = document.getElementById('compareItemName');
             const compareTableBody = document.getElementById('compareTableBody');
             
-            if (!compareItemName || !compareTableBody) return;
+            if (!modal || !compareItemName || !compareTableBody) return showAlert('比價視窗元件缺失', 'error');
 
             compareItemName.textContent = `${item.sequence}. ${item.name}`;
 
@@ -314,7 +311,7 @@ function initProcurementPage() {
                     return `<tr class="${isLowest ? 'table-success' : ''}"><td>${quote.supplier}</td><td class="text-right"><strong>${formatCurrency(quote.quotedUnitPrice)}</strong></td><td>${quote.notes || ''}</td><td><button class="btn btn-sm btn-success btn-select-quote" data-item-id="${item.id}" data-supplier="${quote.supplier}" data-price="${quote.quotedUnitPrice}">選用</button></td></tr>`;
                 }).join('');
             }
-            document.getElementById('priceCompareModal').style.display = 'flex';
+            modal.style.display = 'flex';
         }
 
         function selectQuote(itemId, supplier, price) {
@@ -332,14 +329,21 @@ function initProcurementPage() {
             const modal = document.getElementById('orderModal');
             const form = document.getElementById('orderForm');
             const deleteBtn = document.getElementById('deleteOrderBtn');
-            if (!form || !modal) return;
+            if (!form || !modal) return showAlert('訂單視窗元件缺失', 'error');
             form.reset();
+            
+            const item = orderData 
+                ? detailItems.find(i => i.id === orderData.detailItemId)
+                : detailItems.find(i => i.id === detailItemId);
+                
+            if (!item) return showAlert('找不到關聯的細項資料', 'error');
+
+            document.getElementById('itemNameDisplay').textContent = `${item.sequence}. ${item.name}`;
+            document.getElementById('detailItemId').value = item.id;
+
             if (orderData) {
                 document.getElementById('modalTitle').textContent = '編輯採購單';
                 document.getElementById('orderId').value = orderData.id;
-                document.getElementById('detailItemId').value = orderData.detailItemId;
-                const item = detailItems.find(i => i.id === orderData.detailItemId);
-                document.getElementById('itemNameDisplay').textContent = item ? `${item.sequence}. ${item.name}` : '項目未知';
                 document.getElementById('supplier').value = orderData.supplier;
                 document.getElementById('purchaseQuantity').value = orderData.purchaseQuantity;
                 document.getElementById('unitPrice').value = orderData.unitPrice;
@@ -350,10 +354,6 @@ function initProcurementPage() {
             } else {
                 document.getElementById('modalTitle').textContent = '新增採購單';
                 document.getElementById('orderId').value = '';
-                const item = detailItems.find(i => i.id === detailItemId);
-                if (!item) { showAlert('找不到關聯項目', 'error'); return; }
-                document.getElementById('detailItemId').value = item.id;
-                document.getElementById('itemNameDisplay').textContent = `${item.sequence}. ${item.name}`;
                 if(deleteBtn) deleteBtn.style.display = 'none';
             }
             modal.style.display = 'flex';
@@ -366,6 +366,11 @@ function initProcurementPage() {
             const quantity = parseFloat(document.getElementById('purchaseQuantity').value);
             const price = parseFloat(document.getElementById('unitPrice').value);
             const data = { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: detailItemId, supplier: document.getElementById('supplier').value.trim(), purchaseQuantity: quantity, unitPrice: price, totalPrice: quantity * price, status: document.getElementById('status').value, orderDate: document.getElementById('orderDate').value, notes: document.getElementById('notes').value.trim(), updatedBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+            
+            if (!data.supplier || isNaN(quantity) || isNaN(price)) {
+                return showAlert('供應商、數量和單價為必填欄位。', 'warning');
+            }
+
             showLoading(true, '儲存中...');
             try {
                 if (orderId) {
@@ -374,8 +379,10 @@ function initProcurementPage() {
                     data.createdBy = currentUser.email;
                     data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                     const item = detailItems.find(i => i.id === detailItemId);
-                    data.itemName = item.name;
-                    data.itemSequence = item.sequence;
+                    if (item) {
+                        data.itemName = item.name;
+                        data.itemSequence = item.sequence;
+                    }
                     await db.collection('purchaseOrders').add(data);
                 }
                 closeModal('orderModal');
@@ -409,9 +416,9 @@ function initProcurementPage() {
         function closeModal(modalId) { const modal = document.getElementById(modalId); if(modal) modal.style.display = 'none'; }
         function formatCurrency(amount) { if (amount === null || amount === undefined || isNaN(amount)) return 'N/A'; return `NT$ ${parseInt(amount, 10).toLocaleString()}`; }
         function showLoading(isLoading, message='載入中...') { const loadingEl = document.getElementById('loading'); if(loadingEl) { loadingEl.style.display = isLoading ? 'flex' : 'none'; const p = loadingEl.querySelector('p'); if(p) p.textContent = message; } }
-        function populateSelect(selectEl, options, defaultText, emptyText = '沒有可選項') { let html = `<option value="">${defaultText}</option>`; if (options.length === 0 && emptyText) { html += `<option value="" disabled>${emptyText}</option>`; } else { options.forEach(option => { html += `<option value="${option.id}">${option.name}</option>`; }); } selectEl.innerHTML = html; selectEl.disabled = options.length === 0; }
+        function populateSelect(selectEl, options, defaultText, emptyText = '沒有可選項') { if(!selectEl) return; let html = `<option value="">${defaultText}</option>`; if (options.length === 0 && emptyText) { html += `<option value="" disabled>${emptyText}</option>`; } else { options.forEach(option => { html += `<option value="${option.id}">${option.sequence || ''}. ${option.name}</option>`; }); } selectEl.innerHTML = html; selectEl.disabled = options.length === 0; }
         function resetSelects(from = 'project') { const selects = ['tender', 'majorItem']; const startIdx = selects.indexOf(from); for (let i = startIdx; i < selects.length; i++) { const select = document.getElementById(`${selects[i]}Select`); if(select) { select.innerHTML = `<option value="">請先選擇上一個選項</option>`; select.disabled = true; } } showMainContent(false); }
-        function showMainContent(shouldShow) { document.getElementById('mainContent').style.display = shouldShow ? 'block' : 'none'; document.getElementById('emptyState').style.display = shouldShow ? 'none' : 'flex'; }
+        function showMainContent(shouldShow) { const main = document.getElementById('mainContent'); const empty = document.getElementById('emptyState'); if(main) main.style.display = shouldShow ? 'block' : 'none'; if(empty) empty.style.display = shouldShow ? 'none' : 'flex'; }
 
         runPageLogic();
     });
