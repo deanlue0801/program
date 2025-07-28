@@ -1,5 +1,5 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v3.2 (新增管理與刪除報價功能)
+ * 標單採購管理 (tenders-procurement.js) - v3.3 (修正資料庫連線實例問題)
  */
 function initProcurementPage() {
     console.log("🚀 [1/4] 初始化標單採購管理頁面...");
@@ -26,12 +26,15 @@ function initProcurementPage() {
         
         let projects = [], tenders = [], majorItems = [], detailItems = [], purchaseOrders = [], quotations = [];
         let selectedProject = null, selectedTender = null;
-        const db = firebase.firestore();
+        
+        // 【核心修正】移除此處的 const db = firebase.firestore();
+        // 讓此檔案使用 firebase-config.js 中已初始化的全域 db 變數
         const currentUser = firebase.auth().currentUser;
 
         async function runPageLogic() {
             console.log("🚀 [3/4] 核心邏輯啟動...");
             if (!currentUser) return showAlert("使用者未登入", "error");
+            if (!db) return showAlert("資料庫尚未初始化，請重新整理頁面。", "error"); // 增加保護
             setupEventListeners();
             await loadProjectsWithPermission();
             console.log("✅ [4/4] 頁面初始化完成。");
@@ -78,7 +81,6 @@ function initProcurementPage() {
             safeAddEventListener('#exportRfqBtn', 'click', exportRfqExcel);
             safeAddEventListener('#importQuotesBtn', 'click', () => document.getElementById('importQuotesInput').click());
             safeAddEventListener('#importQuotesInput', 'change', handleQuoteImport);
-            // 【核心修改】監聽管理報價按鈕
             safeAddEventListener('#manageQuotesBtn', 'click', openManageQuotesModal);
             
             document.body.addEventListener('click', (e) => {
@@ -87,7 +89,6 @@ function initProcurementPage() {
                 const selectQuoteBtn = e.target.closest('.btn-select-quote');
                 const orderChip = e.target.closest('.order-chip');
                 const closeModalBtn = e.target.closest('.modal-close, #cancelCompareModalBtn, #cancelOrderModalBtn');
-                // 【核心修改】監聽動態產生的刪除報價按鈕
                 const deleteQuoteBtn = e.target.closest('.btn-delete-supplier-quotes');
 
                 if (compareBtn) {
@@ -224,20 +225,14 @@ function initProcurementPage() {
             if (!selectedTender || detailItems.length === 0) {
                 return showAlert('請先選擇一個標單以匯出詢價單。', 'warning');
             }
-
             const filterMajorItemId = document.getElementById('majorItemSelect').value;
-            const majorItemsToExport = filterMajorItemId
-                ? majorItems.filter(m => m.id === filterMajorItemId)
-                : majorItems;
-
+            const majorItemsToExport = filterMajorItemId ? majorItems.filter(m => m.id === filterMajorItemId) : majorItems;
             if (majorItemsToExport.length === 0) {
                 return showAlert('沒有符合篩選條件的資料可匯出。', 'warning');
             }
-
             const data = [];
             const headers = ['項目', '單位', '預計數量', '報價單價', '備註'];
             data.push(headers);
-
             majorItemsToExport.forEach(majorItem => {
                 data.push([ `${majorItem.sequence || ''}. ${majorItem.name}`, '', '', '', '' ]);
                 const itemsInMajor = detailItems.filter(detail => detail.majorItemId === majorItem.id);
@@ -245,7 +240,6 @@ function initProcurementPage() {
                     data.push([ `  ${item.sequence || ''}. ${item.name}`, item.unit || '', item.totalQuantity || 0, '', '' ]);
                 });
             });
-
             const ws = XLSX.utils.aoa_to_sheet(data);
             ws['!cols'] = [ { wch: 60 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 30 } ];
             const wb = XLSX.utils.book_new();
@@ -270,20 +264,13 @@ function initProcurementPage() {
                     const workbook = XLSX.read(data, { type: 'array' });
                     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                     const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1, range: 1}); 
-
                     const batch = db.batch();
                     jsonData.forEach(row => {
                         const itemNameWithSeq = String(row[0] || '').trim();
                         const unitPrice = parseFloat(row[3]);
                         const notes = row[4] || '';
-
                         if (!itemNameWithSeq || isNaN(unitPrice)) return;
-                        
-                        const targetItem = detailItems.find(item => {
-                            const fullItemName = `  ${item.sequence || ''}. ${item.name}`.trim();
-                            return fullItemName === itemNameWithSeq;
-                        });
-
+                        const targetItem = detailItems.find(item => `  ${item.sequence || ''}. ${item.name}`.trim() === itemNameWithSeq);
                         if (targetItem) {
                             const docRef = db.collection('quotations').doc();
                             batch.set(docRef, { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: targetItem.id, supplier: supplier.trim(), quotedUnitPrice: unitPrice, notes: notes, quotedDate: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
@@ -304,11 +291,8 @@ function initProcurementPage() {
             const modal = document.getElementById('priceCompareModal');
             const compareItemName = document.getElementById('compareItemName');
             const compareTableBody = document.getElementById('compareTableBody');
-            
             if (!modal || !compareItemName || !compareTableBody) return showAlert('比價視窗元件缺失', 'error');
-
             compareItemName.textContent = `${item.sequence}. ${item.name}`;
-
             if (itemQuotes.length === 0) {
                 compareTableBody.innerHTML = `<tr><td colspan="4" class="text-center" style="padding: 1rem;">此項目尚無報價。</td></tr>`;
             } else {
@@ -338,16 +322,10 @@ function initProcurementPage() {
             const deleteBtn = document.getElementById('deleteOrderBtn');
             if (!form || !modal) return showAlert('訂單視窗元件缺失', 'error');
             form.reset();
-            
-            const item = orderData 
-                ? detailItems.find(i => i.id === orderData.detailItemId)
-                : detailItems.find(i => i.id === detailItemId);
-                
+            const item = orderData ? detailItems.find(i => i.id === orderData.detailItemId) : detailItems.find(i => i.id === detailItemId);
             if (!item) return showAlert('找不到關聯的細項資料', 'error');
-
             document.getElementById('itemNameDisplay').textContent = `${item.sequence}. ${item.name}`;
             document.getElementById('detailItemId').value = item.id;
-
             if (orderData) {
                 document.getElementById('modalTitle').textContent = '編輯採購單';
                 document.getElementById('orderId').value = orderData.id;
@@ -372,12 +350,19 @@ function initProcurementPage() {
             const detailItemId = document.getElementById('detailItemId').value;
             const quantity = parseFloat(document.getElementById('purchaseQuantity').value);
             const price = parseFloat(document.getElementById('unitPrice').value);
-            const data = { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: detailItemId, supplier: document.getElementById('supplier').value.trim(), purchaseQuantity: quantity, unitPrice: price, totalPrice: quantity * price, status: document.getElementById('status').value, orderDate: document.getElementById('orderDate').value, notes: document.getElementById('notes').value.trim(), updatedBy: currentUser.email, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-            
+            const data = {
+                projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: detailItemId, 
+                supplier: document.getElementById('supplier').value.trim(), 
+                purchaseQuantity: quantity, unitPrice: price, totalPrice: quantity * price, 
+                status: document.getElementById('status').value, 
+                orderDate: document.getElementById('orderDate').value, 
+                notes: document.getElementById('notes').value.trim(), 
+                updatedBy: currentUser.email, 
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
             if (!data.supplier || isNaN(quantity) || isNaN(price)) {
                 return showAlert('供應商、數量和單價為必填欄位。', 'warning');
             }
-
             showLoading(true, '儲存中...');
             try {
                 if (orderId) {
@@ -419,7 +404,6 @@ function initProcurementPage() {
             }
         }
 
-        // --- 【核心修改】新增管理報價相關函數 ---
         function openManageQuotesModal() {
             if (!selectedTender) {
                 return showAlert('請先選擇一個標單。', 'warning');
@@ -427,9 +411,7 @@ function initProcurementPage() {
             const modal = document.getElementById('manageQuotesModal');
             const listEl = document.getElementById('supplierQuotesList');
             if (!modal || !listEl) return showAlert('管理視窗元件缺失', 'error');
-
             const suppliers = [...new Set(quotations.map(q => q.supplier))];
-
             if (suppliers.length === 0) {
                 listEl.innerHTML = '<p class="text-center">目前沒有任何已匯入的供應商報價。</p>';
             } else {
@@ -446,7 +428,6 @@ function initProcurementPage() {
         async function deleteSupplierQuotes(supplierName) {
             if (!supplierName) return;
             if (!confirm(`您確定要刪除供應商「${supplierName}」在本標單的所有報價紀錄嗎？\n此操作無法復原。`)) return;
-            
             showLoading(true, `正在刪除 ${supplierName} 的報價...`);
             try {
                 const quotesToDelete = quotations.filter(q => q.supplier === supplierName && q.tenderId === selectedTender.id);
@@ -454,19 +435,15 @@ function initProcurementPage() {
                     showAlert('找不到可刪除的報價紀錄。', 'info');
                     return;
                 }
-
                 const batch = db.batch();
                 quotesToDelete.forEach(quote => {
                     const docRef = db.collection('quotations').doc(quote.id);
                     batch.delete(docRef);
                 });
-
                 await batch.commit();
-                
                 closeModal('manageQuotesModal');
-                await onTenderChange(selectedTender.id); // 重新載入資料
+                await onTenderChange(selectedTender.id);
                 showAlert(`✅ 已成功刪除供應商「${supplierName}」的所有報價。`, 'success');
-
             } catch (error) {
                 showAlert(`刪除失敗: ${error.message}`, 'error');
             } finally {
