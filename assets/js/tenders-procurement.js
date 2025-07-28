@@ -1,5 +1,5 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v2.9 (修正Excel匯出排序與格式)
+ * 標單採購管理 (tenders-procurement.js) - v3.0 (修正匯出邏輯以對應篩選條件)
  */
 function initProcurementPage() {
     console.log("🚀 [1/4] 初始化標單採購管理頁面...");
@@ -37,9 +37,6 @@ function initProcurementPage() {
             console.log("✅ [4/4] 頁面初始化完成。");
         }
         
-        // ===================================================================
-        // 【核心修正 1/2】引入更強大的自然排序函數
-        // ===================================================================
         function naturalSequenceSort(a, b) {
             const CHINESE_NUM_MAP = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'甲':1,'乙':2,'丙':3,'丁':4,'戊':5,'己':6,'庚':7,'辛':8,'壬':9,'癸':10};
             const re = /(\d+(\.\d+)?)|([一二三四五六七八九十甲乙丙丁戊己庚辛壬癸])|(\D+)/g;
@@ -203,56 +200,51 @@ function initProcurementPage() {
             tableBody.innerHTML = bodyHTML;
         }
 
-        // ===================================================================
-        // 【核心修正 2/2】重寫 Excel 匯出函數以符合新的格式需求
-        // ===================================================================
+        /**
+         * 【核心修正】匯出 Excel 時，會根據下拉選單的篩選條件來決定匯出範圍
+         */
         function exportRfqExcel() {
             if (!selectedTender || detailItems.length === 0) {
                 return showAlert('請先選擇一個標單以匯出詢價單。', 'warning');
             }
+
+            const filterMajorItemId = document.getElementById('majorItemSelect').value;
             
+            // 1. 決定要匯出的大項目範圍
+            const majorItemsToExport = filterMajorItemId
+                ? majorItems.filter(m => m.id === filterMajorItemId)
+                : majorItems;
+
+            if (majorItemsToExport.length === 0) {
+                return showAlert('沒有符合篩選條件的資料可匯出。', 'warning');
+            }
+
             const data = [];
-            // 1. 定義新的欄位標題
             const headers = ['項目', '單位', '預計數量', '報價單價', '備註'];
             data.push(headers);
 
-            // 2. 遍歷正確排序後的大項目
-            majorItems.forEach(majorItem => {
-                // 3. 為每個大項新增一列，只在第一欄顯示名稱
+            // 2. 遍歷要匯出的大項目
+            majorItemsToExport.forEach(majorItem => {
                 data.push([
                     `${majorItem.sequence || ''}. ${majorItem.name}`,
-                    '', // 單位留空
-                    '', // 預計數量留空
-                    '', // 報價單價留空
-                    ''  // 備註留空
+                    '','','',''
                 ]);
 
-                // 4. 篩選並遍歷屬於此大項的細項
                 const itemsInMajor = detailItems.filter(detail => detail.majorItemId === majorItem.id);
                 
                 itemsInMajor.forEach(item => {
-                    // 5. 為每個細項新增一列，填入對應資料
                     data.push([
-                        `  ${item.sequence || ''}. ${item.name}`, // 細項名稱前加上縮排以區分
+                        `  ${item.sequence || ''}. ${item.name}`,
                         item.unit || '',
                         item.totalQuantity || 0,
-                        '', // 報價單價留空
-                        ''  // 備註留空
+                        '',
+                        ''
                     ]);
                 });
             });
 
-            // 6. 使用 array-of-arrays 的方式產生 worksheet，這樣才能確保欄位順序
             const ws = XLSX.utils.aoa_to_sheet(data);
-
-            // (可選) 設定欄寬，讓報表更好看
-            ws['!cols'] = [
-                { wch: 60 }, // 項目
-                { wch: 10 }, // 單位
-                { wch: 15 }, // 預計數量
-                { wch: 15 }, // 報價單價
-                { wch: 30 }  // 備註
-            ];
+            ws['!cols'] = [ { wch: 60 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 30 } ];
             
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "詢價單");
@@ -275,20 +267,16 @@ function initProcurementPage() {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    // 從第二行開始讀取，因為第一行是標題
                     const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1, range: 1}); 
 
                     const batch = db.batch();
                     jsonData.forEach(row => {
-                        // 假設格式為 [項目, 單位, 預計數量, 報價單價, 備註]
                         const itemNameWithSeq = String(row[0] || '').trim();
                         const unitPrice = parseFloat(row[3]);
                         const notes = row[4] || '';
 
-                        // 忽略大項目列
                         if (!itemNameWithSeq || isNaN(unitPrice)) return;
                         
-                        // 嘗試從 detailItems 中找到最匹配的項目
                         const targetItem = detailItems.find(item => {
                             const fullItemName = `  ${item.sequence || ''}. ${item.name}`.trim();
                             return fullItemName === itemNameWithSeq;
