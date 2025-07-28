@@ -1,5 +1,5 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v3.1 (修正UI按鈕無反應問題)
+ * 標單採購管理 (tenders-procurement.js) - v3.2 (新增管理與刪除報價功能)
  */
 function initProcurementPage() {
     console.log("🚀 [1/4] 初始化標單採購管理頁面...");
@@ -78,6 +78,8 @@ function initProcurementPage() {
             safeAddEventListener('#exportRfqBtn', 'click', exportRfqExcel);
             safeAddEventListener('#importQuotesBtn', 'click', () => document.getElementById('importQuotesInput').click());
             safeAddEventListener('#importQuotesInput', 'change', handleQuoteImport);
+            // 【核心修改】監聽管理報價按鈕
+            safeAddEventListener('#manageQuotesBtn', 'click', openManageQuotesModal);
             
             document.body.addEventListener('click', (e) => {
                 const compareBtn = e.target.closest('.btn-compare-price');
@@ -85,6 +87,8 @@ function initProcurementPage() {
                 const selectQuoteBtn = e.target.closest('.btn-select-quote');
                 const orderChip = e.target.closest('.order-chip');
                 const closeModalBtn = e.target.closest('.modal-close, #cancelCompareModalBtn, #cancelOrderModalBtn');
+                // 【核心修改】監聽動態產生的刪除報價按鈕
+                const deleteQuoteBtn = e.target.closest('.btn-delete-supplier-quotes');
 
                 if (compareBtn) {
                     e.preventDefault();
@@ -104,6 +108,9 @@ function initProcurementPage() {
                     e.preventDefault();
                     const modal = closeModalBtn.closest('.modal-overlay');
                     if(modal) closeModal(modal.id);
+                } else if (deleteQuoteBtn) {
+                    e.preventDefault();
+                    deleteSupplierQuotes(deleteQuoteBtn.dataset.supplier);
                 }
             });
 
@@ -279,7 +286,7 @@ function initProcurementPage() {
 
                         if (targetItem) {
                             const docRef = db.collection('quotations').doc();
-                            batch.set(docRef, { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: targetItem.id, supplier: supplier, quotedUnitPrice: unitPrice, notes: notes, quotedDate: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                            batch.set(docRef, { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: targetItem.id, supplier: supplier.trim(), quotedUnitPrice: unitPrice, notes: notes, quotedDate: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                         }
                     });
                     await batch.commit();
@@ -407,6 +414,61 @@ function initProcurementPage() {
                 showAlert('✅ 採購單已刪除！', 'success');
             } catch (error) {
                 showAlert('刪除失敗: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // --- 【核心修改】新增管理報價相關函數 ---
+        function openManageQuotesModal() {
+            if (!selectedTender) {
+                return showAlert('請先選擇一個標單。', 'warning');
+            }
+            const modal = document.getElementById('manageQuotesModal');
+            const listEl = document.getElementById('supplierQuotesList');
+            if (!modal || !listEl) return showAlert('管理視窗元件缺失', 'error');
+
+            const suppliers = [...new Set(quotations.map(q => q.supplier))];
+
+            if (suppliers.length === 0) {
+                listEl.innerHTML = '<p class="text-center">目前沒有任何已匯入的供應商報價。</p>';
+            } else {
+                listEl.innerHTML = suppliers.map(supplier => `
+                    <div class="supplier-quote-item">
+                        <span>${supplier}</span>
+                        <button class="btn btn-sm btn-danger btn-delete-supplier-quotes" data-supplier="${supplier}">刪除此供應商的所有報價</button>
+                    </div>
+                `).join('');
+            }
+            modal.style.display = 'flex';
+        }
+
+        async function deleteSupplierQuotes(supplierName) {
+            if (!supplierName) return;
+            if (!confirm(`您確定要刪除供應商「${supplierName}」在本標單的所有報價紀錄嗎？\n此操作無法復原。`)) return;
+            
+            showLoading(true, `正在刪除 ${supplierName} 的報價...`);
+            try {
+                const quotesToDelete = quotations.filter(q => q.supplier === supplierName && q.tenderId === selectedTender.id);
+                if (quotesToDelete.length === 0) {
+                    showAlert('找不到可刪除的報價紀錄。', 'info');
+                    return;
+                }
+
+                const batch = db.batch();
+                quotesToDelete.forEach(quote => {
+                    const docRef = db.collection('quotations').doc(quote.id);
+                    batch.delete(docRef);
+                });
+
+                await batch.commit();
+                
+                closeModal('manageQuotesModal');
+                await onTenderChange(selectedTender.id); // 重新載入資料
+                showAlert(`✅ 已成功刪除供應商「${supplierName}」的所有報價。`, 'success');
+
+            } catch (error) {
+                showAlert(`刪除失敗: ${error.message}`, 'error');
             } finally {
                 showLoading(false);
             }
