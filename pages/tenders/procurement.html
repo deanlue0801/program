@@ -1,62 +1,161 @@
-<div class="page-container">
-    <div class="page-header">
-        <h1 class="page-title">🛒 標單採購管理</h1>
-        <div class="action-buttons">
-            <button id="exportRfqBtn" class="btn btn-primary">📄 匯出詢價單</button>
-            <button id="importQuotesBtn" class="btn btn-info">📥 匯入報價單</button>
-            <input type="file" id="importQuotesInput" accept=".xlsx, .xls" style="display: none;">
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>標單採購管理</title>
+    <link rel="stylesheet" href="../assets/css/main.css">
+    <style>
+        .status-planning { background-color: #e3f2fd; }
+        .status-active { background-color: #e8f5e9; }
+        .status-completed { background-color: #fce4ec; text-decoration: line-through; color: #888; }
+        .major-item-header { background-color: #f5f5f5; font-weight: bold; }
+        .order-list, .quote-list { display: flex; flex-wrap: wrap; gap: 5px; }
+        .order-chip, .quote-chip { padding: 3px 8px; border-radius: 12px; font-size: 0.8em; cursor: pointer; }
+        .order-chip { background-color: #d1c4e9; color: #311b92; }
+        .quote-chip { background-color: #c8e6c9; color: #1b5e20; }
+        .order-chip.status-已下單 { background-color: #a5d6a7; }
+        .order-chip.status-已到貨 { background-color: #81c784; }
+        .order-chip.status-已結算 { background-color: #66bb6a; }
+        .action-buttons { display: flex; gap: 5px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="sidebar"></div>
+        <div id="main-content-area">
+            <header>
+                <h1>標單採購管理</h1>
+            </header>
+            <main>
+                <div class="controls">
+                    <select id="projectSelect" class="form-control"></select>
+                    <select id="tenderSelect" class="form-control" disabled></select>
+                    <select id="majorItemSelect" class="form-control" disabled></select>
+                    <button id="exportRfqBtn" class="btn btn-primary">匯出詢價單 (Excel)</button>
+                    <button id="importQuotesBtn" class="btn btn-secondary">匯入報價單</button>
+                    <input type="file" id="importQuotesInput" accept=".xlsx, .xls" style="display: none;">
+                </div>
+
+                <div id="loading" class="loading-overlay" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>載入中...</p>
+                </div>
+
+                <div id="emptyState" class="empty-state" style="display: flex;">
+                    <p>請先從上方選擇一個專案和標單以開始。</p>
+                </div>
+
+                <div id="mainContent" style="display: none;">
+                    <table id="procurementTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">項次</th>
+                                <th style="width: 30%;">項目名稱</th>
+                                <th style="width: 10%;" class="text-right">預計數量</th>
+                                <th style="width: 10%;" class="text-right">已採購量</th>
+                                <th style="width: 10%;" class="text-right">剩餘數量</th>
+                                <th style="width: 25%;">採購/報價紀錄</th>
+                                <th style="width: 10%;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </main>
         </div>
     </div>
 
-    <div class="content-card">
-        <div class="filter-row">
-            <div class="form-group">
-                <label for="projectSelect">📁 選擇專案</label>
-                <select class="form-control" id="projectSelect">
-                    <option value="">請選擇專案...</option>
-                </select>
+    <div id="priceCompareModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h5 class="modal-title">廠商報價比價</h5>
+                <button type="button" class="modal-close">&times;</button>
             </div>
-            <div class="form-group">
-                <label for="tenderSelect">📋 選擇標單</label>
-                <select class="form-control" id="tenderSelect" disabled>
-                    <option value="">請先選擇專案</option>
-                </select>
+            <div class="modal-body">
+                <p><strong>項目:</strong> <span id="compareItemName"></span></p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>供應商</th>
+                            <th class="text-right">報價單價</th>
+                            <th>備註</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="compareTableBody">
+                    </tbody>
+                </table>
             </div>
-            <div class="form-group">
-                <label for="majorItemSelect">🔧 篩選大項 (可選)</label>
-                <select class="form-control" id="majorItemSelect" disabled>
-                    <option value="">所有大項目</option>
-                </select>
+            <div class="modal-footer">
+                <button type="button" id="cancelCompareModalBtn" class="btn btn-secondary">關閉</button>
             </div>
+        </div>
+    </div>
+
+    <div id="orderModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">新增/編輯採購單</h5>
+                <button type="button" class="modal-close">&times;</button>
+            </div>
+            <form id="orderForm">
+                <div class="modal-body">
+                    <p><strong>項目:</strong> <span id="itemNameDisplay"></span></p>
+                    <input type="hidden" id="orderId">
+                    <input type="hidden" id="detailItemId">
+                    <div class="form-group">
+                        <label for="supplier">供應商</label>
+                        <input type="text" id="supplier" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchaseQuantity">採購數量</label>
+                        <input type="number" id="purchaseQuantity" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="unitPrice">採購單價</label>
+                        <input type="number" id="unitPrice" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="status">狀態</label>
+                        <select id="status" class="form-control">
+                            <option value="草稿">草稿</option>
+                            <option value="已下單">已下單</option>
+                            <option value="已到貨">已到貨</option>
+                            <option value="已結算">已結算</option>
+                        </select>
+                    </div>
+                     <div class="form-group">
+                        <label for="orderDate">下單日期</label>
+                        <input type="date" id="orderDate" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">備註</label>
+                        <textarea id="notes" class="form-control"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="deleteOrderBtn" class="btn btn-danger" style="display: none;">刪除</button>
+                    <button type="button" id="cancelOrderModalBtn" class="btn btn-secondary modal-close">取消</button>
+                    <button type="submit" class="btn btn-primary">儲存</button>
+                </div>
+            </form>
         </div>
     </div>
     
-    <div id="loading" class="loading" style="display: none;"><div class="spinner"></div><p>載入資料中...</p></div>
-    <div id="emptyState" class="empty-state" style="display: flex;"><p>請從上方選擇「專案」與「標單」以載入資料。</p></div>
-
-    <div id="mainContent" class="content-card" style="display: none; margin-top: 20px;">
-        <div class="table-container">
-            <table class="table" id="procurementTable">
-                <thead>
-                    <tr>
-                        <th style="width: 8%;">項次</th>
-                        <th>項目名稱</th>
-                        <th class="text-right" style="width: 10%;">合約數量</th>
-                        <th class="text-right" style="width: 10%;">已採購</th>
-                        <th class="text-right" style="width: 10%;">剩餘</th>
-                        <th style="width: 25%;">採購單/報價</th>
-                        <th style="width: 10%;">操作</th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody">
-                    </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<div id="orderModal" class="modal-overlay">
-    </div>
-
-<div id="priceCompareModal" class="modal-overlay">
-    </div>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script src="../assets/js/firebase-config.js"></script>
+    <script src="../assets/js/auth.js"></script>
+    <script src="../assets/js/main.js"></script>
+    <script src="../assets/js/tenders-procurement.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            initProcurementPage();
+        });
+    </script>
+</body>
+</html>
