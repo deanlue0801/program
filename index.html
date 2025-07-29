@@ -62,5 +62,22 @@
     <script src="/program/assets/js/tenders-tracking-setup.js"></script>
     <script src="/program/assets/js/tenders-procurement.js"></script>
     <script src="/program/assets/js/tenders-cost-management.js"></script>
+        <script>
+        // 【新增】漢堡選單的控制邏輯
+        document.addEventListener('DOMContentLoaded', () => {
+            const sidebar = document.getElementById('sidebar');
+            const hamburgerBtn = document.getElementById('hamburgerBtn');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            function toggleSidebar() {
+                document.body.classList.toggle('sidebar-open');
+            }
+
+            if (hamburgerBtn && sidebar && overlay) {
+                hamburgerBtn.addEventListener('click', toggleSidebar);
+                overlay.addEventListener('click', toggleSidebar);
+            }
+        });
+    </script>
 </body>
 </html>
