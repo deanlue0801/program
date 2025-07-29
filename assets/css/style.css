@@ -1079,3 +1079,79 @@ body.sidebar-open .sidebar-overlay {
         max-height: none;
     }
 }
+/* --- 6.3 施工進度管理表格響應式 (新增區塊) --- */
+@media (max-width: 768px) {
+    .progress-management-page .progress-table thead {
+        display: none; /* 在手機上隱藏桌面版的表頭 */
+    }
+
+    .progress-management-page .progress-table tr {
+        display: block;
+        margin-bottom: 1rem;
+        border: 1px solid var(--gray-border);
+        border-radius: var(--radius-md);
+        padding: 0.5rem;
+        box-shadow: var(--shadow-md);
+        background: var(--white);
+    }
+
+    .progress-management-page .progress-table td {
+        display: flex; /* 使用 flexbox 讓標籤和內容對齊 */
+        justify-content: space-between; /* 標籤在左，內容在右 */
+        align-items: center;
+        text-align: right;
+        padding: 0.75rem 0.5rem;
+        border-bottom: 1px dashed var(--gray-border);
+    }
+
+    .progress-management-page .progress-table tr td:last-child {
+        border-bottom: none;
+    }
+
+    /* 使用 ::before 偽元素來顯示欄位標題 (從 data-label 讀取) */
+    .progress-management-page .progress-table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: var(--text-light);
+        text-align: left;
+        margin-right: 1rem;
+    }
+
+    /* 將前兩個儲存格(項次、名稱)變成卡片的標題區 */
+    .progress-management-page .progress-table td:nth-child(1),
+    .progress-management-page .progress-table td:nth-child(2) {
+        display: block;
+        text-align: left;
+        padding: 0.5rem;
+        border-bottom: 2px solid var(--primary-color-start);
+    }
+    
+    .progress-management-page .progress-table td:nth-child(1)::before,
+    .progress-management-page .progress-table td:nth-child(2)::before {
+        display: none; /* 標題區不需要顯示 "項次:", "項目名稱:" */
+    }
+
+    .progress-management-page .progress-table td:nth-child(1) { /* 項次 */
+        font-size: var(--font-size-sm);
+        color: var(--text-light);
+        padding-bottom: 0;
+    }
+
+    .progress-management-page .progress-table td:nth-child(2) { /* 項目名稱 */
+        font-size: var(--font-size-lg);
+        font-weight: bold;
+        padding-top: 0;
+        line-height: 1.3;
+    }
+
+    /* 讓下拉選單和按鈕在儲存格中看起來更好 */
+    .progress-management-page .progress-table .progress-status-select {
+        flex-basis: 120px; /* 給下拉選單一個固定的基礎寬度 */
+        padding: 4px 8px;
+    }
+
+    .progress-management-page .progress-table .photo-cell {
+        justify-content: flex-end; /* 將內容(按鈕和圖示)推到右邊 */
+        gap: 0.5rem;
+    }
+}
