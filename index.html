@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/program/assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
-    </head>
+</head>
 <body>
     <div class="app-layout">
         <nav class="sidebar" id="sidebar">
@@ -36,7 +36,19 @@
                 <button class="btn btn-logout" onclick="logout()">登出</button>
             </div>
         </nav>
-        <main class="main-content" id="app-content"></main>
+
+        <div class="content-wrapper">
+            <header class="main-header">
+                <button class="hamburger-btn" id="hamburgerBtn">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="header-title" id="page-title-container"></div>
+            </header>
+            
+            <main class="main-content" id="app-content"></main>
+        </div>
+
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -62,10 +74,9 @@
     <script src="/program/assets/js/tenders-tracking-setup.js"></script>
     <script src="/program/assets/js/tenders-procurement.js"></script>
     <script src="/program/assets/js/tenders-cost-management.js"></script>
-        <script>
-        // 【新增】漢堡選單的控制邏輯
+
+    <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const sidebar = document.getElementById('sidebar');
             const hamburgerBtn = document.getElementById('hamburgerBtn');
             const overlay = document.getElementById('sidebarOverlay');
 
@@ -73,7 +84,7 @@
                 document.body.classList.toggle('sidebar-open');
             }
 
-            if (hamburgerBtn && sidebar && overlay) {
+            if (hamburgerBtn && overlay) {
                 hamburgerBtn.addEventListener('click', toggleSidebar);
                 overlay.addEventListener('click', toggleSidebar);
             }
