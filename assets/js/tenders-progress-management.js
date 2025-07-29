@@ -122,7 +122,7 @@ function initProgressManagementPage() {
         const tableHeader = document.getElementById('tableHeader');
         const tableBody = document.getElementById('tableBody');
         
-        // 步驟 1: 修改表頭，將「項次」和「項目名稱」分開
+        // 建立表頭
         let headerHTML = '<tr><th style="width: 80px;">項次</th><th>項目名稱</th>';
         if (!selectedSpace) { headerHTML += '<th>所在空間</th>'; }
         workItems.forEach(w => headerHTML += `<th>${w}</th>`);
@@ -133,11 +133,11 @@ function initProgressManagementPage() {
         const canEditStatus = currentUserRole === 'owner' || (currentUserRole === 'editor' && currentUserPermissions.canAccessTenders);
         const canUpload = currentUserRole === 'owner' || (currentUserRole === 'editor' && currentUserPermissions.canUploadPhotos);
         
-        // 使用 allDetailItems 進行遍歷，確保順序正確
+        // 遍歷所有細項來建立表格內容
         allDetailItems.forEach(detailItem => {
             const floorDist = floorDists.find(d => d.detailItemId === detailItem.id);
             if (!floorDist || !floorDist.quantity) return; // 如果此樓層沒有分配此項目，則跳過
-
+    
             const itemSpaceDists = spaceDists.filter(sd => sd.detailItemId === detailItem.id);
             let cumulativeQty = 0;
             const spaceLookup = itemSpaceDists.map(sd => { const start = cumulativeQty + 1; cumulativeQty += sd.quantity; return { space: sd.spaceName, start, end: cumulativeQty }; });
@@ -153,22 +153,22 @@ function initProgressManagementPage() {
                 
                 bodyHTML += `<tr data-unique-id="${uniqueId}" data-detail-item-id="${detailItem.id}" data-space-name="${spaceName}">`;
                 
-                // 步驟 2: 修改表格內容，將項次和名稱放入不同的 <td>
-                bodyHTML += `<td>${detailItem.sequence || ''}</td>`;
-                bodyHTML += `<td>${detailItem.name} #${i}</td>`;
+                // 【核心修改】為每個 <td> 加上 data-label 屬性
+                bodyHTML += `<td data-label="項次">${detailItem.sequence || ''}</td>`;
+                bodyHTML += `<td data-label="項目名稱">${detailItem.name} #${i}</td>`;
                 
-                if (!selectedSpace) bodyHTML += `<td>${spaceName}</td>`;
+                if (!selectedSpace) bodyHTML += `<td data-label="所在空間">${spaceName}</td>`;
                 
                 workItems.forEach(workItem => {
                     const currentStatus = progressItem?.workStatuses?.[workItem] || '未施工';
-                    bodyHTML += `<td><select class="form-select progress-status-select" data-work-item="${workItem}" ${!canEditStatus ? 'disabled' : ''}>
+                    bodyHTML += `<td data-label="${workItem}"><select class="form-select progress-status-select" data-work-item="${workItem}" ${!canEditStatus ? 'disabled' : ''}>
                         <option value="未施工" ${currentStatus === '未施工' ? 'selected' : ''}>未施工</option>
                         <option value="施工中" ${currentStatus === '施工中' ? 'selected' : ''}>施工中</option>
                         <option value="已完成" ${currentStatus === '已完成' ? 'selected' : ''}>已完成</option>
                     </select></td>`;
                 });
                 
-                bodyHTML += `<td class="photo-cell">
+                bodyHTML += `<td class="photo-cell" data-label="查驗照片">
                     ${canUpload ? '<button class="btn btn-sm btn-upload-photo">上傳</button>' : ''}
                     <span class="photo-indicator ${photoIndicatorClass}" title="${hasPhotos ? '點擊預覽照片' : '無照片'}">📷</span>
                 </td></tr>`;
