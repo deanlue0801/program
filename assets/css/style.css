@@ -68,9 +68,7 @@ body, html {
 }
 .main-content {
   flex-grow: 1;
-  margin-left: 250px;
   padding: var(--spacing-xl);
-  width: calc(100% - 250px);
   overflow: auto;
 }
 .page-header {
