@@ -1,9 +1,12 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v9.0 (去除排序限制版)
- * 修正核心：移除 Firestore 查詢時的 .orderBy()，改由前端排序，解決 "Missing or insufficient permissions" 問題。
+ * 標單採購管理 (tenders-procurement.js) - v10.0 (權限邏輯同步版)
+ * 核心修正：
+ * 1. 同步 tenders-edit.js 的權限檢查流程。
+ * 2. 查詢時嚴格帶入 projectId 以符合安全規則。
+ * 3. 使用系統封裝的 safeFirestoreQuery (若可用)。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v9.0 去除排序限制)...");
+    console.log("🚀 初始化採購管理頁面 (v10.0 權限同步版)...");
 
     // 1. 等待 HTML 元素
     function waitForElement(selector, callback) {
@@ -29,7 +32,9 @@ function initProcurementPage() {
         let purchaseOrders = [], quotations = [];
         let selectedProject = null, selectedTender = null;
         
+        // 取得全域 Firebase 實例
         const currentUser = firebase.auth().currentUser;
+        const db = firebase.firestore(); // 確保 db 實例存在
 
         // --- 啟動初始化 ---
         initializePage();
@@ -40,29 +45,33 @@ function initProcurementPage() {
             await loadProjectsWithPermission();
         }
 
-        // --- (A) 載入專案 ---
+        // --- (A) 載入專案 (參考 tenders-edit.js 的權限邏輯) ---
         async function loadProjectsWithPermission() {
             showLoading(true, '載入專案中...');
             try {
-                // 使用全域 loadProjects()
+                // 1. 嘗試使用全域 loadProjects
                 let allMyProjects = [];
                 if (typeof loadProjects === 'function') {
                     allMyProjects = await loadProjects();
                 } else {
-                    const db = firebase.firestore();
+                    // Fallback: 直接查詢
                     const snapshot = await db.collection('projects').get();
                     allMyProjects = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
                 }
                 
-                // 篩選權限
+                // 2. 篩選權限：使用者必須是成員
                 projects = allMyProjects.filter(project => {
-                    const memberInfo = project.members && project.members[currentUser.email];
-                    return memberInfo || project.createdBy === currentUser.email;
+                    // 檢查 members 結構
+                    if (project.members && project.members[currentUser.email]) return true;
+                    // 檢查 createdBy
+                    if (project.createdBy === currentUser.email) return true;
+                    return false;
                 });
 
                 populateSelect(document.getElementById('projectSelect'), projects, '請選擇專案...');
             } catch (error) {
                 console.error("載入專案失敗:", error);
+                showAlert('載入專案失敗', 'error');
             } finally {
                 showLoading(false);
             }
@@ -79,15 +88,20 @@ function initProcurementPage() {
             tenderSelect.disabled = true;
 
             try {
-                const db = firebase.firestore();
-                // ❌ 移除 orderBy，避免權限問題
-                const snapshot = await db.collection('tenders')
-                    .where('projectId', '==', projectId)
-                    .get();
-                
-                tenders = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                
-                // ✅ 改在前端排序 (最新在前)
+                // 嘗試使用 safeFirestoreQuery (如果有定義)
+                let tenderDocs = [];
+                if (typeof safeFirestoreQuery === 'function') {
+                    const result = await safeFirestoreQuery("tenders", [{ field: "projectId", operator: "==", value: projectId }]);
+                    tenderDocs = result.docs;
+                } else {
+                    const snapshot = await db.collection('tenders')
+                        .where('projectId', '==', projectId)
+                        .get();
+                    tenderDocs = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+                }
+
+                tenders = tenderDocs;
+                // 前端排序
                 tenders.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
                 populateSelect(tenderSelect, tenders, '請選擇標單...');
@@ -97,7 +111,7 @@ function initProcurementPage() {
             }
         }
 
-        // --- (C) 標單變更 -> 載入所有資料 (🔥 修正重點) ---
+        // --- (C) 標單變更 -> 載入所有資料 (🔥 權限修正重點) ---
         async function onTenderChange(tenderId) {
             resetSelects('majorItem');
             if (!tenderId) return;
@@ -107,47 +121,86 @@ function initProcurementPage() {
             majorItemSelect.innerHTML = '<option value="">載入中...</option>';
             majorItemSelect.disabled = true;
 
-            showLoading(true, '載入標單明細...');
+            showLoading(true, '載入資料中...');
 
             try {
-                const db = firebase.firestore();
+                // 準備查詢參數：必須包含 projectId 以符合安全規則
+                const queryConditions = [
+                    { field: 'tenderId', operator: '==', value: tenderId },
+                    { field: 'projectId', operator: '==', value: selectedProject.id }
+                ];
 
-                // 1. 載入大項與細項 (❌ 移除 .orderBy，改用純 where)
-                // 這會跟 space-distribution.js 的查詢方式一模一樣
-                const majorProm = db.collection('majorItems')
-                    .where('tenderId', '==', tenderId)
-                    .get();
-                
-                const detailProm = db.collection('detailItems')
-                    .where('tenderId', '==', tenderId)
-                    .get();
+                // 1. 載入大項與細項
+                let majorData, detailData;
 
-                const [majorSnap, detailSnap] = await Promise.all([majorProm, detailProm]);
-                
-                majorItems = majorSnap.docs.map(d => ({id: d.id, ...d.data()}));
-                detailItems = detailSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                if (typeof safeFirestoreQuery === 'function') {
+                    const [majorRes, detailRes] = await Promise.all([
+                        safeFirestoreQuery('majorItems', queryConditions),
+                        safeFirestoreQuery('detailItems', queryConditions)
+                    ]);
+                    majorData = majorRes.docs;
+                    detailData = detailRes.docs;
+                } else {
+                    // Fallback: 手動查詢
+                    const majorSnap = await db.collection('majorItems')
+                        .where('tenderId', '==', tenderId)
+                        .where('projectId', '==', selectedProject.id)
+                        .get();
+                    
+                    const detailSnap = await db.collection('detailItems')
+                        .where('tenderId', '==', tenderId)
+                        .where('projectId', '==', selectedProject.id)
+                        .get();
 
-                // ✅ 改在前端排序 (依 sequence)
+                    majorData = majorSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                    detailData = detailSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                }
+
+                majorItems = majorData;
+                detailItems = detailData;
+
+                // 排序
                 majorItems.sort(naturalSequenceSort);
                 detailItems.sort(naturalSequenceSort);
 
                 populateSelect(majorItemSelect, majorItems, '所有大項目');
 
-                // 2. 嘗試載入採購單 (容錯)
+                // 2. 嘗試載入採購單 (容錯 + 權限修正)
                 try {
-                    const poSnap = await db.collection('purchaseOrders').where('tenderId', '==', tenderId).get();
-                    purchaseOrders = poSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                    let poData = [];
+                    // 這裡也加上 projectId 條件
+                    if (typeof safeFirestoreQuery === 'function') {
+                         const poRes = await safeFirestoreQuery('purchaseOrders', queryConditions);
+                         poData = poRes.docs;
+                    } else {
+                        const poSnap = await db.collection('purchaseOrders')
+                            .where('tenderId', '==', tenderId)
+                            .where('projectId', '==', selectedProject.id)
+                            .get();
+                        poData = poSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                    }
+                    purchaseOrders = poData;
                 } catch (poError) {
-                    console.warn("⚠️ 採購單讀取被拒 (可能是權限未開)，視為無資料");
+                    console.warn("⚠️ 採購單讀取失敗 (權限或索引問題)，視為無資料:", poError.message);
                     purchaseOrders = [];
                 }
 
-                // 3. 嘗試載入報價單 (容錯)
+                // 3. 嘗試載入報價單 (容錯 + 權限修正)
                 try {
-                    const quoteSnap = await db.collection('quotations').where('tenderId', '==', tenderId).get();
-                    quotations = quoteSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                    let quoteData = [];
+                    if (typeof safeFirestoreQuery === 'function') {
+                        const quoteRes = await safeFirestoreQuery('quotations', queryConditions);
+                        quoteData = quoteRes.docs;
+                    } else {
+                        const quoteSnap = await db.collection('quotations')
+                            .where('tenderId', '==', tenderId)
+                            .where('projectId', '==', selectedProject.id)
+                            .get();
+                        quoteData = quoteSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                    }
+                    quotations = quoteData;
                 } catch (quoteError) {
-                    console.warn("⚠️ 報價單讀取被拒，視為無資料");
+                    console.warn("⚠️ 報價單讀取失敗，視為無資料:", quoteError.message);
                     quotations = [];
                 }
 
@@ -159,7 +212,6 @@ function initProcurementPage() {
 
             } catch (error) {
                 console.error("❌ 核心資料載入失敗:", error);
-                // 這裡如果不幸失敗，我們至少要在 Console 看到是誰失敗
                 showAlert('載入失敗: ' + error.message, 'error');
                 majorItemSelect.innerHTML = '<option value="">載入失敗</option>';
             } finally {
@@ -284,9 +336,13 @@ function initProcurementPage() {
             if(totalEl) totalEl.textContent = detailItems.length;
         }
 
-        // 自然排序法 (前端排序)
         function naturalSequenceSort(a, b) {
             return (a.sequence || '').localeCompare((b.sequence || ''), undefined, {numeric: true, sensitivity: 'base'});
+        }
+        
+        // 簡單的 alert 替代品，避免依賴外部庫
+        function showAlert(msg, type) {
+            alert(msg);
         }
     });
 }
