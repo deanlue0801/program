@@ -1153,3 +1153,80 @@ body.sidebar-open .sidebar-overlay {
         gap: 0.5rem;
     }
 }
+/* =========================================
+   採購管理頁面專屬樣式 (Procurement Page)
+   ========================================= */
+
+/* 狀態標籤基礎樣式 */
+.order-chip {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    background-color: var(--gray-light);
+    color: var(--text-dark);
+    border: 1px solid var(--gray-border);
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.order-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* 採購狀態顏色 */
+.order-chip.status-planning { 
+    background-color: #e3f2fd; 
+    color: #0d47a1; 
+    border-color: #90caf9; 
+} /* 規劃中 - 藍色 */
+
+.order-chip.status-ordered { 
+    background-color: #fff3e0; 
+    color: #e65100; 
+    border-color: #ffcc80; 
+} /* 已下單 - 橘色 */
+
+.order-chip.status-arrived { 
+    background-color: #e8f5e9; 
+    color: #1b5e20; 
+    border-color: #a5d6a7; 
+} /* 已到貨 - 綠色 */
+
+.order-chip.status-installed { 
+    background-color: #f3e5f5; 
+    color: #4a148c; 
+    border-color: #ce93d8; 
+} /* 已安裝 - 紫色 */
+
+/* 供應商報價標籤 */
+.quote-chip {
+    display: inline-block;
+    padding: 2px 8px;
+    margin: 2px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #495057;
+    cursor: pointer;
+}
+
+.quote-chip.selected {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+    font-weight: bold;
+}
+
+/* 修正篩選區在電腦版的排版 */
+@media (min-width: 768px) {
+    .procurement-page .filter-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr); /* 強制三欄並排 */
+        gap: 20px;
+    }
+}
