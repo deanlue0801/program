@@ -63,6 +63,7 @@
                 <h3 class="content-subtitle">📝 採購項目清單</h3>
                 
                 <div class="action-buttons" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    
                     <input type="file" id="importQuotesInput" accept=".xlsx,.xls" style="display: none;">
 
                     <button id="exportRfqBtn" class="btn btn-outline-secondary btn-sm" title="匯出詢價單">
@@ -147,7 +148,7 @@
         gap: 10px;
     }
     
-    /* 確保按鈕在手機版不會擠在一起 */
+    /* 避免手機版按鈕擠在一起 */
     @media (max-width: 768px) {
         .card-header-actions {
             flex-direction: column;
@@ -156,6 +157,7 @@
         .action-buttons {
             width: 100%;
             justify-content: flex-start;
+            margin-top: 10px;
         }
     }
 </style>
