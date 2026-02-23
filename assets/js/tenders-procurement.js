@@ -1,11 +1,11 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v8.0 (終極修復版)
- * 特性：採用 space-distribution.js 的穩健架構，並加入權限容錯機制。
+ * 標單採購管理 (tenders-procurement.js) - v9.0 (去除排序限制版)
+ * 修正核心：移除 Firestore 查詢時的 .orderBy()，改由前端排序，解決 "Missing or insufficient permissions" 問題。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v8.0 終極版)...");
+    console.log("🚀 初始化採購管理頁面 (v9.0 去除排序限制)...");
 
-    // 1. 等待 HTML 元素 (採用與 space-distribution 相同的機制)
+    // 1. 等待 HTML 元素
     function waitForElement(selector, callback) {
         const element = document.querySelector(selector);
         if (element) {
@@ -21,16 +21,14 @@ function initProcurementPage() {
         }, 100);
     }
 
-    // 2. 當下拉選單出現後，才開始執行邏輯
     waitForElement('#projectSelect', () => {
-        console.log("✅ HTML 元素已就緒，開始執行核心邏輯...");
+        console.log("✅ HTML 元素已就緒，開始執行...");
 
         // --- 變數宣告 ---
         let projects = [], tenders = [], majorItems = [], detailItems = [];
-        let purchaseOrders = [], quotations = []; // 這些是容易因為權限報錯的資料
+        let purchaseOrders = [], quotations = [];
         let selectedProject = null, selectedTender = null;
         
-        // 取得全域 Firebase 實例 (由 firebase-config.js 提供)
         const currentUser = firebase.auth().currentUser;
 
         // --- 啟動初始化 ---
@@ -42,23 +40,29 @@ function initProcurementPage() {
             await loadProjectsWithPermission();
         }
 
-        // --- (A) 載入專案 (參考 space-distribution) ---
+        // --- (A) 載入專案 ---
         async function loadProjectsWithPermission() {
             showLoading(true, '載入專案中...');
             try {
-                // 使用全域 loadProjects() 載入，確保邏輯一致
-                const allMyProjects = await loadProjects();
+                // 使用全域 loadProjects()
+                let allMyProjects = [];
+                if (typeof loadProjects === 'function') {
+                    allMyProjects = await loadProjects();
+                } else {
+                    const db = firebase.firestore();
+                    const snapshot = await db.collection('projects').get();
+                    allMyProjects = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                }
                 
-                // 篩選權限 (Owner 或 成員)
+                // 篩選權限
                 projects = allMyProjects.filter(project => {
                     const memberInfo = project.members && project.members[currentUser.email];
-                    return memberInfo; // 只要是成員就能看
+                    return memberInfo || project.createdBy === currentUser.email;
                 });
 
                 populateSelect(document.getElementById('projectSelect'), projects, '請選擇專案...');
             } catch (error) {
                 console.error("載入專案失敗:", error);
-                showAlert('載入專案失敗', 'error');
             } finally {
                 showLoading(false);
             }
@@ -67,31 +71,23 @@ function initProcurementPage() {
         // --- (B) 專案變更 -> 載入標單 ---
         async function onProjectChange(projectId) {
             resetSelects('tender');
+            if (!projectId) return;
             
-            if (!projectId) {
-                selectedProject = null;
-                return;
-            }
             selectedProject = projects.find(p => p.id === projectId);
-            
             const tenderSelect = document.getElementById('tenderSelect');
             tenderSelect.innerHTML = '<option value="">載入中...</option>';
             tenderSelect.disabled = true;
 
             try {
-                // 使用 safeFirestoreQuery (如果有定義) 或直接查詢
-                let tenderDocs;
-                if (typeof safeFirestoreQuery === 'function') {
-                    const result = await safeFirestoreQuery("tenders", [{ field: "projectId", operator: "==", value: projectId }]);
-                    tenderDocs = result.docs;
-                } else {
-                    // Fallback: 直接使用 db
-                    const snapshot = await db.collection('tenders').where('projectId', '==', projectId).get();
-                    tenderDocs = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                }
-
-                tenders = tenderDocs;
-                // 排序：最新的在上面
+                const db = firebase.firestore();
+                // ❌ 移除 orderBy，避免權限問題
+                const snapshot = await db.collection('tenders')
+                    .where('projectId', '==', projectId)
+                    .get();
+                
+                tenders = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+                
+                // ✅ 改在前端排序 (最新在前)
                 tenders.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
                 populateSelect(tenderSelect, tenders, '請選擇標單...');
@@ -101,27 +97,25 @@ function initProcurementPage() {
             }
         }
 
-        // --- (C) 標單變更 -> 載入所有資料 (🔥 核心容錯區) ---
+        // --- (C) 標單變更 -> 載入所有資料 (🔥 修正重點) ---
         async function onTenderChange(tenderId) {
             resetSelects('majorItem');
-            
-            if (!tenderId) {
-                selectedTender = null;
-                return;
-            }
+            if (!tenderId) return;
+
             selectedTender = tenders.find(t => t.id === tenderId);
-            
             const majorItemSelect = document.getElementById('majorItemSelect');
             majorItemSelect.innerHTML = '<option value="">載入中...</option>';
             majorItemSelect.disabled = true;
 
-            showLoading(true, '載入標單明細與採購資料...');
+            showLoading(true, '載入標單明細...');
 
             try {
-                // 1. 載入大項與細項 (這是核心資料，必須成功)
+                const db = firebase.firestore();
+
+                // 1. 載入大項與細項 (❌ 移除 .orderBy，改用純 where)
+                // 這會跟 space-distribution.js 的查詢方式一模一樣
                 const majorProm = db.collection('majorItems')
                     .where('tenderId', '==', tenderId)
-                    .orderBy('sequence') // 如果這裡報索引錯，可暫時移除 orderBy
                     .get();
                 
                 const detailProm = db.collection('detailItems')
@@ -132,36 +126,40 @@ function initProcurementPage() {
                 
                 majorItems = majorSnap.docs.map(d => ({id: d.id, ...d.data()}));
                 detailItems = detailSnap.docs.map(d => ({id: d.id, ...d.data()}));
+
+                // ✅ 改在前端排序 (依 sequence)
+                majorItems.sort(naturalSequenceSort);
                 detailItems.sort(naturalSequenceSort);
 
                 populateSelect(majorItemSelect, majorItems, '所有大項目');
 
-                // 2. 🔥 嘗試載入採購單 (容錯處理)
+                // 2. 嘗試載入採購單 (容錯)
                 try {
                     const poSnap = await db.collection('purchaseOrders').where('tenderId', '==', tenderId).get();
                     purchaseOrders = poSnap.docs.map(d => ({id: d.id, ...d.data()}));
                 } catch (poError) {
-                    console.warn("⚠️ [權限警告] 無法讀取採購單，將視為空:", poError.message);
-                    purchaseOrders = []; // 設為空，讓程式繼續跑
+                    console.warn("⚠️ 採購單讀取被拒 (可能是權限未開)，視為無資料");
+                    purchaseOrders = [];
                 }
 
-                // 3. 🔥 嘗試載入報價單 (容錯處理)
+                // 3. 嘗試載入報價單 (容錯)
                 try {
                     const quoteSnap = await db.collection('quotations').where('tenderId', '==', tenderId).get();
                     quotations = quoteSnap.docs.map(d => ({id: d.id, ...d.data()}));
                 } catch (quoteError) {
-                    console.warn("⚠️ [權限警告] 無法讀取報價單，將視為空:", quoteError.message);
+                    console.warn("⚠️ 報價單讀取被拒，視為無資料");
                     quotations = [];
                 }
 
-                // 4. 全部完成，顯示表格
+                // 4. 顯示表格
                 document.getElementById('mainContent').style.display = 'block';
                 document.getElementById('emptyState').style.display = 'none';
                 renderTable();
                 updateStats();
 
             } catch (error) {
-                console.error("載入核心資料失敗:", error);
+                console.error("❌ 核心資料載入失敗:", error);
+                // 這裡如果不幸失敗，我們至少要在 Console 看到是誰失敗
                 showAlert('載入失敗: ' + error.message, 'error');
                 majorItemSelect.innerHTML = '<option value="">載入失敗</option>';
             } finally {
@@ -174,9 +172,8 @@ function initProcurementPage() {
             const tbody = document.getElementById('procurementTableBody');
             const filterMajorId = document.getElementById('majorItemSelect').value;
             
-            if (!tbody) return; // 防呆
+            if (!tbody) return;
 
-            // 根據大項篩選
             const displayItems = filterMajorId 
                 ? detailItems.filter(i => i.majorItemId === filterMajorId) 
                 : detailItems;
@@ -188,15 +185,11 @@ function initProcurementPage() {
 
             let html = '';
             displayItems.forEach(item => {
-                // 狀態判斷
+                // 狀態與報價顯示
                 const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
                 const itemQuotes = quotations.filter(q => q.detailItemId === item.id);
                 
-                // 預設狀態
-                let statusText = '規劃中';
-                let statusClass = 'status-planning';
-                
-                // 如果有採購單，覆蓋狀態
+                let statusText = '規劃中', statusClass = 'status-planning';
                 if (itemPO) {
                     const statusMap = {
                         'ordered': {t: '已下單', c: 'status-ordered'},
@@ -204,16 +197,14 @@ function initProcurementPage() {
                         'installed': {t: '已安裝', c: 'status-installed'}
                     };
                     const s = statusMap[itemPO.status] || {t: itemPO.status, c: 'status-planning'};
-                    statusText = s.t;
-                    statusClass = s.c;
+                    statusText = s.t; statusClass = s.c;
                 }
 
-                // 報價顯示
                 let quotesHtml = '<span class="text-muted text-sm">-</span>';
                 if (itemQuotes.length > 0) {
                     quotesHtml = itemQuotes.map(q => 
                         `<span class="quote-chip" title="${q.supplier}">
-                            ${q.supplier.substring(0,4)}.. $${q.quotedUnitPrice || 0}
+                            ${(q.supplier||'').substring(0,4)}.. $${q.quotedUnitPrice || 0}
                          </span>`
                     ).join('');
                 }
@@ -247,12 +238,10 @@ function initProcurementPage() {
             bind('tenderSelect', 'change', (e) => onTenderChange(e.target.value));
             bind('majorItemSelect', 'change', () => renderTable());
 
-            // 按鈕功能 (暫時只做 log 或簡單 alert，確保不會報錯)
             bind('exportRfqBtn', 'click', () => alert('匯出功能建置中...'));
             bind('importQuotesBtn', 'click', () => document.getElementById('importQuotesInput')?.click());
             bind('manageQuotesBtn', 'click', () => document.getElementById('manageQuotesModal').style.display = 'flex');
             
-            // Modal 關閉按鈕
             document.querySelectorAll('[data-action="close-modal"]').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const modal = btn.closest('.modal-overlay');
@@ -291,11 +280,11 @@ function initProcurementPage() {
         }
         
         function updateStats() {
-            // 簡單更新統計，如果元素存在
             const totalEl = document.getElementById('totalItemsCount');
             if(totalEl) totalEl.textContent = detailItems.length;
         }
 
+        // 自然排序法 (前端排序)
         function naturalSequenceSort(a, b) {
             return (a.sequence || '').localeCompare((b.sequence || ''), undefined, {numeric: true, sensitivity: 'base'});
         }
