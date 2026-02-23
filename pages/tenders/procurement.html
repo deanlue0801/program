@@ -1,166 +1,130 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>標單採購管理</title>
-    <link rel="stylesheet" href="../assets/css/main.css">
-    <style>
-        .status-planning { background-color: #e3f2fd; }
-        .status-active { background-color: #e8f5e9; }
-        .status-completed { background-color: #fce4ec; text-decoration: line-through; color: #888; }
-        .major-item-header { background-color: #f5f5f5; font-weight: bold; }
-        .order-list, .quote-list { display: flex; flex-wrap: wrap; gap: 5px; }
-        .order-chip, .quote-chip { padding: 3px 8px; border-radius: 12px; font-size: 0.8em; cursor: pointer; }
-        .order-chip { background-color: #d1c4e9; color: #311b92; }
-        .quote-chip { background-color: #c8e6c9; color: #1b5e20; }
-        .order-chip.status-已下單 { background-color: #a5d6a7; }
-        .order-chip.status-已到貨 { background-color: #81c784; }
-        .order-chip.status-已結算 { background-color: #66bb6a; }
-        .action-buttons { display: flex; gap: 5px; }
-        .supplier-quote-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; }
-    </style>
-</head>
-<body>
-    <div id="app">
-        <div id="sidebar"></div>
-        <div id="main-content-area">
-            <header>
-                <h1>標單採購管理</h1>
-            </header>
-            <main>
-                <div class="controls">
-                    <select id="projectSelect" class="form-control"></select>
-                    <select id="tenderSelect" class="form-control" disabled></select>
-                    <select id="majorItemSelect" class="form-control" disabled></select>
-                    <button id="exportRfqBtn" class="btn btn-primary">匯出詢價單 (Excel)</button>
-                    <button id="importQuotesBtn" class="btn btn-secondary">匯入報價單</button>
-                    <button id="manageQuotesBtn" class="btn btn-warning">管理報價單</button>
-                    <input type="file" id="importQuotesInput" accept=".xlsx, .xls" style="display: none;">
-                </div>
+<div class="procurement-page">
+    <div class="page-header">
+        <h1 class="page-title">🛒 採購管理</h1>
+        <p class="page-subtitle">管理標單項目的採購下單、到貨追蹤與供應商報價。</p>
+    </div>
 
-                <div id="loading" class="loading-overlay" style="display: none;">
-                    <div class="spinner"></div>
-                    <p>載入中...</p>
-                </div>
-
-                <div id="emptyState" class="empty-state" style="display: flex;">
-                    <p>請先從上方選擇一個專案和標單以開始。</p>
-                </div>
-
-                <div id="mainContent" style="display: none;">
-                    <table id="procurementTable">
-                        <thead>
-                            <tr>
-                                <th style="width: 5%;">項次</th>
-                                <th style="width: 30%;">項目名稱</th>
-                                <th style="width: 10%;" class="text-right">預計數量</th>
-                                <th style="width: 10%;" class="text-right">已採購量</th>
-                                <th style="width: 10%;" class="text-right">剩餘數量</th>
-                                <th style="width: 25%;">採購/報價紀錄</th>
-                                <th style="width: 10%;">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody">
-                        </tbody>
-                    </table>
-                </div>
-            </main>
+    <div class="content-card filter-section">
+        <div class="filter-row">
+            <div class="form-group">
+                <label for="projectSelect">📁 選擇專案</label>
+                <select id="projectSelect" class="form-control">
+                    <option value="">載入中...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="tenderSelect">📋 選擇標單</label>
+                <select id="tenderSelect" class="form-control" disabled>
+                    <option value="">請先選擇專案</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="majorItemSelect">🔧 篩選大項 (可選)</label>
+                <select id="majorItemSelect" class="form-control" disabled>
+                    <option value="">所有大項目</option>
+                </select>
+            </div>
         </div>
     </div>
 
-    <div id="priceCompareModal" class="modal-overlay" style="display: none;">
-        <div class="modal-content" style="max-width: 600px;">
-            <div class="modal-header">
-                <h5 class="modal-title">廠商報價比價</h5>
-                <button type="button" class="modal-close">&times;</button>
+    <div id="loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>載入採購資料中...</p>
+    </div>
+
+    <div id="emptyState" class="empty-state" style="display: flex;">
+        <div class="empty-state-icon">🛒</div>
+        <h3>請選擇專案與標單</h3>
+        <p>請從上方選擇標單以開始管理採購作業。</p>
+    </div>
+
+    <div id="mainContent" style="display: none;">
+        
+        <div class="content-card">
+            <h3 class="content-subtitle">📊 採購狀態概覽</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalItemsCount">0</div>
+                    <div class="stat-label">總項目數</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="orderedCount">0</div>
+                    <div class="stat-label">已下單</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="arrivedCount">0</div>
+                    <div class="stat-label">已到貨</div>
+                </div>
             </div>
-            <div class="modal-body">
-                <p><strong>項目:</strong> <span id="compareItemName"></span></p>
-                <table class="data-table">
+        </div>
+
+        <div class="content-card">
+            <div class="card-header-actions">
+                <h3 class="content-subtitle">📝 採購項目清單</h3>
+                <button id="manageQuotesBtn" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-file-invoice-dollar"></i> 管理供應商報價
+                </button>
+            </div>
+            
+            <div class="table-container">
+                <table class="table">
                     <thead>
                         <tr>
-                            <th>供應商</th>
-                            <th class="text-right">報價單價</th>
-                            <th>備註</th>
-                            <th>操作</th>
+                            <th style="width: 5%;">項次</th>
+                            <th style="width: 25%;">項目名稱</th>
+                            <th style="width: 8%;">單位</th>
+                            <th style="width: 8%;" class="text-right">數量</th>
+                            <th style="width: 20%;">採購狀態 (點擊切換)</th>
+                            <th style="width: 25%;">供應商報價 (點擊選擇)</th>
+                            <th style="width: 9%;" class="text-right">成本單價</th>
                         </tr>
                     </thead>
-                    <tbody id="compareTableBody">
-                    </tbody>
+                    <tbody id="procurementTableBody">
+                        </tbody>
                 </table>
             </div>
-            <div class="modal-footer">
-                <button type="button" id="cancelCompareModalBtn" class="btn btn-secondary">關閉</button>
-            </div>
         </div>
     </div>
+</div>
 
-    <div id="orderModal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalTitle">新增/編輯採購單</h5>
-                <button type="button" class="modal-close">&times;</button>
-            </div>
-            <form id="orderForm">
-                <div class="modal-body">
-                    <p><strong>項目:</strong> <span id="itemNameDisplay"></span></p>
-                    <input type="hidden" id="orderId">
-                    <input type="hidden" id="detailItemId">
-                    <div class="form-group">
-                        <label for="supplier">供應商</label>
-                        <input type="text" id="supplier" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="purchaseQuantity">採購數量</label>
-                        <input type="number" id="purchaseQuantity" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="unitPrice">採購單價</label>
-                        <input type="number" id="unitPrice" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="status">狀態</label>
-                        <select id="status" class="form-control">
-                            <option value="草稿">草稿</option>
-                            <option value="已下單">已下單</option>
-                            <option value="已到貨">已到貨</option>
-                            <option value="已結算">已結算</option>
-                        </select>
-                    </div>
-                     <div class="form-group">
-                        <label for="orderDate">下單日期</label>
-                        <input type="date" id="orderDate" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="notes">備註</label>
-                        <textarea id="notes" class="form-control"></textarea>
-                    </div>
+<div id="manageQuotesModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">管理供應商報價</h3>
+            <button type="button" class="close-modal-btn" data-action="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p class="text-muted">此處列出目前已匯入報價的供應商。您可以刪除特定供應商的報價紀錄。</p>
+            <div id="supplierQuotesList" class="list-group mt-3">
                 </div>
-                <div class="modal-footer">
-                    <button type="button" id="deleteOrderBtn" class="btn btn-danger" style="display: none;">刪除</button>
-                    <button type="button" id="cancelOrderModalBtn" class="btn btn-secondary modal-close">取消</button>
-                    <button type="submit" class="btn btn-primary">儲存</button>
-                </div>
-            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-action="close-modal">關閉</button>
         </div>
     </div>
+</div>
 
-    <div id="manageQuotesModal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">管理供應商報價</h5>
-                <button type="button" class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p>此處將列出所有已匯入報價的供應商。您可以刪除特定供應商在本標單的所有報價紀錄，以便重新匯入。</p>
-                <div id="supplierQuotesList">
-                    </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary modal-close">完成</button>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
+<style>
+    @media (min-width: 768px) {
+        .procurement-page, 
+        .filter-section, 
+        #mainContent {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+        
+        .filter-row {
+            display: flex !important;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+    }
+
+    .card-header-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+</style>
