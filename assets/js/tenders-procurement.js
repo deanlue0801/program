@@ -386,7 +386,7 @@ function initProcurementPage() {
                     '單位': item.unit || '',
                     '數量': item.quantity || 0,
                     '供應商報價(單價)': '',
-                    '小計(復價)': '',
+                    '小計(複價)': '',
                     '備註': ''
                 }));
 
