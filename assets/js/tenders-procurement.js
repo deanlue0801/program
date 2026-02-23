@@ -1,12 +1,11 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v14.0 (數量欄位修正版)
- * 修正：
- * 1. 匯出 Excel 時，強制將「數量」轉為數字格式，解決顯示為 0 的問題。
- * 2. 同步修正表格顯示邏輯，確保畫面與匯出一致。
- * 3. 包含 v13 的狀態切換與資料庫寫入功能。
+ * 標單採購管理 (tenders-procurement.js) - v15.0 (欄位名稱修正版)
+ * 修正重點：
+ * 1. 【關鍵】修正數量欄位讀取：改用 totalQuantity (原本誤用 quantity)。
+ * 2. 增加過濾機制：只載入原始標單項目 (排除 isAddition 追加減項目)，避免資料重複。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v14.0 數量修正版)...");
+    console.log("🚀 初始化採購管理頁面 (v15.0 欄位修正版)...");
 
     // 1. 等待 HTML 元素
     function waitForElement(selector, callback) {
@@ -122,7 +121,7 @@ function initProcurementPage() {
                 ];
 
                 // 1. 載入大項與細項
-                let majorData, detailData;
+                let majorData, detailDataRaw;
 
                 if (typeof safeFirestoreQuery === 'function') {
                     const [majorRes, detailRes] = await Promise.all([
@@ -130,7 +129,7 @@ function initProcurementPage() {
                         safeFirestoreQuery('detailItems', queryConditions)
                     ]);
                     majorData = majorRes.docs;
-                    detailData = detailRes.docs;
+                    detailDataRaw = detailRes.docs;
                 } else {
                     const majorSnap = await db.collection('majorItems')
                         .where('tenderId', '==', tenderId)
@@ -143,11 +142,14 @@ function initProcurementPage() {
                         .get();
 
                     majorData = majorSnap.docs.map(d => ({id: d.id, ...d.data()}));
-                    detailData = detailSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                    detailDataRaw = detailSnap.docs.map(d => ({id: d.id, ...d.data()}));
                 }
 
                 majorItems = majorData;
-                detailItems = detailData;
+                
+                // ✅ 過濾掉追加減項目 (isAddition: true)，只保留原始項目
+                // 參考 tenders-edit.js 的邏輯
+                detailItems = detailDataRaw.filter(item => !item.isAddition);
 
                 majorItems.sort(naturalSequenceSort);
                 detailItems.sort(naturalSequenceSort);
@@ -227,7 +229,7 @@ function initProcurementPage() {
                 const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
                 const itemQuotes = quotations.filter(q => q.detailItemId === item.id);
                 
-                // 狀態顯示邏輯
+                // 狀態顯示
                 let statusText = '規劃中', statusClass = 'status-planning';
                 let currentStatusCode = 'planning';
 
@@ -251,8 +253,20 @@ function initProcurementPage() {
                     ).join('');
                 }
 
-                // ✅ 修正：確保數量顯示為數字
-                const qty = item.quantity ? Number(item.quantity) : (item.qty ? Number(item.qty) : 0);
+                // ✅ 關鍵修正：優先使用 totalQuantity，若無則嘗試其他欄位
+                let qty = 0;
+                if (item.totalQuantity !== undefined && item.totalQuantity !== null) {
+                    qty = Number(item.totalQuantity);
+                } else if (item.quantity !== undefined && item.quantity !== null) {
+                    qty = Number(item.quantity);
+                } else if (item.qty !== undefined && item.qty !== null) {
+                    qty = Number(item.qty);
+                }
+
+                // 成本單價 (優先使用 unitPrice, 再用 cost)
+                let unitPrice = 0;
+                if (item.unitPrice !== undefined) unitPrice = item.unitPrice;
+                else if (item.cost !== undefined) unitPrice = item.cost;
 
                 html += `
                     <tr>
@@ -271,7 +285,7 @@ function initProcurementPage() {
                             </span>
                         </td>
                         <td>${quotesHtml}</td>
-                        <td class="text-right">${item.cost ? parseInt(item.cost).toLocaleString() : '-'}</td>
+                        <td class="text-right">${unitPrice ? parseInt(unitPrice).toLocaleString() : '-'}</td>
                     </tr>
                 `;
             });
@@ -326,7 +340,6 @@ function initProcurementPage() {
                 if (nextStatus === 'planning') {
                     if (itemPO) {
                         await db.collection('purchaseOrders').doc(itemPO.id).delete();
-                        console.log(`🗑️ 已刪除採購單: ${itemPO.id}`);
                     }
                 } else {
                     const poData = {
@@ -350,7 +363,6 @@ function initProcurementPage() {
                     }
                 }
                 await onTenderChange(selectedTender.id);
-
             } catch (error) {
                 console.error("狀態更新失敗:", error);
                 showAlert("狀態更新失敗: " + error.message, 'error');
@@ -359,12 +371,12 @@ function initProcurementPage() {
             }
         }
 
-        // 2. 選擇報價 (預留)
+        // 2. 選擇報價
         function handleSelectQuote(quoteId) {
             console.log("選擇報價:", quoteId);
         }
 
-        // 3. 匯出詢價單 (🔥 修正：強制轉換數量)
+        // 3. 匯出詢價單
         function handleExportRFQ() {
             if (!selectedTender) return showAlert('請先選擇標單', 'warning');
             if (detailItems.length === 0) return showAlert('目前沒有項目可匯出', 'warning');
@@ -373,17 +385,20 @@ function initProcurementPage() {
                 if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
 
                 const exportData = detailItems.map(item => {
-                    // ✅ 強制轉為數字，並處理可能的欄位名稱差異
-                    const qty = item.quantity ? Number(item.quantity) : (item.qty ? Number(item.qty) : 0);
+                    // ✅ 匯出時也使用正確的欄位 totalQuantity
+                    let qty = 0;
+                    if (item.totalQuantity !== undefined && item.totalQuantity !== null) qty = Number(item.totalQuantity);
+                    else if (item.quantity !== undefined && item.quantity !== null) qty = Number(item.quantity);
+                    else if (item.qty !== undefined && item.qty !== null) qty = Number(item.qty);
 
                     return {
                         '項次': item.sequence || '',
                         '項目名稱': item.name || '',
                         '說明(廠牌/型號)': `${item.brand || ''} ${item.model || ''}`.trim(),
                         '單位': item.unit || '',
-                        '數量': qty, // 這裡已經是乾淨的數字了
+                        '數量': qty, 
                         '供應商報價(單價)': '',
-                        '小計(複價)': '',
+                        '小計(複價)': '', 
                         '備註': ''
                     };
                 });
