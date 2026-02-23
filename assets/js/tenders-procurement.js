@@ -1,12 +1,11 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v10.0 (權限邏輯同步版)
- * 核心修正：
- * 1. 同步 tenders-edit.js 的權限檢查流程。
- * 2. 查詢時嚴格帶入 projectId 以符合安全規則。
- * 3. 使用系統封裝的 safeFirestoreQuery (若可用)。
+ * 標單採購管理 (tenders-procurement.js) - v12.0 (匯出欄位補強版)
+ * 修正：
+ * 1. 匯出 Excel 時加入「小計(復價)」欄位。
+ * 2. 調整 Excel 欄位寬度設定。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v10.0 權限同步版)...");
+    console.log("🚀 初始化採購管理頁面 (v12.0 匯出補強版)...");
 
     // 1. 等待 HTML 元素
     function waitForElement(selector, callback) {
@@ -32,9 +31,8 @@ function initProcurementPage() {
         let purchaseOrders = [], quotations = [];
         let selectedProject = null, selectedTender = null;
         
-        // 取得全域 Firebase 實例
         const currentUser = firebase.auth().currentUser;
-        const db = firebase.firestore(); // 確保 db 實例存在
+        const db = firebase.firestore();
 
         // --- 啟動初始化 ---
         initializePage();
@@ -45,25 +43,20 @@ function initProcurementPage() {
             await loadProjectsWithPermission();
         }
 
-        // --- (A) 載入專案 (參考 tenders-edit.js 的權限邏輯) ---
+        // --- (A) 載入專案 ---
         async function loadProjectsWithPermission() {
             showLoading(true, '載入專案中...');
             try {
-                // 1. 嘗試使用全域 loadProjects
                 let allMyProjects = [];
                 if (typeof loadProjects === 'function') {
                     allMyProjects = await loadProjects();
                 } else {
-                    // Fallback: 直接查詢
                     const snapshot = await db.collection('projects').get();
                     allMyProjects = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
                 }
                 
-                // 2. 篩選權限：使用者必須是成員
                 projects = allMyProjects.filter(project => {
-                    // 檢查 members 結構
                     if (project.members && project.members[currentUser.email]) return true;
-                    // 檢查 createdBy
                     if (project.createdBy === currentUser.email) return true;
                     return false;
                 });
@@ -88,7 +81,6 @@ function initProcurementPage() {
             tenderSelect.disabled = true;
 
             try {
-                // 嘗試使用 safeFirestoreQuery (如果有定義)
                 let tenderDocs = [];
                 if (typeof safeFirestoreQuery === 'function') {
                     const result = await safeFirestoreQuery("tenders", [{ field: "projectId", operator: "==", value: projectId }]);
@@ -101,7 +93,6 @@ function initProcurementPage() {
                 }
 
                 tenders = tenderDocs;
-                // 前端排序
                 tenders.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
                 populateSelect(tenderSelect, tenders, '請選擇標單...');
@@ -111,7 +102,7 @@ function initProcurementPage() {
             }
         }
 
-        // --- (C) 標單變更 -> 載入所有資料 (🔥 權限修正重點) ---
+        // --- (C) 標單變更 -> 載入資料 ---
         async function onTenderChange(tenderId) {
             resetSelects('majorItem');
             if (!tenderId) return;
@@ -124,7 +115,6 @@ function initProcurementPage() {
             showLoading(true, '載入資料中...');
 
             try {
-                // 準備查詢參數：必須包含 projectId 以符合安全規則
                 const queryConditions = [
                     { field: 'tenderId', operator: '==', value: tenderId },
                     { field: 'projectId', operator: '==', value: selectedProject.id }
@@ -141,7 +131,6 @@ function initProcurementPage() {
                     majorData = majorRes.docs;
                     detailData = detailRes.docs;
                 } else {
-                    // Fallback: 手動查詢
                     const majorSnap = await db.collection('majorItems')
                         .where('tenderId', '==', tenderId)
                         .where('projectId', '==', selectedProject.id)
@@ -159,16 +148,14 @@ function initProcurementPage() {
                 majorItems = majorData;
                 detailItems = detailData;
 
-                // 排序
                 majorItems.sort(naturalSequenceSort);
                 detailItems.sort(naturalSequenceSort);
 
                 populateSelect(majorItemSelect, majorItems, '所有大項目');
 
-                // 2. 嘗試載入採購單 (容錯 + 權限修正)
+                // 2. 嘗試載入採購單 (容錯)
                 try {
                     let poData = [];
-                    // 這裡也加上 projectId 條件
                     if (typeof safeFirestoreQuery === 'function') {
                          const poRes = await safeFirestoreQuery('purchaseOrders', queryConditions);
                          poData = poRes.docs;
@@ -181,11 +168,11 @@ function initProcurementPage() {
                     }
                     purchaseOrders = poData;
                 } catch (poError) {
-                    console.warn("⚠️ 採購單讀取失敗 (權限或索引問題)，視為無資料:", poError.message);
+                    console.warn("⚠️ 採購單讀取失敗:", poError.message);
                     purchaseOrders = [];
                 }
 
-                // 3. 嘗試載入報價單 (容錯 + 權限修正)
+                // 3. 嘗試載入報價單 (容錯)
                 try {
                     let quoteData = [];
                     if (typeof safeFirestoreQuery === 'function') {
@@ -200,18 +187,17 @@ function initProcurementPage() {
                     }
                     quotations = quoteData;
                 } catch (quoteError) {
-                    console.warn("⚠️ 報價單讀取失敗，視為無資料:", quoteError.message);
+                    console.warn("⚠️ 報價單讀取失敗:", quoteError.message);
                     quotations = [];
                 }
 
-                // 4. 顯示表格
                 document.getElementById('mainContent').style.display = 'block';
                 document.getElementById('emptyState').style.display = 'none';
                 renderTable();
                 updateStats();
 
             } catch (error) {
-                console.error("❌ 核心資料載入失敗:", error);
+                console.error("❌ 資料載入失敗:", error);
                 showAlert('載入失敗: ' + error.message, 'error');
                 majorItemSelect.innerHTML = '<option value="">載入失敗</option>';
             } finally {
@@ -237,7 +223,6 @@ function initProcurementPage() {
 
             let html = '';
             displayItems.forEach(item => {
-                // 狀態與報價顯示
                 const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
                 const itemQuotes = quotations.filter(q => q.detailItemId === item.id);
                 
@@ -290,9 +275,11 @@ function initProcurementPage() {
             bind('tenderSelect', 'change', (e) => onTenderChange(e.target.value));
             bind('majorItemSelect', 'change', () => renderTable());
 
-            bind('exportRfqBtn', 'click', () => alert('匯出功能建置中...'));
+            bind('exportRfqBtn', 'click', handleExportRFQ);
             bind('importQuotesBtn', 'click', () => document.getElementById('importQuotesInput')?.click());
+            bind('importQuotesInput', 'change', handleImportQuotes);
             bind('manageQuotesBtn', 'click', () => document.getElementById('manageQuotesModal').style.display = 'flex');
+            bind('deleteOrderBtn', 'click', handleDeleteOrder);
             
             document.querySelectorAll('[data-action="close-modal"]').forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -300,6 +287,74 @@ function initProcurementPage() {
                     if (modal) modal.style.display = 'none';
                 });
             });
+        }
+
+        // --- (F) 功能函數 ---
+
+        // 1. 匯出詢價單 (加入小計)
+        function handleExportRFQ() {
+            if (!selectedTender) return showAlert('請先選擇標單', 'warning');
+            if (detailItems.length === 0) return showAlert('目前沒有項目可匯出', 'warning');
+
+            try {
+                if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
+
+                const exportData = detailItems.map(item => ({
+                    '項次': item.sequence || '',
+                    '項目名稱': item.name || '',
+                    '說明(廠牌/型號)': `${item.brand || ''} ${item.model || ''}`.trim(),
+                    '單位': item.unit || '',
+                    '數量': item.quantity || 0,
+                    '供應商報價(單價)': '',
+                    '小計(復價)': '', // ✅ 已加入
+                    '備註': ''
+                }));
+
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(exportData);
+
+                // 設定欄寬
+                ws['!cols'] = [
+                    {wch: 8}, {wch: 30}, {wch: 25}, {wch: 8}, {wch: 10}, 
+                    {wch: 15}, {wch: 15}, {wch: 20}
+                ];
+
+                XLSX.utils.book_append_sheet(wb, ws, "詢價單");
+                const filename = `${selectedProject.name}_${selectedTender.name}_詢價單.xlsx`;
+                XLSX.writeFile(wb, filename);
+
+            } catch (error) {
+                console.error("匯出失敗:", error);
+                showAlert("匯出失敗: " + error.message, 'error');
+            }
+        }
+
+        // 2. 匯入報價單
+        async function handleImportQuotes(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
+
+                const data = await file.arrayBuffer();
+                const workbook = XLSX.read(data);
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                console.log("解析資料:", jsonData);
+                showAlert(`成功解析 ${jsonData.length} 筆資料 (寫入邏輯建置中)`, 'success');
+            } catch (error) {
+                console.error("匯入失敗:", error);
+                showAlert("匯入失敗: " + error.message, 'error');
+            } finally {
+                e.target.value = '';
+            }
+        }
+
+        // 3. 刪除單據
+        function handleDeleteOrder() {
+            showAlert("請先選擇要刪除的項目 (功能建置中)", 'info');
         }
 
         // --- 輔助函式 ---
@@ -340,7 +395,6 @@ function initProcurementPage() {
             return (a.sequence || '').localeCompare((b.sequence || ''), undefined, {numeric: true, sensitivity: 'base'});
         }
         
-        // 簡單的 alert 替代品，避免依賴外部庫
         function showAlert(msg, type) {
             alert(msg);
         }
