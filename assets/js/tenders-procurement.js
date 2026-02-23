@@ -1,11 +1,12 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v15.0 (欄位名稱修正版)
- * 修正重點：
- * 1. 【關鍵】修正數量欄位讀取：改用 totalQuantity (原本誤用 quantity)。
- * 2. 增加過濾機制：只載入原始標單項目 (排除 isAddition 追加減項目)，避免資料重複。
+ * 標單採購管理 (tenders-procurement.js) - v16.0 (排序優化版)
+ * 修正：
+ * 1. 強化 naturalSequenceSort：支援中文數字 (一,二,三 / 壹,貳,參) 排序。
+ * 2. 確保「下拉選單」與「表格內容」都依照正確的項次順序排列。
+ * 3. 維持 v15.0 的數量修正與追加減過濾邏輯。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v15.0 欄位修正版)...");
+    console.log("🚀 初始化採購管理頁面 (v16.0 排序優化版)...");
 
     // 1. 等待 HTML 元素
     function waitForElement(selector, callback) {
@@ -146,13 +147,24 @@ function initProcurementPage() {
                 }
 
                 majorItems = majorData;
-                
-                // ✅ 過濾掉追加減項目 (isAddition: true)，只保留原始項目
-                // 參考 tenders-edit.js 的邏輯
                 detailItems = detailDataRaw.filter(item => !item.isAddition);
 
+                // ✅ 關鍵：套用增強版排序
                 majorItems.sort(naturalSequenceSort);
-                detailItems.sort(naturalSequenceSort);
+                
+                // 細項也跟著排 (先依大項順序，再依細項 sequence)
+                detailItems.sort((a, b) => {
+                    // 1. 先比對大項順序
+                    const majorA = majorItems.find(m => m.id === a.majorItemId);
+                    const majorB = majorItems.find(m => m.id === b.majorItemId);
+                    const indexA = majorA ? majorItems.indexOf(majorA) : 9999;
+                    const indexB = majorB ? majorItems.indexOf(majorB) : 9999;
+                    
+                    if (indexA !== indexB) return indexA - indexB;
+
+                    // 2. 同大項內，比對細項 sequence
+                    return naturalSequenceSort(a, b);
+                });
 
                 populateSelect(majorItemSelect, majorItems, '所有大項目');
 
@@ -229,7 +241,6 @@ function initProcurementPage() {
                 const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
                 const itemQuotes = quotations.filter(q => q.detailItemId === item.id);
                 
-                // 狀態顯示
                 let statusText = '規劃中', statusClass = 'status-planning';
                 let currentStatusCode = 'planning';
 
@@ -253,17 +264,12 @@ function initProcurementPage() {
                     ).join('');
                 }
 
-                // ✅ 關鍵修正：優先使用 totalQuantity，若無則嘗試其他欄位
                 let qty = 0;
-                if (item.totalQuantity !== undefined && item.totalQuantity !== null) {
-                    qty = Number(item.totalQuantity);
-                } else if (item.quantity !== undefined && item.quantity !== null) {
-                    qty = Number(item.quantity);
-                } else if (item.qty !== undefined && item.qty !== null) {
-                    qty = Number(item.qty);
-                }
+                if (item.totalQuantity !== undefined && item.totalQuantity !== null) qty = Number(item.totalQuantity);
+                else if (item.quantity !== undefined && item.quantity !== null) qty = Number(item.quantity);
+                else if (item.qty !== undefined && item.qty !== null) qty = Number(item.qty);
 
-                // 成本單價 (優先使用 unitPrice, 再用 cost)
+                // 成本單價
                 let unitPrice = 0;
                 if (item.unitPrice !== undefined) unitPrice = item.unitPrice;
                 else if (item.cost !== undefined) unitPrice = item.cost;
@@ -322,7 +328,6 @@ function initProcurementPage() {
 
         // --- (F) 功能函數 ---
 
-        // 1. 狀態切換
         async function handleToggleStatus(itemId, currentStatus) {
             const statusCycle = {
                 'planning': 'ordered',
@@ -371,12 +376,10 @@ function initProcurementPage() {
             }
         }
 
-        // 2. 選擇報價
         function handleSelectQuote(quoteId) {
             console.log("選擇報價:", quoteId);
         }
 
-        // 3. 匯出詢價單
         function handleExportRFQ() {
             if (!selectedTender) return showAlert('請先選擇標單', 'warning');
             if (detailItems.length === 0) return showAlert('目前沒有項目可匯出', 'warning');
@@ -385,7 +388,6 @@ function initProcurementPage() {
                 if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
 
                 const exportData = detailItems.map(item => {
-                    // ✅ 匯出時也使用正確的欄位 totalQuantity
                     let qty = 0;
                     if (item.totalQuantity !== undefined && item.totalQuantity !== null) qty = Number(item.totalQuantity);
                     else if (item.quantity !== undefined && item.quantity !== null) qty = Number(item.quantity);
@@ -421,19 +423,15 @@ function initProcurementPage() {
             }
         }
 
-        // 4. 匯入報價單
         async function handleImportQuotes(e) {
             const file = e.target.files[0];
             if (!file) return;
-
             try {
                 if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
-
                 const data = await file.arrayBuffer();
                 const workbook = XLSX.read(data);
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-
                 console.log("解析資料:", jsonData);
                 showAlert(`成功解析 ${jsonData.length} 筆資料 (寫入邏輯建置中)`, 'success');
             } catch (error) {
@@ -444,7 +442,6 @@ function initProcurementPage() {
             }
         }
 
-        // 5. 刪除單據
         function handleDeleteOrder() {
             showAlert("請先選擇要刪除的項目 (功能建置中)", 'info');
         }
@@ -482,13 +479,37 @@ function initProcurementPage() {
             const totalEl = document.getElementById('totalItemsCount');
             if(totalEl) totalEl.textContent = detailItems.length;
         }
-
-        function naturalSequenceSort(a, b) {
-            return (a.sequence || '').localeCompare((b.sequence || ''), undefined, {numeric: true, sensitivity: 'base'});
-        }
         
         function showAlert(msg, type) {
             alert(msg);
+        }
+
+        // 🔥 增強版自然排序 (支援中文數字)
+        function naturalSequenceSort(a, b) {
+            // 中文數字對照表
+            const CHINESE_NUM_MAP = {
+                '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+                '壹': 1, '貳': 2, '參': 3, '肆': 4, '伍': 5, '陸': 6, '柒': 7, '捌': 8, '玖': 9, '拾': 10,
+                '甲': 1, '乙': 2, '丙': 3, '丁': 4, '戊': 5, '己': 6, '庚': 7, '辛': 8, '壬': 9, '癸': 10
+            };
+
+            const seqA = String(a.sequence || '');
+            const seqB = String(b.sequence || '');
+
+            // 1. 嘗試解析中文數字
+            const valA = CHINESE_NUM_MAP[seqA] || seqA;
+            const valB = CHINESE_NUM_MAP[seqB] || seqB;
+
+            // 2. 如果都是數字 (包含轉後的中文數字)，比大小
+            const numA = parseFloat(valA);
+            const numB = parseFloat(valB);
+            
+            if (!isNaN(numA) && !isNaN(numB)) {
+                return numA - numB;
+            }
+
+            // 3. 混合模式 (例如: 1-1, 1-2)
+            return seqA.localeCompare(seqB, undefined, {numeric: true, sensitivity: 'base'});
         }
     });
 }
