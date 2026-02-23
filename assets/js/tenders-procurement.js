@@ -1,11 +1,11 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v12.0 (匯出欄位補強版)
- * 修正：
- * 1. 匯出 Excel 時加入「小計(復價)」欄位。
- * 2. 調整 Excel 欄位寬度設定。
+ * 標單採購管理 (tenders-procurement.js) - v13.0 (狀態切換實作版)
+ * 新增功能：
+ * 1. 實作 handleToggleStatus：點擊狀態標籤可循環切換 (規劃中 -> 已下單 -> 已到貨 -> 已安裝 -> 規劃中)。
+ * 2. 自動寫入/更新/刪除 purchaseOrders 集合。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v12.0 匯出補強版)...");
+    console.log("🚀 初始化採購管理頁面 (v13.0 狀態切換實作版)...");
 
     // 1. 等待 HTML 元素
     function waitForElement(selector, callback) {
@@ -153,7 +153,7 @@ function initProcurementPage() {
 
                 populateSelect(majorItemSelect, majorItems, '所有大項目');
 
-                // 2. 嘗試載入採購單 (容錯)
+                // 2. 嘗試載入採購單
                 try {
                     let poData = [];
                     if (typeof safeFirestoreQuery === 'function') {
@@ -172,7 +172,7 @@ function initProcurementPage() {
                     purchaseOrders = [];
                 }
 
-                // 3. 嘗試載入報價單 (容錯)
+                // 3. 嘗試載入報價單
                 try {
                     let quoteData = [];
                     if (typeof safeFirestoreQuery === 'function') {
@@ -226,8 +226,12 @@ function initProcurementPage() {
                 const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
                 const itemQuotes = quotations.filter(q => q.detailItemId === item.id);
                 
+                // 狀態顯示邏輯
                 let statusText = '規劃中', statusClass = 'status-planning';
+                let currentStatusCode = 'planning'; // 預設狀態碼
+
                 if (itemPO) {
+                    currentStatusCode = itemPO.status; // 記錄目前狀態碼供切換使用
                     const statusMap = {
                         'ordered': {t: '已下單', c: 'status-ordered'},
                         'arrived': {t: '已到貨', c: 'status-arrived'},
@@ -255,7 +259,13 @@ function initProcurementPage() {
                         </td>
                         <td>${item.unit || '-'}</td>
                         <td class="text-right">${item.quantity || 0}</td>
-                        <td><span class="order-chip ${statusClass}">${statusText}</span></td>
+                        <td>
+                            <span class="order-chip ${statusClass}" 
+                                  onclick="window.toggleStatus('${item.id}', '${currentStatusCode}')"
+                                  title="點擊切換狀態">
+                                ${statusText}
+                            </span>
+                        </td>
                         <td>${quotesHtml}</td>
                         <td class="text-right">${item.cost ? parseInt(item.cost).toLocaleString() : '-'}</td>
                     </tr>
@@ -287,11 +297,81 @@ function initProcurementPage() {
                     if (modal) modal.style.display = 'none';
                 });
             });
+
+            // ✅ 將狀態切換函式掛載到 Window 讓 onclick 呼叫
+            window.toggleStatus = handleToggleStatus;
+            window.selectQuote = handleSelectQuote;
         }
 
         // --- (F) 功能函數 ---
 
-        // 1. 匯出詢價單 (加入小計)
+        // 🔥 1. 狀態切換核心邏輯
+        async function handleToggleStatus(itemId, currentStatus) {
+            // 定義狀態循環：規劃中 -> 已下單 -> 已到貨 -> 已安裝 -> 規劃中(刪除)
+            const statusCycle = {
+                'planning': 'ordered',
+                'ordered': 'arrived',
+                'arrived': 'installed',
+                'installed': 'planning'
+            };
+
+            const nextStatus = statusCycle[currentStatus] || 'ordered';
+            const itemPO = purchaseOrders.find(po => po.detailItemId === itemId);
+
+            showLoading(true, '更新狀態中...');
+
+            try {
+                if (nextStatus === 'planning') {
+                    // 如果下一步是「規劃中」，代表要刪除採購單 (Reset)
+                    if (itemPO) {
+                        await db.collection('purchaseOrders').doc(itemPO.id).delete();
+                        console.log(`🗑️ 已刪除採購單: ${itemPO.id}`);
+                    }
+                } else {
+                    // 其他狀態：新增或更新
+                    const poData = {
+                        status: nextStatus,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+
+                    if (itemPO) {
+                        // 更新現有
+                        await db.collection('purchaseOrders').doc(itemPO.id).update(poData);
+                        console.log(`🔄 更新採購單 ${itemPO.id} 狀態為: ${nextStatus}`);
+                    } else {
+                        // 建立新的
+                        const newItem = detailItems.find(i => i.id === itemId);
+                        await db.collection('purchaseOrders').add({
+                            projectId: selectedProject.id,
+                            tenderId: selectedTender.id,
+                            detailItemId: itemId,
+                            majorItemId: newItem ? newItem.majorItemId : null,
+                            status: nextStatus,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            ...poData
+                        });
+                        console.log(`➕ 新增採購單，狀態: ${nextStatus}`);
+                    }
+                }
+
+                // 完成後重新載入資料以刷新畫面
+                await onTenderChange(selectedTender.id);
+
+            } catch (error) {
+                console.error("狀態更新失敗:", error);
+                showAlert("狀態更新失敗: " + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 2. 選擇報價 (預留)
+        function handleSelectQuote(quoteId) {
+            console.log("選擇報價:", quoteId);
+            // 未來實作：將報價金額寫入 purchaseOrder
+        }
+
+        // 3. 匯出詢價單
         function handleExportRFQ() {
             if (!selectedTender) return showAlert('請先選擇標單', 'warning');
             if (detailItems.length === 0) return showAlert('目前沒有項目可匯出', 'warning');
@@ -306,14 +386,13 @@ function initProcurementPage() {
                     '單位': item.unit || '',
                     '數量': item.quantity || 0,
                     '供應商報價(單價)': '',
-                    '小計(復價)': '', // ✅ 已加入
+                    '小計(復價)': '',
                     '備註': ''
                 }));
 
                 const wb = XLSX.utils.book_new();
                 const ws = XLSX.utils.json_to_sheet(exportData);
 
-                // 設定欄寬
                 ws['!cols'] = [
                     {wch: 8}, {wch: 30}, {wch: 25}, {wch: 8}, {wch: 10}, 
                     {wch: 15}, {wch: 15}, {wch: 20}
@@ -329,7 +408,7 @@ function initProcurementPage() {
             }
         }
 
-        // 2. 匯入報價單
+        // 4. 匯入報價單
         async function handleImportQuotes(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -352,7 +431,7 @@ function initProcurementPage() {
             }
         }
 
-        // 3. 刪除單據
+        // 5. 刪除單據
         function handleDeleteOrder() {
             showAlert("請先選擇要刪除的項目 (功能建置中)", 'info');
         }
