@@ -2,27 +2,22 @@
  * 標單採購管理 (tenders-procurement.js) - v3.3 (修正資料庫連線實例問題)
  */
 function initProcurementPage() {
-    console.log("🚀 [1/4] 初始化標單採購管理頁面...");
+    console.log("🚀 初始化採購頁面 (電腦版修復 v3)...");
 
-    function waitForElement(selector, callback) {
-        const element = document.querySelector(selector);
-        if (element) {
-            console.log(`✅ [2/4] 元素 "${selector}" 已找到，立即執行。`);
-            callback();
-            return;
+    // 設定一個計時器，每 0.1 秒檢查一次 #projectSelect 是否出現
+    const checkTimer = setInterval(() => {
+        const targetElement = document.getElementById('projectSelect');
+        
+        // 只要抓到了元素，就停止計時，並執行主程式
+        if (targetElement) {
+            clearInterval(checkTimer);
+            console.log("✅ 抓到 #projectSelect，開始執行核心邏輯");
+            executeMainLogic();
         }
-        console.log(`🔍 [2/4] 元素 "${selector}" 尚未出現，開始等待...`);
-        let interval = setInterval(() => {
-            const element = document.querySelector(selector);
-            if (element) {
-                clearInterval(interval);
-                console.log(`✅ [2/4] 元素 "${selector}" 已出現，執行回呼。`);
-                callback();
-            }
-        }, 100);
-    }
+    }, 100);
 
-    waitForElement('#projectSelect', () => {
+    // 將原本所有的邏輯包裹在這個函數中
+    function executeMainLogic() {
         
         let projects = [], tenders = [], majorItems = [], detailItems = [], purchaseOrders = [], quotations = [];
         let selectedProject = null, selectedTender = null;
@@ -460,5 +455,5 @@ function initProcurementPage() {
         function showMainContent(shouldShow) { const main = document.getElementById('mainContent'); const empty = document.getElementById('emptyState'); if(main) main.style.display = shouldShow ? 'block' : 'none'; if(empty) empty.style.display = shouldShow ? 'none' : 'flex'; }
 
         runPageLogic();
-    });
+    }
 }
