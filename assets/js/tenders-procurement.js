@@ -1,11 +1,12 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v13.0 (狀態切換實作版)
- * 新增功能：
- * 1. 實作 handleToggleStatus：點擊狀態標籤可循環切換 (規劃中 -> 已下單 -> 已到貨 -> 已安裝 -> 規劃中)。
- * 2. 自動寫入/更新/刪除 purchaseOrders 集合。
+ * 標單採購管理 (tenders-procurement.js) - v14.0 (數量欄位修正版)
+ * 修正：
+ * 1. 匯出 Excel 時，強制將「數量」轉為數字格式，解決顯示為 0 的問題。
+ * 2. 同步修正表格顯示邏輯，確保畫面與匯出一致。
+ * 3. 包含 v13 的狀態切換與資料庫寫入功能。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v13.0 狀態切換實作版)...");
+    console.log("🚀 初始化採購管理頁面 (v14.0 數量修正版)...");
 
     // 1. 等待 HTML 元素
     function waitForElement(selector, callback) {
@@ -228,10 +229,10 @@ function initProcurementPage() {
                 
                 // 狀態顯示邏輯
                 let statusText = '規劃中', statusClass = 'status-planning';
-                let currentStatusCode = 'planning'; // 預設狀態碼
+                let currentStatusCode = 'planning';
 
                 if (itemPO) {
-                    currentStatusCode = itemPO.status; // 記錄目前狀態碼供切換使用
+                    currentStatusCode = itemPO.status;
                     const statusMap = {
                         'ordered': {t: '已下單', c: 'status-ordered'},
                         'arrived': {t: '已到貨', c: 'status-arrived'},
@@ -250,6 +251,9 @@ function initProcurementPage() {
                     ).join('');
                 }
 
+                // ✅ 修正：確保數量顯示為數字
+                const qty = item.quantity ? Number(item.quantity) : (item.qty ? Number(item.qty) : 0);
+
                 html += `
                     <tr>
                         <td>${item.sequence || '-'}</td>
@@ -258,7 +262,7 @@ function initProcurementPage() {
                             <div class="text-muted text-sm">${item.brand || ''} ${item.model || ''}</div>
                         </td>
                         <td>${item.unit || '-'}</td>
-                        <td class="text-right">${item.quantity || 0}</td>
+                        <td class="text-right">${qty}</td>
                         <td>
                             <span class="order-chip ${statusClass}" 
                                   onclick="window.toggleStatus('${item.id}', '${currentStatusCode}')"
@@ -298,16 +302,14 @@ function initProcurementPage() {
                 });
             });
 
-            // ✅ 將狀態切換函式掛載到 Window 讓 onclick 呼叫
             window.toggleStatus = handleToggleStatus;
             window.selectQuote = handleSelectQuote;
         }
 
         // --- (F) 功能函數 ---
 
-        // 🔥 1. 狀態切換核心邏輯
+        // 1. 狀態切換
         async function handleToggleStatus(itemId, currentStatus) {
-            // 定義狀態循環：規劃中 -> 已下單 -> 已到貨 -> 已安裝 -> 規劃中(刪除)
             const statusCycle = {
                 'planning': 'ordered',
                 'ordered': 'arrived',
@@ -322,24 +324,19 @@ function initProcurementPage() {
 
             try {
                 if (nextStatus === 'planning') {
-                    // 如果下一步是「規劃中」，代表要刪除採購單 (Reset)
                     if (itemPO) {
                         await db.collection('purchaseOrders').doc(itemPO.id).delete();
                         console.log(`🗑️ 已刪除採購單: ${itemPO.id}`);
                     }
                 } else {
-                    // 其他狀態：新增或更新
                     const poData = {
                         status: nextStatus,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     };
 
                     if (itemPO) {
-                        // 更新現有
                         await db.collection('purchaseOrders').doc(itemPO.id).update(poData);
-                        console.log(`🔄 更新採購單 ${itemPO.id} 狀態為: ${nextStatus}`);
                     } else {
-                        // 建立新的
                         const newItem = detailItems.find(i => i.id === itemId);
                         await db.collection('purchaseOrders').add({
                             projectId: selectedProject.id,
@@ -350,11 +347,8 @@ function initProcurementPage() {
                             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                             ...poData
                         });
-                        console.log(`➕ 新增採購單，狀態: ${nextStatus}`);
                     }
                 }
-
-                // 完成後重新載入資料以刷新畫面
                 await onTenderChange(selectedTender.id);
 
             } catch (error) {
@@ -368,10 +362,9 @@ function initProcurementPage() {
         // 2. 選擇報價 (預留)
         function handleSelectQuote(quoteId) {
             console.log("選擇報價:", quoteId);
-            // 未來實作：將報價金額寫入 purchaseOrder
         }
 
-        // 3. 匯出詢價單
+        // 3. 匯出詢價單 (🔥 修正：強制轉換數量)
         function handleExportRFQ() {
             if (!selectedTender) return showAlert('請先選擇標單', 'warning');
             if (detailItems.length === 0) return showAlert('目前沒有項目可匯出', 'warning');
@@ -379,16 +372,21 @@ function initProcurementPage() {
             try {
                 if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
 
-                const exportData = detailItems.map(item => ({
-                    '項次': item.sequence || '',
-                    '項目名稱': item.name || '',
-                    '說明(廠牌/型號)': `${item.brand || ''} ${item.model || ''}`.trim(),
-                    '單位': item.unit || '',
-                    '數量': item.quantity || 0,
-                    '供應商報價(單價)': '',
-                    '小計(複價)': '',
-                    '備註': ''
-                }));
+                const exportData = detailItems.map(item => {
+                    // ✅ 強制轉為數字，並處理可能的欄位名稱差異
+                    const qty = item.quantity ? Number(item.quantity) : (item.qty ? Number(item.qty) : 0);
+
+                    return {
+                        '項次': item.sequence || '',
+                        '項目名稱': item.name || '',
+                        '說明(廠牌/型號)': `${item.brand || ''} ${item.model || ''}`.trim(),
+                        '單位': item.unit || '',
+                        '數量': qty, // 這裡已經是乾淨的數字了
+                        '供應商報價(單價)': '',
+                        '小計(複價)': '',
+                        '備註': ''
+                    };
+                });
 
                 const wb = XLSX.utils.book_new();
                 const ws = XLSX.utils.json_to_sheet(exportData);
