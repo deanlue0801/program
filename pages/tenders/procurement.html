@@ -61,9 +61,26 @@
         <div class="content-card">
             <div class="card-header-actions">
                 <h3 class="content-subtitle">📝 採購項目清單</h3>
-                <button id="manageQuotesBtn" class="btn btn-outline-primary btn-sm">
-                    <i class="fas fa-file-invoice-dollar"></i> 管理供應商報價
-                </button>
+                
+                <div class="action-buttons" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <input type="file" id="importQuotesInput" accept=".xlsx,.xls" style="display: none;">
+
+                    <button id="exportRfqBtn" class="btn btn-outline-secondary btn-sm" title="匯出詢價單">
+                        <i class="fas fa-file-export"></i> 匯出詢價單
+                    </button>
+
+                    <button id="importQuotesBtn" class="btn btn-outline-secondary btn-sm" title="匯入報價單">
+                        <i class="fas fa-file-import"></i> 匯入報價單
+                    </button>
+
+                    <button id="manageQuotesBtn" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-file-invoice-dollar"></i> 管理供應商報價
+                    </button>
+
+                    <button id="deleteOrderBtn" class="btn btn-outline-danger btn-sm" style="display: none;">
+                        <i class="fas fa-trash-alt"></i> 刪除單據
+                    </button>
+                </div>
             </div>
             
             <div class="table-container">
@@ -126,5 +143,19 @@
         justify-content: space-between;
         align-items: center;
         margin-bottom: 1rem;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    /* 確保按鈕在手機版不會擠在一起 */
+    @media (max-width: 768px) {
+        .card-header-actions {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .action-buttons {
+            width: 100%;
+            justify-content: flex-start;
+        }
     }
 </style>
