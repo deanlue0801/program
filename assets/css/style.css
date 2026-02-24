@@ -586,3 +586,101 @@ body.sidebar-open .sidebar-overlay { opacity: 1; visibility: visible; }
 .variance-negative { color: var(--danger-color); font-weight: bold; }
 .btn-attachment { color: var(--text-light); transition: color 0.2s; }
 .btn-attachment:hover { color: var(--primary-color-start); }
+
+/* --- 補充：分配管理頁面特定元件樣式 --- */
+
+/* 樓層標籤 (Modal 內使用) */
+.floor-tag {
+    display: inline-flex;
+    align-items: center;
+    background: var(--primary-color-start);
+    color: white;
+    padding: 5px 12px;
+    border-radius: 20px;
+    margin: 5px;
+    font-size: 14px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.floor-tag .remove-floor-btn {
+    background: none;
+    border: none;
+    color: white;
+    margin-left: 8px;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+}
+
+/* 排序項目 (Sequence Manager) */
+.sequence-item {
+    display: flex;
+    align-items: center;
+    background: white;
+    padding: 12px;
+    margin-bottom: 8px;
+    border: 1px solid var(--gray-border);
+    border-radius: var(--radius-md);
+    gap: 15px;
+}
+
+.sequence-item .drag-handle {
+    cursor: grab;
+    color: var(--text-light);
+    font-size: 18px;
+}
+
+.sequence-item .sequence-input {
+    width: 60px;
+    padding: 5px;
+    text-align: center;
+    border: 1px solid var(--gray-border);
+    border-radius: 4px;
+}
+
+.sequence-item .item-name {
+    font-weight: 500;
+}
+
+/* 分配表格進階美化 */
+.distribution-table .total-column {
+    background-color: #f8f9fa !important;
+    font-weight: bold;
+    color: var(--primary-color-end);
+    text-align: center;
+}
+
+.distribution-table .total-column.error {
+    background-color: #fff5f5 !important;
+    color: var(--danger-color);
+}
+
+/* 輸入框焦點狀態 */
+.quantity-input:focus {
+    border-color: var(--primary-color-start);
+    background-color: #fff;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    outline: none;
+}
+
+/* 讓表格橫向捲動時，項次與名稱固定 */
+.distribution-table th:nth-child(1),
+.distribution-table td:nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: white;
+}
+
+.distribution-table th:nth-child(2),
+.distribution-table td:nth-child(2) {
+    position: sticky;
+    left: 80px; /* 根據項次寬度調整 */
+    z-index: 10;
+    background: white;
+    border-right: 2px solid var(--gray-border);
+}
+
+.distribution-table thead th {
+    z-index: 20;
+}
