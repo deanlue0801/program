@@ -1,13 +1,14 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v33.0 (UI 風格統一版)
- * 修正重點：
- * 1. 【UI 美化】：重寫 ensureDashboardSection，移除不搭調的漸層背景。
- * 改用您原本的 CSS class (content-card, stat-card)，確保與下方表格風格一致。
- * 2. 【版面配置】：使用 Flexbox 讓「統計數字」與「圓餅圖」左右並排，手機版自動換行。
- * 3. 【功能保留】：完整保留 v32 的所有功能 (批次、自動日期、匯入)。
+ * 標單採購管理 (tenders-procurement.js) - v34.0 (職責分離版)
+ * * 狀態：✅ 已將 CSS 移出至 HTML，JS 回歸純邏輯。
+ * * 功能：
+ * 1. 【儀表板】：JS 計算數據並填入 DOM，不負責樣式。
+ * 2. 【批次功能】：批次需用日、下單日、狀態切換。
+ * 3. 【自動化】：狀態連動日期。
+ * 4. 【智慧匯入】：支援 Excel 匯入。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v33.0 UI 風格統一版)...");
+    console.log("🚀 初始化採購管理頁面 (v34.0 職責分離版)...");
 
     // 全域變數
     let statusChart = null;
@@ -39,8 +40,15 @@ function initProcurementPage() {
         const currentUser = firebase.auth().currentUser;
         const db = firebase.firestore();
 
-        injectStylesAndScripts();
-        injectHiddenDateInputs();
+        // ❌ 移除 injectStylesAndScripts()，樣式交給 HTML 負責
+        injectHiddenDateInputs(); // 這是功能性的 hidden input，必須保留
+
+        // 確保 Chart.js 有載入 (這是外部套件，還是建議由 JS 動態檢查較保險)
+        if (!document.querySelector('script[src*="chart.js"]')) {
+            const script = document.createElement('script');
+            script.src = "https://cdn.jsdelivr.net/npm/chart.js";
+            document.head.appendChild(script);
+        }
 
         initializePage();
 
@@ -119,7 +127,6 @@ function initProcurementPage() {
                     { field: 'projectId', operator: '==', value: selectedProject.id }
                 ];
 
-                // 1. 載入標單結構
                 let majorData, detailDataRaw;
                 if (typeof safeFirestoreQuery === 'function') {
                     const [majorRes, detailRes] = await Promise.all([
@@ -141,7 +148,6 @@ function initProcurementPage() {
                 detailItems.sort(naturalSequenceSort);
                 populateSelect(majorItemSelect, majorItems, '所有大項目');
 
-                // 2. 載入採購與報價
                 try {
                     let poData = [];
                     if (typeof safeFirestoreQuery === 'function') {
@@ -166,11 +172,10 @@ function initProcurementPage() {
                     quotations = quoteData;
                 } catch (quoteError) { quotations = []; }
 
-                // 3. 渲染畫面
                 document.getElementById('mainContent').style.display = 'block';
                 document.getElementById('emptyState').style.display = 'none';
                 
-                ensureDashboardSection(); // 建立美化後的儀表板
+                ensureDashboardSection();
                 adjustTableHeader();      
                 renderTable();            
                 updateStats();            
@@ -184,9 +189,9 @@ function initProcurementPage() {
             }
         }
 
-        // --- UI 建構區 (🔥 v33.0 核心修正) ---
+        // --- UI 建構區 ---
 
-        // 建立上方儀表板 (使用原生 content-card 風格)
+        // 建立上方儀表板 (樣式由 CSS 類別控制)
         function ensureDashboardSection() {
             const mainContent = document.getElementById('mainContent');
             const oldDash = document.getElementById('procurement-dashboard');
@@ -194,54 +199,44 @@ function initProcurementPage() {
 
             const dashboard = document.createElement('div');
             dashboard.id = 'procurement-dashboard';
-            // 🔥 使用您原本的 CSS class，確保白色圓角卡片風格
             dashboard.className = 'content-card'; 
-            dashboard.style.marginBottom = '20px'; // 增加一點底部間距
+            dashboard.style.marginBottom = '20px';
 
             dashboard.innerHTML = `
                 <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
                     <div style="flex: 1; min-width: 300px;">
                         <h3 class="content-subtitle" style="margin-bottom: 15px;">📊 採購狀態概覽</h3>
-                        
                         <div class="custom-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px;">
                             <div class="stat-card" style="background: #f8f9fa; border: 1px solid #eee;">
                                 <div class="stat-number" id="dash-total" style="font-size: 1.5rem; font-weight: bold; color: #333;">-</div>
                                 <div class="stat-label" style="font-size: 0.9rem; color: #666;">總項目</div>
                             </div>
-                            
                             <div class="stat-card" style="background: #fff; border-left: 4px solid #e9ecef; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                                 <div class="stat-number" id="dash-planning" style="font-size: 1.5rem; font-weight: bold; color: #495057;">-</div>
                                 <div class="stat-label" style="font-size: 0.9rem; color: #666;">規劃中</div>
                             </div>
-
                             <div class="stat-card" style="background: #fff; border-left: 4px solid #4c6ef5; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                                 <div class="stat-number" id="dash-inquiry" style="font-size: 1.5rem; font-weight: bold; color: #4c6ef5;">-</div>
                                 <div class="stat-label" style="font-size: 0.9rem; color: #666;">詢價中</div>
                             </div>
-
                             <div class="stat-card" style="background: #fff; border-left: 4px solid #fcc419; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                                 <div class="stat-number" id="dash-ordered" style="font-size: 1.5rem; font-weight: bold; color: #fcc419;">-</div>
                                 <div class="stat-label" style="font-size: 0.9rem; color: #666;">已下單</div>
                             </div>
-
                             <div class="stat-card" style="background: #fff; border-left: 4px solid #40c057; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                                 <div class="stat-number" id="dash-arrived" style="font-size: 1.5rem; font-weight: bold; color: #40c057;">-</div>
                                 <div class="stat-label" style="font-size: 0.9rem; color: #666;">已到貨</div>
                             </div>
                         </div>
                     </div>
-
                     <div style="flex: 0 0 260px; height: 160px; display: flex; align-items: center; justify-content: center;">
                         <canvas id="procurementChart"></canvas>
                     </div>
                 </div>
             `;
-            
-            // 插入到 mainContent 的最前面
             mainContent.insertBefore(dashboard, mainContent.firstChild);
         }
 
-        // 強制設定表頭
         function adjustTableHeader() {
             const tbody = document.getElementById('procurementTableBody');
             if (!tbody) return;
@@ -292,7 +287,6 @@ function initProcurementPage() {
                                     </span>
                                     <span class="badge badge-secondary badge-pill">${myDetails.length} 項</span>
                                 </div>
-                                
                                 <div class="btn-group shadow-sm">
                                     <button class="btn btn-sm btn-light border" onclick="window.triggerBatchDate('required', '${major.id}')" title="批次需用日">📅 需用</button>
                                     <button class="btn btn-sm btn-light border" onclick="window.triggerBatchDate('ordered', '${major.id}')" title="批次下單日">📅 下單</button>
@@ -367,10 +361,8 @@ function initProcurementPage() {
                 <td>${item.sequence || '-'}</td>
                 <td><div style="font-weight:bold;">${item.name || '未命名'}</div><div class="text-muted text-sm">${item.brand || ''} ${item.model || ''}</div></td>
                 <td>${item.unit || '-'}</td>
-                
                 <td style="background-color: #fcf9fe;"><input type="date" class="form-control form-control-sm date-input" value="${reqDate}" style="${reqDateStyle}" onchange="window.updateDate('${item.id}', 'requiredDate', this.value)"></td>
                 <td style="background-color: #fff9f2;"><input type="date" class="form-control form-control-sm date-input" value="${ordDate}" onchange="window.updateDate('${item.id}', 'orderedDate', this.value)"></td>
-                
                 <td class="text-right">${qty}</td>
                 <td><span class="order-chip ${statusClass}" onclick="window.toggleStatus('${item.id}', '${currentStatusCode}')">${statusText}</span></td>
                 <td>${quotesHtml}</td>
@@ -424,7 +416,7 @@ function initProcurementPage() {
             if (!ctx) return;
 
             const dataValues = [counts.planning, counts.inquiry, counts.ordered, counts.arrived];
-            const colors = ['#e9ecef', '#4c6ef5', '#fcc419', '#40c057']; // 使用更鮮明的卡片配色
+            const colors = ['#e9ecef', '#4c6ef5', '#fcc419', '#40c057'];
             const borders = ['#dee2e6', '#bac8ff', '#ffe066', '#8ce99a'];
 
             if (statusChart) {
@@ -477,30 +469,49 @@ function initProcurementPage() {
 
         async function handleBatchDateUpdate(type, majorId, dateStr) {
             const targetDetails = detailItems.filter(d => d.majorItemId === majorId);
-            if (!confirm(`將【${targetDetails.length}】個項目設為 ${dateStr}？`)) return;
+            const typeLabel = type === 'required' ? '需用日期' : '下單日期';
+            
+            if (!confirm(`將【${targetDetails.length}】個項目的「${typeLabel}」全部設為 ${dateStr}？`)) return;
+
             showLoading(true, '批次更新中...');
             const batch = db.batch();
             const fieldName = type === 'required' ? 'requiredDate' : 'orderedDate';
+
             targetDetails.forEach(item => {
                 const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
                 let updates = { [fieldName]: dateStr, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-                if (itemPO) batch.update(db.collection('purchaseOrders').doc(itemPO.id), updates);
-                else {
+
+                if (itemPO) {
+                    batch.update(db.collection('purchaseOrders').doc(itemPO.id), updates);
+                } else {
                     const ref = db.collection('purchaseOrders').doc();
-                    batch.set(ref, { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: item.id, majorItemId: majorId, status: 'planning', createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...updates });
+                    batch.set(ref, {
+                        projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: item.id, majorItemId: majorId,
+                        status: 'planning', createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...updates
+                    });
                 }
             });
-            await batch.commit();
-            await onTenderChange(selectedTender.id);
-            showLoading(false);
+
+            try {
+                await batch.commit();
+                await onTenderChange(selectedTender.id);
+                showAlert('更新完成', 'success');
+            } catch (error) {
+                console.error(error); showAlert("更新失敗", 'error');
+            } finally {
+                showLoading(false);
+            }
         }
 
+        // --- 互動功能函式 ---
         async function handleUpdateDate(itemId, field, dateStr) {
             const itemPO = purchaseOrders.find(po => po.detailItemId === itemId);
             const newItem = detailItems.find(i => i.id === itemId);
-            if (itemPO) await db.collection('purchaseOrders').doc(itemPO.id).update({ [field]: dateStr, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-            else await db.collection('purchaseOrders').add({ projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: itemId, majorItemId: newItem.majorItemId, status: 'planning', [field]: dateStr, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-            renderTable();
+            try {
+                if (itemPO) await db.collection('purchaseOrders').doc(itemPO.id).update({ [field]: dateStr, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                else await db.collection('purchaseOrders').add({ projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: itemId, majorItemId: newItem.majorItemId, status: 'planning', [field]: dateStr, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                renderTable();
+            } catch(e) { showAlert('Error', 'error'); }
         }
         
         async function handleToggleStatus(itemId, currentStatus) {
@@ -509,13 +520,14 @@ function initProcurementPage() {
             const itemPO = purchaseOrders.find(po => po.detailItemId === itemId);
             const item = detailItems.find(i => i.id === itemId);
             showLoading(true);
-            let up = { status: next, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-            if (next === 'ordered' && (!itemPO || !itemPO.orderedDate)) up.orderedDate = new Date().toISOString().split('T')[0];
-            if (next === 'planning' && itemPO) await db.collection('purchaseOrders').doc(itemPO.id).delete();
-            else if (itemPO) await db.collection('purchaseOrders').doc(itemPO.id).update(up);
-            else await db.collection('purchaseOrders').add({ projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: itemId, majorItemId: item.majorItemId, createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...up });
-            await onTenderChange(selectedTender.id);
-            showLoading(false);
+            try {
+                let up = { status: next, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+                if (next === 'ordered' && (!itemPO || !itemPO.orderedDate)) up.orderedDate = new Date().toISOString().split('T')[0];
+                if (next === 'planning' && itemPO) await db.collection('purchaseOrders').doc(itemPO.id).delete();
+                else if (itemPO) await db.collection('purchaseOrders').doc(itemPO.id).update(up);
+                else await db.collection('purchaseOrders').add({ projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: itemId, majorItemId: item.majorItemId, createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...up });
+                await onTenderChange(selectedTender.id);
+            } catch(e) { console.error(e); showAlert('Error', 'error'); } finally { showLoading(false); }
         }
 
         async function handleBatchUpdateStatus(majorId, majorName) {
@@ -537,10 +549,10 @@ function initProcurementPage() {
             });
             await b.commit();
             await onTenderChange(selectedTender.id);
+            showAlert('批次更新完成', 'success');
             showLoading(false);
         }
 
-        // --- 匯入與通用函式 ---
         function setupEventListeners() {
             const change = (id, fn) => { const el = document.getElementById(id); if(el) el.onchange = fn; };
             const click = (id, fn) => { const el = document.getElementById(id); if(el) el.onclick = fn; };
@@ -551,48 +563,16 @@ function initProcurementPage() {
             click('importQuotesBtn', () => document.getElementById('importQuotesInput')?.click());
             change('importQuotesInput', handleImportQuotes);
             click('manageQuotesBtn', openQuoteManager);
-            
             window.triggerBatchDate = triggerBatchDate;
             window.batchUpdateStatus = handleBatchUpdateStatus;
             window.toggleStatus = handleToggleStatus;
             window.updateDate = handleUpdateDate;
             window.deleteSupplierQuotes = deleteSupplierQuotes;
             window.selectQuote = handleSelectQuote;
-
             document.querySelectorAll('[data-action="close-modal"]').forEach(b => b.onclick = () => b.closest('.modal-overlay').style.display='none');
         }
 
-        function injectStylesAndScripts() {
-            const style = document.createElement('style');
-            style.innerHTML = `
-                .status-planning { background-color: #e9ecef; color: #495057; }
-                .status-inquiry { background-color: #dbe4ff; color: #3b5bdb; }
-                .status-ordered { background-color: #fff3bf; color: #f08c00; }
-                .status-arrived { background-color: #d3f9d8; color: #2b8a3e; }
-                .order-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; min-width: 80px; text-align: center; }
-                .order-chip:hover { opacity: 0.8; transform: scale(1.05); }
-                .date-input { border: 1px solid #ced4da; border-radius: 4px; padding: 2px 5px; font-size: 0.85rem; width: 100%; box-sizing: border-box; }
-                
-                /* 🔥 v33 新增：美化統計卡片，讓它們跟下方的卡片風格一致 */
-                .stat-card {
-                    padding: 15px;
-                    border-radius: 8px;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    transition: transform 0.2s;
-                }
-                .stat-card:hover { transform: translateY(-2px); }
-            `;
-            document.head.appendChild(style);
-            if (!document.querySelector('script[src*="chart.js"]')) {
-                const script = document.createElement('script');
-                script.src = "https://cdn.jsdelivr.net/npm/chart.js";
-                document.head.appendChild(script);
-            }
-        }
-
+        // --- 輔助函式 ---
         function showLoading(show, msg) { const el = document.getElementById('loading'); if(el) { el.style.display = show ? 'flex' : 'none'; if(msg) el.querySelector('p').textContent = msg; } }
         function populateSelect(select, items, defaultText) { if(!select) return; select.innerHTML = `<option value="">${defaultText}</option>` + items.map(i => `<option value="${i.id}">${i.sequence ? i.sequence + '.' : ''} ${i.name || i.code}</option>`).join(''); select.disabled = items.length === 0; }
         function resetSelects(level) { if (level === 'project') { document.getElementById('tenderSelect').innerHTML = '<option value="">請先選擇專案</option>'; document.getElementById('tenderSelect').disabled = true; document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>'; document.getElementById('majorItemSelect').disabled = true; document.getElementById('mainContent').style.display = 'none'; document.getElementById('emptyState').style.display = 'flex'; } else if (level === 'tender') { document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>'; } }
