@@ -1,14 +1,15 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v23.0 (強制渲染版)
+ * 標單採購管理 (tenders-procurement.js) - v24.0 (智慧比對增強版)
  * 修正重點：
- * 1. 【管理報價】修正 Modal 空白問題。改為直接鎖定 .modal-body 強制覆蓋內容。
- * 2. 移除「無資料時阻擋開啟」的邏輯，改為在 Modal 內顯示「尚無資料」提示，避免與 HTML 原生開啟行為衝突。
- * 3. 包含 v22 之前的所有功能 (匯入、分組、數量修正)。
+ * 1. 【匯入比對優化】加入 normalizeString 函式：
+ * - 自動將全形括號 (（）) 轉為半形 (())。
+ * - 忽略所有空白鍵 (Trim + Remove spaces)。
+ * - 解決因標點符號不同導致「原有項目」被誤判為「額外項目」的問題。
+ * 2. 包含 v23 的所有功能 (強制渲染 Modal、分組顯示、狀態切換)。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v23.0 強制渲染版)...");
+    console.log("🚀 初始化採購管理頁面 (v24.0 智慧比對增強版)...");
 
-    // 1. 等待 HTML 元素
     function waitForElement(selector, callback) {
         const element = document.querySelector(selector);
         if (element) {
@@ -27,7 +28,6 @@ function initProcurementPage() {
     waitForElement('#projectSelect', () => {
         console.log("✅ HTML 元素已就緒，開始執行...");
 
-        // --- 變數宣告 ---
         let projects = [], tenders = [], majorItems = [], detailItems = [];
         let purchaseOrders = [], quotations = [];
         let selectedProject = null, selectedTender = null;
@@ -35,7 +35,6 @@ function initProcurementPage() {
         const currentUser = firebase.auth().currentUser;
         const db = firebase.firestore();
 
-        // --- 啟動初始化 ---
         initializePage();
 
         async function initializePage() {
@@ -44,7 +43,6 @@ function initProcurementPage() {
             await loadProjectsWithPermission();
         }
 
-        // --- (A) 載入專案 ---
         async function loadProjectsWithPermission() {
             showLoading(true, '載入專案中...');
             try {
@@ -71,7 +69,6 @@ function initProcurementPage() {
             }
         }
 
-        // --- (B) 專案變更 -> 載入標單 ---
         async function onProjectChange(projectId) {
             resetSelects('tender');
             if (!projectId) return;
@@ -103,7 +100,6 @@ function initProcurementPage() {
             }
         }
 
-        // --- (C) 標單變更 -> 載入資料 ---
         async function onTenderChange(tenderId) {
             resetSelects('majorItem');
             if (!tenderId) return;
@@ -121,7 +117,6 @@ function initProcurementPage() {
                     { field: 'projectId', operator: '==', value: selectedProject.id }
                 ];
 
-                // 1. 載入大項與細項
                 let majorData, detailDataRaw;
 
                 if (typeof safeFirestoreQuery === 'function') {
@@ -154,7 +149,6 @@ function initProcurementPage() {
 
                 populateSelect(majorItemSelect, majorItems, '所有大項目');
 
-                // 2. 嘗試載入採購單
                 try {
                     let poData = [];
                     if (typeof safeFirestoreQuery === 'function') {
@@ -173,7 +167,6 @@ function initProcurementPage() {
                     purchaseOrders = [];
                 }
 
-                // 3. 嘗試載入報價單
                 try {
                     let quoteData = [];
                     if (typeof safeFirestoreQuery === 'function') {
@@ -207,7 +200,6 @@ function initProcurementPage() {
             }
         }
 
-        // --- (D) 渲染表格 ---
         function renderTable() {
             const tbody = document.getElementById('procurementTableBody');
             const filterMajorId = document.getElementById('majorItemSelect').value;
@@ -222,7 +214,6 @@ function initProcurementPage() {
 
             let hasAnyData = false;
 
-            // 第一階段：原始項目
             targetMajorItems.forEach(major => {
                 const myDetails = detailItems.filter(d => d.majorItemId === major.id);
 
@@ -244,7 +235,6 @@ function initProcurementPage() {
                 }
             });
 
-            // 第二階段：額外項目
             const allExtraQuotes = quotations.filter(q => q.isExtra);
             if (allExtraQuotes.length > 0) {
                 targetMajorItems.forEach((major) => {
@@ -355,7 +345,6 @@ function initProcurementPage() {
             return tr;
         }
 
-        // --- (E) 事件綁定 ---
         function setupEventListeners() {
             const bind = (id, event, handler) => {
                 const el = document.getElementById(id);
@@ -368,11 +357,8 @@ function initProcurementPage() {
             bind('exportRfqBtn', 'click', handleExportRFQ);
             bind('importQuotesBtn', 'click', () => document.getElementById('importQuotesInput')?.click());
             bind('importQuotesInput', 'change', handleImportQuotes);
-            
-            // ✅ 管理報價按鈕
             bind('manageQuotesBtn', 'click', openQuoteManager);
 
-            // Modal 關閉
             document.querySelectorAll('[data-action="close-modal"]').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const modal = btn.closest('.modal-overlay');
@@ -385,18 +371,13 @@ function initProcurementPage() {
             window.deleteSupplierQuotes = deleteSupplierQuotes;
         }
 
-        // --- (F) 功能函數 ---
-
-        // 🔥 管理供應商報價 (Modal 邏輯 - 強制渲染)
         function openQuoteManager() {
-            // 尋找 Modal Body，這是我們唯一確定存在的元素
             const modalBody = document.querySelector('#manageQuotesModal .modal-body');
             
             if (!modalBody) {
                 return showAlert('無法開啟管理視窗 (找不到 .modal-body)', 'error');
             }
 
-            // 1. 如果沒有資料，顯示空狀態
             if (!quotations || quotations.length === 0) {
                 modalBody.innerHTML = `
                     <div class="text-center p-4">
@@ -405,7 +386,6 @@ function initProcurementPage() {
                     </div>
                 `;
             } else {
-                // 2. 有資料，開始統計
                 const stats = {};
                 quotations.forEach(q => {
                     const supplier = q.supplierName || '未知供應商';
@@ -427,7 +407,6 @@ function initProcurementPage() {
                     stats[supplier].totalAmount += (q.quotedUnitPrice || 0) * qty;
                 });
 
-                // 3. 渲染列表 HTML
                 let html = `
                     <h5 class="mb-3">已匯入的供應商</h5>
                     <div class="table-responsive">
@@ -459,12 +438,8 @@ function initProcurementPage() {
                 });
 
                 html += `</tbody></table></div>`;
-                
-                // 4. 強制寫入 DOM
                 modalBody.innerHTML = html;
             }
-
-            // 5. 顯示 Modal
             document.getElementById('manageQuotesModal').style.display = 'flex';
         }
 
@@ -475,7 +450,6 @@ function initProcurementPage() {
 
             try {
                 const targetQuotes = quotations.filter(q => q.supplierName === supplierName);
-                
                 const batch = db.batch();
                 targetQuotes.forEach(q => {
                     const ref = db.collection('quotations').doc(q.id);
@@ -483,22 +457,25 @@ function initProcurementPage() {
                 });
 
                 await batch.commit();
-                
-                // 重新載入資料
                 await onTenderChange(selectedTender.id);
-                
-                // 重新渲染 Modal (因為資料變了)
                 openQuoteManager();
-                
                 showAlert(`已刪除 ${supplierName} 的所有報價`, 'success');
 
             } catch (error) {
                 console.error("刪除失敗:", error);
                 showAlert("刪除失敗: " + error.message, 'error');
                 showLoading(false);
-            } finally {
-                // 如果是透過 reload 觸發的 finally，這裡其實不會執行到，因為 onTenderChange 裡面有 showLoading(false)
             }
+        }
+
+        // 🔥 核心函式：文字正規化 (去除全形、空白)
+        function normalizeString(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/（/g, '(').replace(/）/g, ')') // 全形轉半形
+                .replace(/\s+/g, '') // 去除所有空白
+                .trim()
+                .toLowerCase(); // 統一小寫
         }
 
         async function handleImportQuotes(e) {
@@ -535,9 +512,15 @@ function initProcurementPage() {
                     const nameCol = row['項目名稱'] ? String(row['項目名稱']).trim() : '';
                     const priceRaw = row['供應商報價(單價)'] || row['單價'] || 0;
                     
+                    // 1. 偵測大項目 (使用 Normalize 寬鬆比對)
                     const foundMajor = majorItems.find(m => {
-                        const majorKey = `${m.sequence || ''} ${m.name || ''}`.trim();
-                        return seqCol.includes(majorKey) || seqCol.replace('.','').includes(majorKey.replace('.',''));
+                        const majorKey = `${m.sequence || ''} ${m.name || ''}`;
+                        const normalizedRowSeq = normalizeString(seqCol);
+                        const normalizedMajorKey = normalizeString(majorKey);
+                        
+                        // 移除小數點後再比對一次 (例如 "壹." vs "壹")
+                        return normalizedRowSeq.includes(normalizedMajorKey) || 
+                               normalizedRowSeq.replace('.','').includes(normalizedMajorKey.replace('.',''));
                     });
 
                     if (foundMajor) {
@@ -547,10 +530,12 @@ function initProcurementPage() {
 
                     if (!currentMajorItem || (!seqCol && !nameCol)) return;
 
+                    // 2. 比對細項 (使用 Normalize 嚴格比對)
+                    // ✅ 修正點：使用 normalizeString 忽略括號差異與空白
                     const targetItem = detailItems.find(item => 
                         item.majorItemId === currentMajorItem.id && 
-                        String(item.sequence).trim() === seqCol && 
-                        String(item.name).trim() === nameCol
+                        normalizeString(item.sequence) === normalizeString(seqCol) && 
+                        normalizeString(item.name) === normalizeString(nameCol)
                     );
 
                     if (priceRaw > 0) {
@@ -733,7 +718,6 @@ function initProcurementPage() {
             openQuoteManager();
         }
 
-        // --- 輔助函式 ---
         function showLoading(show, msg) {
             const el = document.getElementById('loading');
             if(el) {
