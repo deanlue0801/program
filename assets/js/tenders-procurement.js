@@ -1,15 +1,14 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v19.0 (匯入功能實作版)
- * 新增功能：
- * 1. 【匯入報價單】完整實作：
- * - 步驟一：選擇 Excel 檔案。
- * - 步驟二：跳出 Prompt 詢問「供應商名稱」。
- * - 步驟三：解析 Excel，雙重比對「項次」與「名稱」。
- * - 步驟四：擷取「供應商報價(單價)」，批次寫入 Firestore。
- * 2. 包含 v18 的所有功能 (大項分組、匯出排序、數量修正、狀態切換)。
+ * 標單採購管理 (tenders-procurement.js) - v21.0 (額外項目分組顯示版)
+ * 修正重點：
+ * 1. 【顯示邏輯重構】表格分為上下兩區：
+ * - 上區：原始標單項目 (依大項分類)。
+ * - 下區：廠商額外新增項目 (同樣依大項分類顯示)。
+ * 2. 【匯入邏輯】保持 v20 的智慧分組 (Context-Aware)，確保同名項目與額外項目能正確歸屬到當下的大項目。
+ * 3. 包含數量修正 (totalQuantity) 與狀態切換功能。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v19.0 匯入實作版)...");
+    console.log("🚀 初始化採購管理頁面 (v21.0 額外項目分組版)...");
 
     // 1. 等待 HTML 元素
     function waitForElement(selector, callback) {
@@ -176,7 +175,7 @@ function initProcurementPage() {
                     purchaseOrders = [];
                 }
 
-                // 3. 嘗試載入報價單
+                // 3. 嘗試載入報價單 (含額外項目)
                 try {
                     let quoteData = [];
                     if (typeof safeFirestoreQuery === 'function') {
@@ -210,7 +209,7 @@ function initProcurementPage() {
             }
         }
 
-        // --- (D) 渲染表格 ---
+        // --- (D) 渲染表格 (🔥 分區 + 分組顯示) ---
         function renderTable() {
             const tbody = document.getElementById('procurementTableBody');
             const filterMajorId = document.getElementById('majorItemSelect').value;
@@ -218,7 +217,6 @@ function initProcurementPage() {
             if (!tbody) return;
             tbody.innerHTML = '';
 
-            // 1. 決定要顯示哪些大項
             let targetMajorItems = majorItems;
             if (filterMajorId) {
                 targetMajorItems = majorItems.filter(m => m.id === filterMajorId);
@@ -226,14 +224,16 @@ function initProcurementPage() {
 
             let hasAnyData = false;
 
-            // 2. 依序遍歷大項 (外層迴圈)
+            // ==========================================
+            // 第一階段：渲染原始標單項目 (Upper Section)
+            // ==========================================
             targetMajorItems.forEach(major => {
                 const myDetails = detailItems.filter(d => d.majorItemId === major.id);
 
                 if (myDetails.length > 0) {
                     hasAnyData = true;
 
-                    // (A) 插入大項標題列
+                    // 1. 插入大項標題 (原始)
                     const headerRow = document.createElement('tr');
                     headerRow.className = 'table-active';
                     headerRow.innerHTML = `
@@ -243,7 +243,7 @@ function initProcurementPage() {
                     `;
                     tbody.appendChild(headerRow);
 
-                    // (B) 插入細項列
+                    // 2. 插入原始細項
                     myDetails.forEach(item => {
                         const tr = createDetailRow(item);
                         tbody.appendChild(tr);
@@ -251,16 +251,61 @@ function initProcurementPage() {
                 }
             });
 
+            // ==========================================
+            // 第二階段：渲染額外項目 (Lower Section)
+            // ==========================================
+            
+            // 找出所有的額外項目
+            const allExtraQuotes = quotations.filter(q => q.isExtra);
+            
+            // 如果有額外項目，才顯示下半部
+            if (allExtraQuotes.length > 0) {
+                
+                let hasVisibleExtra = false;
+
+                // 為了只顯示有額外項目的大項，我們再次遍歷 targetMajorItems
+                targetMajorItems.forEach((major, index) => {
+                    const myExtraQuotes = allExtraQuotes.filter(q => q.majorItemId === major.id);
+                    
+                    if (myExtraQuotes.length > 0) {
+                        hasVisibleExtra = true;
+                        hasAnyData = true;
+
+                        // 如果是第一個顯示的額外大項，插入一個總分隔線
+                        if (!hasVisibleExtra) {
+                             // 這裡其實不需要做什麼，只要確保結構清楚即可
+                        }
+
+                        // 3. 插入分隔列 + 大項標題 (額外)
+                        const headerRow = document.createElement('tr');
+                        headerRow.style.borderTop = "3px double #dee2e6"; // 雙線分隔
+                        headerRow.innerHTML = `
+                            <td colspan="7" style="font-weight: bold; background-color: #fff3cd; color: #856404; padding: 12px 15px;">
+                                ⚠️ ${major.sequence || ''} ${major.name || ''} (廠商額外新增)
+                            </td>
+                        `;
+                        tbody.appendChild(headerRow);
+
+                        // 4. 插入額外項目列
+                        myExtraQuotes.forEach(quote => {
+                            const tr = createExtraQuoteRow(quote);
+                            tbody.appendChild(tr);
+                        });
+                    }
+                });
+            }
+
             if (!hasAnyData) {
                 tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px;">沒有符合的項目資料</td></tr>';
             }
         }
 
+        // 建立原始細項列
         function createDetailRow(item) {
             const tr = document.createElement('tr');
             
             const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
-            const itemQuotes = quotations.filter(q => q.detailItemId === item.id);
+            const itemQuotes = quotations.filter(q => q.detailItemId === item.id && !q.isExtra);
             
             let statusText = '規劃中', statusClass = 'status-planning';
             let currentStatusCode = 'planning';
@@ -315,6 +360,31 @@ function initProcurementPage() {
             return tr;
         }
 
+        // 建立額外項目列
+        function createExtraQuoteRow(quote) {
+            const tr = document.createElement('tr');
+            tr.style.backgroundColor = '#fff9db'; // 淺黃背景
+
+            const quotesHtml = `
+                <span class="quote-chip" style="border: 1px solid #f59f00; color: #f59f00;" title="${quote.supplierName}">
+                    ${(quote.supplierName || '').substring(0,4)}.. $${quote.quotedUnitPrice || 0}
+                </span>`;
+
+            tr.innerHTML = `
+                <td class="text-muted"><small>(額外)</small></td>
+                <td>
+                    <div style="font-weight:bold; color: #d63384;">${quote.itemName || '額外項目'}</div>
+                    <div class="text-muted text-sm">${quote.remark || '(廠商新增項目)'}</div>
+                </td>
+                <td>${quote.itemUnit || '-'}</td>
+                <td class="text-right">${quote.itemQty || 1}</td>
+                <td><span class="text-muted text-sm">-</span></td>
+                <td>${quotesHtml}</td>
+                <td class="text-right">-</td>
+            `;
+            return tr;
+        }
+
         // --- (E) 事件綁定 ---
         function setupEventListeners() {
             const bind = (id, event, handler) => {
@@ -325,13 +395,9 @@ function initProcurementPage() {
             bind('projectSelect', 'change', (e) => onProjectChange(e.target.value));
             bind('tenderSelect', 'change', (e) => onTenderChange(e.target.value));
             bind('majorItemSelect', 'change', () => renderTable());
-
             bind('exportRfqBtn', 'click', handleExportRFQ);
-            
-            // 匯入按鈕與 Input
             bind('importQuotesBtn', 'click', () => document.getElementById('importQuotesInput')?.click());
             bind('importQuotesInput', 'change', handleImportQuotes);
-            
             bind('manageQuotesBtn', 'click', () => document.getElementById('manageQuotesModal').style.display = 'flex');
             bind('deleteOrderBtn', 'click', handleDeleteOrder);
             
@@ -348,7 +414,7 @@ function initProcurementPage() {
 
         // --- (F) 功能函數 ---
 
-        // 🔥 匯入報價單 (核心實作)
+        // 🔥 匯入報價單 (維持 v20 的智慧判斷)
         async function handleImportQuotes(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -356,68 +422,93 @@ function initProcurementPage() {
             try {
                 if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
 
-                // 1. 詢問供應商
                 const supplierName = prompt("請輸入此報價單的供應商名稱：");
                 if (!supplierName || supplierName.trim() === "") {
                     showAlert("已取消匯入 (未輸入供應商)", "info");
-                    e.target.value = ''; // 清空
+                    e.target.value = '';
                     return;
                 }
 
                 showLoading(true, `正在解析 ${file.name}...`);
 
-                // 2. 解析 Excel
                 const data = await file.arrayBuffer();
                 const workbook = XLSX.read(data);
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const jsonData = XLSX.utils.sheet_to_json(firstSheet);
 
-                // 3. 比對與準備資料
                 const batch = db.batch();
                 let matchCount = 0;
-                let errorCount = 0;
-
-                // 批次計數器 (Firestore batch 上限 500)
+                let extraCount = 0;
                 let operationCounter = 0;
-                const batches = []; 
+                let batches = []; 
                 let currentBatch = db.batch();
+                let currentMajorItem = null;
 
                 jsonData.forEach(row => {
-                    // Excel 欄位容錯處理
-                    const seq = row['項次'] ? String(row['項次']).trim() : null;
-                    const name = row['項目名稱'] ? String(row['項目名稱']).trim() : null;
+                    const seqCol = row['項次'] ? String(row['項次']).trim() : '';
+                    const nameCol = row['項目名稱'] ? String(row['項目名稱']).trim() : '';
                     const priceRaw = row['供應商報價(單價)'] || row['單價'] || 0;
                     
-                    if (!seq || !name) return; // 跳過無效行
+                    // 偵測大項目
+                    const foundMajor = majorItems.find(m => {
+                        const majorKey = `${m.sequence || ''} ${m.name || ''}`.trim();
+                        return seqCol.includes(majorKey) || seqCol.replace('.','').includes(majorKey.replace('.',''));
+                    });
 
-                    // 雙重比對：項次 + 名稱
+                    if (foundMajor) {
+                        currentMajorItem = foundMajor;
+                        return;
+                    }
+
+                    if (!currentMajorItem || (!seqCol && !nameCol)) return;
+
+                    // 在當前大項目下尋找細項
                     const targetItem = detailItems.find(item => 
-                        String(item.sequence).trim() === seq && 
-                        String(item.name).trim() === name
+                        item.majorItemId === currentMajorItem.id && 
+                        String(item.sequence).trim() === seqCol && 
+                        String(item.name).trim() === nameCol
                     );
 
-                    // 只有當比對成功，且價格大於 0 才匯入
-                    if (targetItem && priceRaw > 0) {
+                    if (priceRaw > 0) {
                         const price = Number(priceRaw);
-                        
-                        // 建立新文件引用
                         const newQuoteRef = db.collection('quotations').doc();
-                        
-                        const quoteData = {
-                            projectId: selectedProject.id,
-                            tenderId: selectedTender.id,
-                            detailItemId: targetItem.id,
-                            supplierName: supplierName.trim(),
-                            quotedUnitPrice: price,
-                            remark: row['備註'] || '',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        };
+                        let quoteData = {};
+
+                        if (targetItem) {
+                            quoteData = {
+                                projectId: selectedProject.id,
+                                tenderId: selectedTender.id,
+                                detailItemId: targetItem.id,
+                                majorItemId: currentMajorItem.id,
+                                supplierName: supplierName.trim(),
+                                quotedUnitPrice: price,
+                                isExtra: false,
+                                remark: row['備註'] || '',
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            };
+                            matchCount++;
+                        } else {
+                            // 額外項目：同時記錄 majorItemId
+                            quoteData = {
+                                projectId: selectedProject.id,
+                                tenderId: selectedTender.id,
+                                detailItemId: null,
+                                majorItemId: currentMajorItem.id, // 綁定大項
+                                supplierName: supplierName.trim(),
+                                quotedUnitPrice: price,
+                                isExtra: true,
+                                itemName: nameCol || '未命名額外項',
+                                itemUnit: row['單位'] || '',
+                                itemQty: row['數量'] || 1,
+                                remark: row['備註'] || '',
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            };
+                            extraCount++;
+                        }
 
                         currentBatch.set(newQuoteRef, quoteData);
-                        matchCount++;
                         operationCounter++;
 
-                        // 如果超過 450 筆 (預留緩衝)，就換一個 Batch
                         if (operationCounter >= 450) {
                             batches.push(currentBatch.commit());
                             currentBatch = db.batch();
@@ -426,24 +517,17 @@ function initProcurementPage() {
                     }
                 });
 
-                // 4. 送出最後一批
-                if (operationCounter > 0) {
-                    batches.push(currentBatch.commit());
-                }
-
-                // 等待所有批次完成
+                if (operationCounter > 0) batches.push(currentBatch.commit());
                 await Promise.all(batches);
 
-                showAlert(`成功匯入 ${matchCount} 筆報價 (供應商: ${supplierName})`, 'success');
-                
-                // 5. 重新載入顯示
+                showAlert(`匯入完成！匹配 ${matchCount} 筆，額外新增 ${extraCount} 筆`, 'success');
                 await onTenderChange(selectedTender.id);
 
             } catch (error) {
                 console.error("匯入失敗:", error);
                 showAlert("匯入失敗: " + error.message, 'error');
             } finally {
-                e.target.value = ''; // 清空 Input 讓同個檔案可再選
+                e.target.value = '';
                 showLoading(false);
             }
         }
