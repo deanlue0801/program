@@ -1230,3 +1230,46 @@ body.sidebar-open .sidebar-overlay {
         gap: 20px;
     }
 }
+/* =========================================
+   4. 採購頁面 - 版面佈局與 RWD 設定 (原 HTML 內樣式移入)
+   ========================================= */
+
+/* 電腦版顯示設定 */
+@media (min-width: 768px) {
+    .procurement-page, 
+    .filter-section, 
+    #mainContent {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    .filter-row {
+        display: flex !important;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+}
+
+/* 標題與按鈕區塊排版 */
+.card-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+/* 手機版按鈕優化 */
+@media (max-width: 768px) {
+    .card-header-actions {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .action-buttons {
+        width: 100%;
+        justify-content: flex-start;
+        margin-top: 10px;
+    }
+}
