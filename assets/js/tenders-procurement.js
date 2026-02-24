@@ -1,14 +1,12 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v21.0 (額外項目分組顯示版)
+ * 標單採購管理 (tenders-procurement.js) - v23.0 (強制渲染版)
  * 修正重點：
- * 1. 【顯示邏輯重構】表格分為上下兩區：
- * - 上區：原始標單項目 (依大項分類)。
- * - 下區：廠商額外新增項目 (同樣依大項分類顯示)。
- * 2. 【匯入邏輯】保持 v20 的智慧分組 (Context-Aware)，確保同名項目與額外項目能正確歸屬到當下的大項目。
- * 3. 包含數量修正 (totalQuantity) 與狀態切換功能。
+ * 1. 【管理報價】修正 Modal 空白問題。改為直接鎖定 .modal-body 強制覆蓋內容。
+ * 2. 移除「無資料時阻擋開啟」的邏輯，改為在 Modal 內顯示「尚無資料」提示，避免與 HTML 原生開啟行為衝突。
+ * 3. 包含 v22 之前的所有功能 (匯入、分組、數量修正)。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v21.0 額外項目分組版)...");
+    console.log("🚀 初始化採購管理頁面 (v23.0 強制渲染版)...");
 
     // 1. 等待 HTML 元素
     function waitForElement(selector, callback) {
@@ -175,7 +173,7 @@ function initProcurementPage() {
                     purchaseOrders = [];
                 }
 
-                // 3. 嘗試載入報價單 (含額外項目)
+                // 3. 嘗試載入報價單
                 try {
                     let quoteData = [];
                     if (typeof safeFirestoreQuery === 'function') {
@@ -209,7 +207,7 @@ function initProcurementPage() {
             }
         }
 
-        // --- (D) 渲染表格 (🔥 分區 + 分組顯示) ---
+        // --- (D) 渲染表格 ---
         function renderTable() {
             const tbody = document.getElementById('procurementTableBody');
             const filterMajorId = document.getElementById('majorItemSelect').value;
@@ -224,16 +222,12 @@ function initProcurementPage() {
 
             let hasAnyData = false;
 
-            // ==========================================
-            // 第一階段：渲染原始標單項目 (Upper Section)
-            // ==========================================
+            // 第一階段：原始項目
             targetMajorItems.forEach(major => {
                 const myDetails = detailItems.filter(d => d.majorItemId === major.id);
 
                 if (myDetails.length > 0) {
                     hasAnyData = true;
-
-                    // 1. 插入大項標題 (原始)
                     const headerRow = document.createElement('tr');
                     headerRow.className = 'table-active';
                     headerRow.innerHTML = `
@@ -243,7 +237,6 @@ function initProcurementPage() {
                     `;
                     tbody.appendChild(headerRow);
 
-                    // 2. 插入原始細項
                     myDetails.forEach(item => {
                         const tr = createDetailRow(item);
                         tbody.appendChild(tr);
@@ -251,42 +244,21 @@ function initProcurementPage() {
                 }
             });
 
-            // ==========================================
-            // 第二階段：渲染額外項目 (Lower Section)
-            // ==========================================
-            
-            // 找出所有的額外項目
+            // 第二階段：額外項目
             const allExtraQuotes = quotations.filter(q => q.isExtra);
-            
-            // 如果有額外項目，才顯示下半部
             if (allExtraQuotes.length > 0) {
-                
-                let hasVisibleExtra = false;
-
-                // 為了只顯示有額外項目的大項，我們再次遍歷 targetMajorItems
-                targetMajorItems.forEach((major, index) => {
+                targetMajorItems.forEach((major) => {
                     const myExtraQuotes = allExtraQuotes.filter(q => q.majorItemId === major.id);
-                    
                     if (myExtraQuotes.length > 0) {
-                        hasVisibleExtra = true;
                         hasAnyData = true;
-
-                        // 如果是第一個顯示的額外大項，插入一個總分隔線
-                        if (!hasVisibleExtra) {
-                             // 這裡其實不需要做什麼，只要確保結構清楚即可
-                        }
-
-                        // 3. 插入分隔列 + 大項標題 (額外)
                         const headerRow = document.createElement('tr');
-                        headerRow.style.borderTop = "3px double #dee2e6"; // 雙線分隔
+                        headerRow.style.borderTop = "3px double #dee2e6";
                         headerRow.innerHTML = `
                             <td colspan="7" style="font-weight: bold; background-color: #fff3cd; color: #856404; padding: 12px 15px;">
                                 ⚠️ ${major.sequence || ''} ${major.name || ''} (廠商額外新增)
                             </td>
                         `;
                         tbody.appendChild(headerRow);
-
-                        // 4. 插入額外項目列
                         myExtraQuotes.forEach(quote => {
                             const tr = createExtraQuoteRow(quote);
                             tbody.appendChild(tr);
@@ -300,7 +272,6 @@ function initProcurementPage() {
             }
         }
 
-        // 建立原始細項列
         function createDetailRow(item) {
             const tr = document.createElement('tr');
             
@@ -360,10 +331,9 @@ function initProcurementPage() {
             return tr;
         }
 
-        // 建立額外項目列
         function createExtraQuoteRow(quote) {
             const tr = document.createElement('tr');
-            tr.style.backgroundColor = '#fff9db'; // 淺黃背景
+            tr.style.backgroundColor = '#fff9db';
 
             const quotesHtml = `
                 <span class="quote-chip" style="border: 1px solid #f59f00; color: #f59f00;" title="${quote.supplierName}">
@@ -398,9 +368,11 @@ function initProcurementPage() {
             bind('exportRfqBtn', 'click', handleExportRFQ);
             bind('importQuotesBtn', 'click', () => document.getElementById('importQuotesInput')?.click());
             bind('importQuotesInput', 'change', handleImportQuotes);
-            bind('manageQuotesBtn', 'click', () => document.getElementById('manageQuotesModal').style.display = 'flex');
-            bind('deleteOrderBtn', 'click', handleDeleteOrder);
             
+            // ✅ 管理報價按鈕
+            bind('manageQuotesBtn', 'click', openQuoteManager);
+
+            // Modal 關閉
             document.querySelectorAll('[data-action="close-modal"]').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const modal = btn.closest('.modal-overlay');
@@ -410,11 +382,125 @@ function initProcurementPage() {
 
             window.toggleStatus = handleToggleStatus;
             window.selectQuote = handleSelectQuote;
+            window.deleteSupplierQuotes = deleteSupplierQuotes;
         }
 
         // --- (F) 功能函數 ---
 
-        // 🔥 匯入報價單 (維持 v20 的智慧判斷)
+        // 🔥 管理供應商報價 (Modal 邏輯 - 強制渲染)
+        function openQuoteManager() {
+            // 尋找 Modal Body，這是我們唯一確定存在的元素
+            const modalBody = document.querySelector('#manageQuotesModal .modal-body');
+            
+            if (!modalBody) {
+                return showAlert('無法開啟管理視窗 (找不到 .modal-body)', 'error');
+            }
+
+            // 1. 如果沒有資料，顯示空狀態
+            if (!quotations || quotations.length === 0) {
+                modalBody.innerHTML = `
+                    <div class="text-center p-4">
+                        <h5 class="text-muted">目前尚無任何報價紀錄</h5>
+                        <p class="text-muted text-sm">請使用「匯入報價單」功能匯入資料。</p>
+                    </div>
+                `;
+            } else {
+                // 2. 有資料，開始統計
+                const stats = {};
+                quotations.forEach(q => {
+                    const supplier = q.supplierName || '未知供應商';
+                    if (!stats[supplier]) {
+                        stats[supplier] = { count: 0, totalAmount: 0 };
+                    }
+                    stats[supplier].count++;
+                    
+                    let qty = 1;
+                    if (q.isExtra) {
+                        qty = Number(q.itemQty) || 1;
+                    } else {
+                        const detail = detailItems.find(d => d.id === q.detailItemId);
+                        if (detail) {
+                            if (detail.totalQuantity !== undefined && detail.totalQuantity !== null) qty = Number(detail.totalQuantity);
+                            else if (detail.quantity !== undefined && detail.quantity !== null) qty = Number(detail.quantity);
+                        }
+                    }
+                    stats[supplier].totalAmount += (q.quotedUnitPrice || 0) * qty;
+                });
+
+                // 3. 渲染列表 HTML
+                let html = `
+                    <h5 class="mb-3">已匯入的供應商</h5>
+                    <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>供應商名稱</th>
+                                <th class="text-right">項目數</th>
+                                <th class="text-right">總金額(預估)</th>
+                                <th class="text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                Object.keys(stats).forEach(supplier => {
+                    html += `
+                        <tr>
+                            <td style="vertical-align: middle;"><strong>${supplier}</strong></td>
+                            <td class="text-right" style="vertical-align: middle;">${stats[supplier].count}</td>
+                            <td class="text-right" style="vertical-align: middle;">$${parseInt(stats[supplier].totalAmount).toLocaleString()}</td>
+                            <td class="text-center">
+                                <button class="btn btn-outline-danger btn-sm" onclick="deleteSupplierQuotes('${supplier}')">
+                                    🗑️ 刪除
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += `</tbody></table></div>`;
+                
+                // 4. 強制寫入 DOM
+                modalBody.innerHTML = html;
+            }
+
+            // 5. 顯示 Modal
+            document.getElementById('manageQuotesModal').style.display = 'flex';
+        }
+
+        async function deleteSupplierQuotes(supplierName) {
+            if (!confirm(`確定要刪除「${supplierName}」的所有報價嗎？\n此動作無法復原。`)) return;
+
+            showLoading(true, `正在刪除 ${supplierName} 的報價...`);
+
+            try {
+                const targetQuotes = quotations.filter(q => q.supplierName === supplierName);
+                
+                const batch = db.batch();
+                targetQuotes.forEach(q => {
+                    const ref = db.collection('quotations').doc(q.id);
+                    batch.delete(ref);
+                });
+
+                await batch.commit();
+                
+                // 重新載入資料
+                await onTenderChange(selectedTender.id);
+                
+                // 重新渲染 Modal (因為資料變了)
+                openQuoteManager();
+                
+                showAlert(`已刪除 ${supplierName} 的所有報價`, 'success');
+
+            } catch (error) {
+                console.error("刪除失敗:", error);
+                showAlert("刪除失敗: " + error.message, 'error');
+                showLoading(false);
+            } finally {
+                // 如果是透過 reload 觸發的 finally，這裡其實不會執行到，因為 onTenderChange 裡面有 showLoading(false)
+            }
+        }
+
         async function handleImportQuotes(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -449,7 +535,6 @@ function initProcurementPage() {
                     const nameCol = row['項目名稱'] ? String(row['項目名稱']).trim() : '';
                     const priceRaw = row['供應商報價(單價)'] || row['單價'] || 0;
                     
-                    // 偵測大項目
                     const foundMajor = majorItems.find(m => {
                         const majorKey = `${m.sequence || ''} ${m.name || ''}`.trim();
                         return seqCol.includes(majorKey) || seqCol.replace('.','').includes(majorKey.replace('.',''));
@@ -462,7 +547,6 @@ function initProcurementPage() {
 
                     if (!currentMajorItem || (!seqCol && !nameCol)) return;
 
-                    // 在當前大項目下尋找細項
                     const targetItem = detailItems.find(item => 
                         item.majorItemId === currentMajorItem.id && 
                         String(item.sequence).trim() === seqCol && 
@@ -488,12 +572,11 @@ function initProcurementPage() {
                             };
                             matchCount++;
                         } else {
-                            // 額外項目：同時記錄 majorItemId
                             quoteData = {
                                 projectId: selectedProject.id,
                                 tenderId: selectedTender.id,
                                 detailItemId: null,
-                                majorItemId: currentMajorItem.id, // 綁定大項
+                                majorItemId: currentMajorItem.id,
                                 supplierName: supplierName.trim(),
                                 quotedUnitPrice: price,
                                 isExtra: true,
@@ -647,7 +730,7 @@ function initProcurementPage() {
         }
 
         function handleDeleteOrder() {
-            showAlert("請先選擇要刪除的項目 (功能建置中)", 'info');
+            openQuoteManager();
         }
 
         // --- 輔助函式 ---
