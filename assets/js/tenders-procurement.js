@@ -1,14 +1,12 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v34.0 (職責分離版)
- * * 狀態：✅ 已將 CSS 移出至 HTML，JS 回歸純邏輯。
- * * 功能：
- * 1. 【儀表板】：JS 計算數據並填入 DOM，不負責樣式。
- * 2. 【批次功能】：批次需用日、下單日、狀態切換。
- * 3. 【自動化】：狀態連動日期。
- * 4. 【智慧匯入】：支援 Excel 匯入。
+ * 標單採購管理 (tenders-procurement.js) - v35.0 (預算差異與選商實作版)
+ * * 更新日誌：
+ * 1. [新增] 預算差異分析：計算 (成本 - 成交) * 數量，顯示盈虧。
+ * 2. [新增] 選定廠商功能：點擊報價膠囊可將其設為「成交價」。
+ * 3. [介面] 表格擴充至 11 欄，新增「預算差異」與「附件」。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v34.0 職責分離版)...");
+    console.log("🚀 初始化採購管理頁面 (v35.0 預算差異版)...");
 
     // 全域變數
     let statusChart = null;
@@ -40,10 +38,9 @@ function initProcurementPage() {
         const currentUser = firebase.auth().currentUser;
         const db = firebase.firestore();
 
-        // ❌ 移除 injectStylesAndScripts()，樣式交給 HTML 負責
-        injectHiddenDateInputs(); // 這是功能性的 hidden input，必須保留
+        injectHiddenDateInputs();
 
-        // 確保 Chart.js 有載入 (這是外部套件，還是建議由 JS 動態檢查較保險)
+        // 確保 Chart.js 有載入
         if (!document.querySelector('script[src*="chart.js"]')) {
             const script = document.createElement('script');
             script.src = "https://cdn.jsdelivr.net/npm/chart.js";
@@ -191,7 +188,6 @@ function initProcurementPage() {
 
         // --- UI 建構區 ---
 
-        // 建立上方儀表板 (樣式由 CSS 類別控制)
         function ensureDashboardSection() {
             const mainContent = document.getElementById('mainContent');
             const oldDash = document.getElementById('procurement-dashboard');
@@ -237,6 +233,7 @@ function initProcurementPage() {
             mainContent.insertBefore(dashboard, mainContent.firstChild);
         }
 
+        // [v35.0 修改] 更新表格標頭，加入預算差異與附件欄位
         function adjustTableHeader() {
             const tbody = document.getElementById('procurementTableBody');
             if (!tbody) return;
@@ -246,15 +243,17 @@ function initProcurementPage() {
             if (!thead) return;
 
             thead.innerHTML = `
-                <th style="width: 5%">項次</th>
-                <th style="width: 22%">項目名稱</th>
-                <th style="width: 5%">單位</th>
-                <th style="width: 11%; background-color: #f8f0fc;">需用日期</th>
-                <th style="width: 11%; background-color: #fff4e6;">下單日期</th>
-                <th class="text-right" style="width: 8%">數量</th>
-                <th style="width: 10%">採購狀態</th>
-                <th style="width: 18%">供應商報價</th>
-                <th class="text-right" style="width: 10%">成本單價</th>
+                <th style="width: 4%">項次</th>
+                <th style="width: 20%">項目名稱</th>
+                <th style="width: 4%">單位</th>
+                <th style="width: 10%; background-color: #f8f0fc;">需用日期</th>
+                <th style="width: 10%; background-color: #fff4e6;">下單日期</th>
+                <th class="text-right" style="width: 6%">數量</th>
+                <th style="width: 9%">採購狀態</th>
+                <th style="width: 18%">供應商報價 (點擊選定)</th>
+                <th class="text-right" style="width: 8%">成本單價</th>
+                <th class="text-right" style="width: 8%">預算差異</th>
+                <th class="text-center" style="width: 3%">附件</th>
             `;
         }
 
@@ -275,11 +274,11 @@ function initProcurementPage() {
 
                 if (myDetails.length > 0) {
                     hasAnyData = true;
+                    // [v35.0 修改] colspan 改為 11 欄
                     const headerRow = document.createElement('tr');
                     headerRow.className = 'table-active';
-                    
                     headerRow.innerHTML = `
-                        <td colspan="9" style="background-color: #f1f3f5; padding: 8px 15px; vertical-align: middle; border-bottom: 2px solid #dee2e6;">
+                        <td colspan="11" style="background-color: #f1f3f5; padding: 8px 15px; vertical-align: middle; border-bottom: 2px solid #dee2e6;">
                             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <span style="font-weight: bold; font-size: 1.05rem;">
@@ -304,6 +303,7 @@ function initProcurementPage() {
                 }
             });
 
+            // 額外項目區塊
             const allExtraQuotes = quotations.filter(q => q.isExtra);
             if (allExtraQuotes.length > 0) {
                 targetMajorItems.forEach((major) => {
@@ -312,16 +312,18 @@ function initProcurementPage() {
                         hasAnyData = true;
                         const headerRow = document.createElement('tr');
                         headerRow.style.borderTop = "3px double #dee2e6";
-                        headerRow.innerHTML = `<td colspan="9" style="font-weight: bold; background-color: #fff3cd; color: #856404; padding: 12px 15px;">⚠️ ${major.sequence || ''} ${major.name || ''} (廠商額外新增)</td>`;
+                        // [v35.0 修改] colspan 改為 11
+                        headerRow.innerHTML = `<td colspan="11" style="font-weight: bold; background-color: #fff3cd; color: #856404; padding: 12px 15px;">⚠️ ${major.sequence || ''} ${major.name || ''} (廠商額外新增)</td>`;
                         tbody.appendChild(headerRow);
                         myExtraQuotes.forEach(quote => tbody.appendChild(createExtraQuoteRow(quote)));
                     }
                 });
             }
 
-            if (!hasAnyData) tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding: 20px;">沒有符合的項目資料</td></tr>';
+            if (!hasAnyData) tbody.innerHTML = '<tr><td colspan="11" class="text-center" style="padding: 20px;">沒有符合的項目資料</td></tr>';
         }
 
+        // [v35.0 修改] 核心：建立詳細資料列 (含預算差異計算)
         function createDetailRow(item) {
             const tr = document.createElement('tr');
             const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
@@ -329,11 +331,15 @@ function initProcurementPage() {
             
             let statusText = '規劃中', statusClass = 'status-planning', currentStatusCode = 'planning';
             let reqDate = '', ordDate = '';
+            // [v35.0 新增] 從 PO 取得成交價
+            let confirmedPrice = 0; 
 
             if (itemPO) {
                 currentStatusCode = itemPO.status;
                 reqDate = itemPO.requiredDate || '';
                 ordDate = itemPO.orderedDate || '';
+                confirmedPrice = itemPO.confirmedPrice || 0;
+
                 const statusMap = {
                     'inquiry': {t: '詢價中', c: 'status-inquiry'},
                     'ordered': {t: '已下單', c: 'status-ordered'},
@@ -349,13 +355,30 @@ function initProcurementPage() {
                 if (reqDate < today && currentStatusCode !== 'arrived') reqDateStyle = 'color: #e03131; font-weight: bold; border-color: #e03131;';
             }
 
-            let quotesHtml = itemQuotes.length > 0 ? itemQuotes.map(q => `<span class="quote-chip" title="${q.supplierName}">${(q.supplierName || '').substring(0,4)}.. $${q.quotedUnitPrice || 0}</span>`).join('') : '<span class="text-muted text-sm">-</span>';
+            // 報價單顯示邏輯：標記已選定的報價
+            let quotesHtml = itemQuotes.length > 0 ? itemQuotes.map(q => {
+                const isSelected = q.quotedUnitPrice === confirmedPrice && confirmedPrice > 0;
+                const style = isSelected ? 'background-color: #d4edda; border-color: #c3e6cb; color: #155724; font-weight: bold;' : '';
+                return `<span class="quote-chip" style="${style}" title="點擊選定此報價: ${q.supplierName}" onclick="window.selectQuote('${q.id}', '${q.supplierName}', ${q.quotedUnitPrice}, '${item.id}')">${(q.supplierName || '').substring(0,4)}.. $${q.quotedUnitPrice || 0}</span>`;
+            }).join('') : '<span class="text-muted text-sm">-</span>';
             
             let qty = 0;
             if (item.totalQuantity !== undefined) qty = Number(item.totalQuantity);
             else if (item.quantity !== undefined) qty = Number(item.quantity);
 
+            // 成本單價與預算差異計算
             let unitPrice = item.unitPrice !== undefined ? item.unitPrice : (item.cost !== undefined ? item.cost : 0);
+            let varianceHtml = '<span class="text-muted">-</span>';
+            
+            if (confirmedPrice > 0) {
+                const varianceUnit = unitPrice - confirmedPrice;
+                const varianceTotal = varianceUnit * qty;
+                if (varianceTotal >= 0) {
+                    varianceHtml = `<span style="color: #28a745; font-weight: bold;">+${parseInt(varianceTotal).toLocaleString()}</span>`;
+                } else {
+                    varianceHtml = `<span style="color: #dc3545; font-weight: bold;">${parseInt(varianceTotal).toLocaleString()}</span>`;
+                }
+            }
 
             tr.innerHTML = `
                 <td>${item.sequence || '-'}</td>
@@ -367,6 +390,10 @@ function initProcurementPage() {
                 <td><span class="order-chip ${statusClass}" onclick="window.toggleStatus('${item.id}', '${currentStatusCode}')">${statusText}</span></td>
                 <td>${quotesHtml}</td>
                 <td class="text-right">${unitPrice ? parseInt(unitPrice).toLocaleString() : '-'}</td>
+                <td class="text-right" style="background-color: #fdfdfd;">${varianceHtml}</td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-link text-muted" title="上傳附件 (尚未實作)" onclick="alert('附件上傳功能將在下一階段開放')"><i class="fas fa-paperclip"></i></button>
+                </td>
             `;
             return tr;
         }
@@ -376,6 +403,7 @@ function initProcurementPage() {
             tr.style.backgroundColor = '#fff9db';
             const quotesHtml = `<span class="quote-chip" style="border: 1px solid #f59f00; color: #f59f00;" title="${quote.supplierName}">${(quote.supplierName || '').substring(0,4)}.. $${quote.quotedUnitPrice || 0}</span>`;
 
+            // [v35.0 修改] 補齊 11 欄位
             tr.innerHTML = `
                 <td class="text-muted"><small>(額外)</small></td>
                 <td><div style="font-weight:bold; color: #d63384;">${quote.itemName || '額外項目'}</div><div class="text-muted text-sm">${quote.remark || '(廠商新增項目)'}</div></td>
@@ -385,6 +413,8 @@ function initProcurementPage() {
                 <td><span class="text-muted text-sm">-</span></td>
                 <td>${quotesHtml}</td>
                 <td class="text-right">-</td>
+                <td class="text-right">-</td>
+                <td></td>
             `;
             return tr;
         }
@@ -553,6 +583,48 @@ function initProcurementPage() {
             showLoading(false);
         }
 
+        // [v35.0 新增] 選定廠商報價邏輯
+        async function handleSelectQuote(quoteId, supplierName, price, detailItemId) {
+            if (!confirm(`確定要向【${supplierName}】採購？\n成交單價：$${price}\n\n這將會更新此項目的採購狀態為「已下單」並計算預算差異。`)) return;
+
+            showLoading(true, '更新採購單...');
+            try {
+                const itemPO = purchaseOrders.find(po => po.detailItemId === detailItemId);
+                const item = detailItems.find(i => i.id === detailItemId);
+                
+                // 準備更新的資料
+                const updateData = {
+                    status: 'ordered', // 自動設為已下單
+                    confirmedPrice: Number(price),
+                    supplierName: supplierName,
+                    orderedDate: itemPO?.orderedDate || new Date().toISOString().split('T')[0],
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                if (itemPO) {
+                    await db.collection('purchaseOrders').doc(itemPO.id).update(updateData);
+                } else {
+                    await db.collection('purchaseOrders').add({
+                        projectId: selectedProject.id,
+                        tenderId: selectedTender.id,
+                        detailItemId: detailItemId,
+                        majorItemId: item.majorItemId,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        ...updateData
+                    });
+                }
+
+                await onTenderChange(selectedTender.id);
+                showAlert('✅ 已確認採購並更新預算分析！', 'success');
+
+            } catch (error) {
+                console.error(error);
+                showAlert('更新失敗: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
         function setupEventListeners() {
             const change = (id, fn) => { const el = document.getElementById(id); if(el) el.onchange = fn; };
             const click = (id, fn) => { const el = document.getElementById(id); if(el) el.onclick = fn; };
@@ -563,12 +635,15 @@ function initProcurementPage() {
             click('importQuotesBtn', () => document.getElementById('importQuotesInput')?.click());
             change('importQuotesInput', handleImportQuotes);
             click('manageQuotesBtn', openQuoteManager);
+            
+            // 掛載全域函式
             window.triggerBatchDate = triggerBatchDate;
             window.batchUpdateStatus = handleBatchUpdateStatus;
             window.toggleStatus = handleToggleStatus;
             window.updateDate = handleUpdateDate;
             window.deleteSupplierQuotes = deleteSupplierQuotes;
-            window.selectQuote = handleSelectQuote;
+            window.selectQuote = handleSelectQuote; // [v35.0 新增]
+            
             document.querySelectorAll('[data-action="close-modal"]').forEach(b => b.onclick = () => b.closest('.modal-overlay').style.display='none');
         }
 
@@ -577,7 +652,6 @@ function initProcurementPage() {
         function populateSelect(select, items, defaultText) { if(!select) return; select.innerHTML = `<option value="">${defaultText}</option>` + items.map(i => `<option value="${i.id}">${i.sequence ? i.sequence + '.' : ''} ${i.name || i.code}</option>`).join(''); select.disabled = items.length === 0; }
         function resetSelects(level) { if (level === 'project') { document.getElementById('tenderSelect').innerHTML = '<option value="">請先選擇專案</option>'; document.getElementById('tenderSelect').disabled = true; document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>'; document.getElementById('majorItemSelect').disabled = true; document.getElementById('mainContent').style.display = 'none'; document.getElementById('emptyState').style.display = 'flex'; } else if (level === 'tender') { document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>'; } }
         function showAlert(msg, type) { alert(msg); }
-        function handleSelectQuote(id) { console.log(id); }
         function naturalSequenceSort(a, b) { const MAP = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'壹':1,'貳':2,'參':3,'肆':4,'伍':5,'陸':6,'柒':7,'捌':8,'玖':9,'拾':10}; const sA = String(a.sequence||''), sB = String(b.sequence||''); const nA = parseFloat(MAP[sA]||sA), nB = parseFloat(MAP[sB]||sB); if(!isNaN(nA)&&!isNaN(nB)) return nA-nB; return sA.localeCompare(sB, undefined, {numeric:true}); }
         function normalizeString(str) { return String(str).replace(/（/g, '(').replace(/）/g, ')').replace(/\s+/g, '').trim().toLowerCase(); }
         async function handleImportQuotes(e) { const file = e.target.files[0]; if (!file) return; try { if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件"); const supplierName = prompt("請輸入此報價單的供應商名稱："); if (!supplierName || supplierName.trim() === "") return; showLoading(true); const data = await file.arrayBuffer(); const workbook = XLSX.read(data); const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]); const batch = db.batch(); let cnt=0, ext=0, ops=0, batches=[], curBatch=db.batch(), curMajor=null; jsonData.forEach(row => { const seq=row['項次']?String(row['項次']).trim():'', name=row['項目名稱']?String(row['項目名稱']).trim():'', price=row['供應商報價(單價)']||row['單價']||0; const foundMajor = majorItems.find(m => { const k = `${m.sequence||''} ${m.name||''}`; return normalizeString(seq).includes(normalizeString(k)); }); if(foundMajor) { curMajor=foundMajor; return; } if(!curMajor || (!seq && !name)) return; const item = detailItems.find(i => i.majorItemId===curMajor.id && normalizeString(i.sequence)===normalizeString(seq) && normalizeString(i.name)===normalizeString(name)); if(price>0) { const ref = db.collection('quotations').doc(); let q = { projectId:selectedProject.id, tenderId:selectedTender.id, majorItemId:curMajor.id, supplierName:supplierName.trim(), quotedUnitPrice:Number(price), remark:row['備註']||'', createdAt:firebase.firestore.FieldValue.serverTimestamp() }; if(item) { q.detailItemId=item.id; q.isExtra=false; cnt++; } else { q.detailItemId=null; q.isExtra=true; q.itemName=name||'額外'; q.itemUnit=row['單位']||''; q.itemQty=row['數量']||1; ext++; } curBatch.set(ref, q); ops++; if(ops>=450) { batches.push(curBatch.commit()); curBatch=db.batch(); ops=0; } } }); if(ops>0) batches.push(curBatch.commit()); await Promise.all(batches); showAlert(`匯入完成！匹配 ${cnt} 筆，額外 ${ext} 筆`, 'success'); await onTenderChange(selectedTender.id); } catch(e) { console.error(e); showAlert(e.message, 'error'); } finally { e.target.value=''; showLoading(false); } }
