@@ -525,15 +525,24 @@ function initDistributionPage() {
             div.className = 'sequence-item'; 
             div.dataset.itemId = item.id; 
             div.innerHTML = `
-                <span class="drag-handle">☰</span>
-                <input class="sequence-input" value="${item.sequence || ''}" placeholder="項次">
-                <span class="item-name">${item.name}</span>
-            `; 
+                <div class="drag-handle">☰</div>
+                <div class="sequence-content">
+                    <input class="sequence-input" type="text" value="${item.sequence || ''}" placeholder="#">
+                    <span class="item-name">${item.name}</span>
+                </div>
+            `;
             list.appendChild(div); 
         }); 
         
         if (sortableSequence) sortableSequence.destroy(); 
-        sortableSequence = new Sortable(list, { handle: '.drag-handle', animation: 150 }); 
+// 設定 Sortable
+        sortableSequence = new Sortable(list, { 
+            handle: '.drag-handle', 
+            animation: 150,
+            ghostClass: 'sortable-ghost', // 拖曳時的半透明效果
+            chosenClass: 'sortable-chosen' // 選中時的效果
+        }); 
+        
         openModal('sequenceModal'); 
     }
 
@@ -675,3 +684,4 @@ function initDistributionPage() {
 
     initializePage();
 }
+
