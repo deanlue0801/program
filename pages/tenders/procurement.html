@@ -39,7 +39,7 @@
     </div>
 
     <div id="mainContent" style="display: none;">
-
+        
         <div class="content-card">
             <div class="card-header-actions">
                 <h3 class="content-subtitle">📝 採購項目清單</h3>
@@ -67,7 +67,7 @@
             </div>
             
             <div class="table-container">
-                <table class="table">
+                <table class="table" id="procurementTable">
                     <thead>
                         <tr>
                             <th style="width: 5%;">項次</th>
@@ -103,43 +103,3 @@
         </div>
     </div>
 </div>
-
-<style>
-    @media (min-width: 768px) {
-        .procurement-page, 
-        .filter-section, 
-        #mainContent {
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-        }
-        
-        .filter-row {
-            display: flex !important;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-    }
-
-    .card-header-actions {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1rem;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    
-    /* 避免手機版按鈕擠在一起 */
-    @media (max-width: 768px) {
-        .card-header-actions {
-            flex-direction: column;
-            align-items: flex-start;
-        }
-        .action-buttons {
-            width: 100%;
-            justify-content: flex-start;
-            margin-top: 10px;
-        }
-    }
-</style>
