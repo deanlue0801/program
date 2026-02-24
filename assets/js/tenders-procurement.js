@@ -1,18 +1,19 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v27.1 (表頭對齊修正版)
- * 修正重點：
- * 1. 【嚴重修正】修復表頭與內容對齊問題。
- * - 改用更穩健的方式抓取 <thead>，確保「需用日期」與「下單日期」欄位標題正確顯示。
- * 2. 【功能維持】包含 v27.0 的所有功能：
- * - 日期自動化 (下單自動填今天)。
- * - 批次變更狀態。
- * - 圓餅圖儀表板。
- * - 匯入/匯出/分組顯示。
+ * 標單採購管理 (tenders-procurement.js) - v28.0 (最終完整版)
+ * 更新重點：
+ * 1. 【圖表修復】：強制在表格上方插入圖表與統計區塊，確保圓餅圖可見。
+ * 2. 【批次日期】：
+ * - 大項目標題列新增「批次需用日」與「批次下單日」按鈕。
+ * - 實作隱藏式 Date Picker 觸發邏輯，讓操作更直覺。
+ * 3. 【完整功能】：包含匯入智慧比對、表頭對齊、狀態自動化等所有功能。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v27.1 表頭修正版)...");
+    console.log("🚀 初始化採購管理頁面 (v28.0 最終完整版)...");
 
+    // 全域變數
     let statusChart = null;
+    let currentBatchMajorId = null; // 用來記錄當前正在批次操作的大項 ID
+    let currentBatchType = null;    // 'required' or 'ordered'
 
     function waitForElement(selector, callback) {
         const element = document.querySelector(selector);
@@ -40,6 +41,8 @@ function initProcurementPage() {
         const db = firebase.firestore();
 
         injectStylesAndScripts();
+        injectHiddenDateInputs(); // 🔥 插入隱藏的日期選擇器
+
         initializePage();
 
         async function initializePage() {
@@ -77,7 +80,6 @@ function initProcurementPage() {
         async function onProjectChange(projectId) {
             resetSelects('tender');
             if (!projectId) return;
-            
             selectedProject = projects.find(p => p.id === projectId);
             const tenderSelect = document.getElementById('tenderSelect');
             tenderSelect.innerHTML = '<option value="">載入中...</option>';
@@ -89,15 +91,11 @@ function initProcurementPage() {
                     const result = await safeFirestoreQuery("tenders", [{ field: "projectId", operator: "==", value: projectId }]);
                     tenderDocs = result.docs;
                 } else {
-                    const snapshot = await db.collection('tenders')
-                        .where('projectId', '==', projectId)
-                        .get();
+                    const snapshot = await db.collection('tenders').where('projectId', '==', projectId).get();
                     tenderDocs = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
                 }
-
                 tenders = tenderDocs;
                 tenders.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-
                 populateSelect(tenderSelect, tenders, '請選擇標單...');
             } catch (error) {
                 console.error("載入標單失敗:", error);
@@ -132,64 +130,49 @@ function initProcurementPage() {
                     majorData = majorRes.docs;
                     detailDataRaw = detailRes.docs;
                 } else {
-                    const majorSnap = await db.collection('majorItems')
-                        .where('tenderId', '==', tenderId).where('projectId', '==', selectedProject.id).get();
-                    const detailSnap = await db.collection('detailItems')
-                        .where('tenderId', '==', tenderId).where('projectId', '==', selectedProject.id).get();
+                    const majorSnap = await db.collection('majorItems').where('tenderId', '==', tenderId).where('projectId', '==', selectedProject.id).get();
+                    const detailSnap = await db.collection('detailItems').where('tenderId', '==', tenderId).where('projectId', '==', selectedProject.id).get();
                     majorData = majorSnap.docs.map(d => ({id: d.id, ...d.data()}));
                     detailDataRaw = detailSnap.docs.map(d => ({id: d.id, ...d.data()}));
                 }
 
                 majorItems = majorData;
                 detailItems = detailDataRaw.filter(item => !item.isAddition);
-
                 majorItems.sort(naturalSequenceSort);
                 detailItems.sort(naturalSequenceSort);
-
                 populateSelect(majorItemSelect, majorItems, '所有大項目');
 
-                // 載入採購單
+                // 載入採購單 & 報價單
                 try {
                     let poData = [];
                     if (typeof safeFirestoreQuery === 'function') {
                          const poRes = await safeFirestoreQuery('purchaseOrders', queryConditions);
                          poData = poRes.docs;
                     } else {
-                        const poSnap = await db.collection('purchaseOrders')
-                            .where('tenderId', '==', tenderId).where('projectId', '==', selectedProject.id).get();
+                        const poSnap = await db.collection('purchaseOrders').where('tenderId', '==', tenderId).where('projectId', '==', selectedProject.id).get();
                         poData = poSnap.docs.map(d => ({id: d.id, ...d.data()}));
                     }
                     purchaseOrders = poData;
-                } catch (poError) {
-                    console.warn("採購單讀取失敗:", poError);
-                    purchaseOrders = [];
-                }
+                } catch (poError) { purchaseOrders = []; }
 
-                // 載入報價單
                 try {
                     let quoteData = [];
                     if (typeof safeFirestoreQuery === 'function') {
                         const quoteRes = await safeFirestoreQuery('quotations', queryConditions);
                         quoteData = quoteRes.docs;
                     } else {
-                        const quoteSnap = await db.collection('quotations')
-                            .where('tenderId', '==', tenderId).where('projectId', '==', selectedProject.id).get();
+                        const quoteSnap = await db.collection('quotations').where('tenderId', '==', tenderId).where('projectId', '==', selectedProject.id).get();
                         quoteData = quoteSnap.docs.map(d => ({id: d.id, ...d.data()}));
                     }
                     quotations = quoteData;
-                } catch (quoteError) {
-                    console.warn("報價單讀取失敗:", quoteError);
-                    quotations = [];
-                }
+                } catch (quoteError) { quotations = []; }
 
                 document.getElementById('mainContent').style.display = 'block';
                 document.getElementById('emptyState').style.display = 'none';
                 
-                setupChartContainer();
-                
-                // 🔥 修正表頭的核心呼叫
+                // 🔥 確保圖表區域存在
+                ensureDashboardSection();
                 adjustTableHeader();   
-                
                 renderTable();
                 updateStats();
 
@@ -202,27 +185,47 @@ function initProcurementPage() {
             }
         }
 
-        // 🔥 強制修正表頭 (Fix Alignment)
+        // 🔥 強制建立儀表板區域 (保證圓餅圖出現)
+        function ensureDashboardSection() {
+            // 檢查是否已存在
+            if (document.getElementById('procurement-dashboard')) return;
+
+            const mainContent = document.getElementById('mainContent');
+            // 建立一個新的 Dashboard 容器
+            const dashboard = document.createElement('div');
+            dashboard.id = 'procurement-dashboard';
+            dashboard.className = 'card mb-3';
+            dashboard.innerHTML = `
+                <div class="card-body" style="display: flex; align-items: center; justify-content: space-between; padding: 15px;">
+                    <div style="flex: 1;">
+                        <h5 class="card-title">採購概覽</h5>
+                        <div class="d-flex" style="gap: 20px; font-size: 1.1rem;">
+                            <div>總項次: <strong id="dash-total">-</strong></div>
+                            <div class="text-secondary">規劃中: <strong id="dash-planning">-</strong></div>
+                            <div class="text-primary">詢價中: <strong id="dash-inquiry">-</strong></div>
+                            <div class="text-warning">已下單: <strong id="dash-ordered">-</strong></div>
+                            <div class="text-success">已到貨: <strong id="dash-arrived">-</strong></div>
+                        </div>
+                    </div>
+                    <div style="width: 300px; height: 150px;">
+                        <canvas id="procurementChart"></canvas>
+                    </div>
+                </div>
+            `;
+            
+            // 插入到 mainContent 的最前面
+            mainContent.insertBefore(dashboard, mainContent.firstChild);
+        }
+
         function adjustTableHeader() {
-            // 1. 透過 tbody 往上找 table，確保一定找得到，不用管 ID 是什麼
             const tbody = document.getElementById('procurementTableBody');
             if (!tbody) return;
-            
             const table = tbody.closest('table');
             if (!table) return;
+            const thead = table.querySelector('thead tr');
+            if (!thead || thead.innerHTML.includes('需用日期')) return;
 
-            const thead = table.querySelector('thead');
-            if (!thead) return;
-
-            const tr = thead.querySelector('tr');
-            if (!tr) return;
-
-            // 2. 檢查是否已經更新過 (避免重複插入)
-            if (tr.innerHTML.includes('需用日期')) return;
-
-            // 3. 重寫表頭 HTML，確保有 9 個欄位，對應 Body 的內容
-            // 欄位對應: [1.項次] [2.名稱] [3.單位] [4.需用日] [5.下單日] [6.數量] [7.狀態] [8.報價] [9.單價]
-            tr.innerHTML = `
+            thead.innerHTML = `
                 <th style="width: 5%">項次</th>
                 <th style="width: 22%">項目名稱</th>
                 <th style="width: 5%">單位</th>
@@ -233,7 +236,6 @@ function initProcurementPage() {
                 <th style="width: 18%">供應商報價</th>
                 <th class="text-right" style="width: 10%">成本單價</th>
             `;
-            console.log("✅ 表頭已強制更新為 9 欄模式");
         }
 
         function renderTable() {
@@ -244,13 +246,10 @@ function initProcurementPage() {
             tbody.innerHTML = '';
 
             let targetMajorItems = majorItems;
-            if (filterMajorId) {
-                targetMajorItems = majorItems.filter(m => m.id === filterMajorId);
-            }
+            if (filterMajorId) targetMajorItems = majorItems.filter(m => m.id === filterMajorId);
 
             let hasAnyData = false;
 
-            // 第一階段：原始項目
             targetMajorItems.forEach(major => {
                 const myDetails = detailItems.filter(d => d.majorItemId === major.id);
 
@@ -259,16 +258,28 @@ function initProcurementPage() {
                     const headerRow = document.createElement('tr');
                     headerRow.className = 'table-active';
                     
-                    // colspan = 9 確保大項標題橫跨整個表格
+                    // 🔥 大項目標題 + 3 個批次按鈕
                     headerRow.innerHTML = `
                         <td colspan="9" style="background-color: #f1f3f5; padding: 10px 15px; vertical-align: middle;">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-weight: bold;">${major.sequence || ''} ${major.name || '未命名大項'}</span>
-                                <button class="btn btn-sm btn-outline-dark" 
-                                        onclick="window.batchUpdateStatus('${major.id}', '${major.name}')"
-                                        title="批次變更此大項下的所有項目狀態">
-                                    ⚡ 批次變更狀態
-                                </button>
+                                <span style="font-weight: bold; font-size: 1.05rem;">
+                                    ${major.sequence || ''} ${major.name || '未命名大項'} 
+                                    <span class="badge badge-secondary badge-pill ml-2">${myDetails.length}</span>
+                                </span>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-primary bg-white" 
+                                            onclick="window.triggerBatchDate('required', '${major.id}')">
+                                        📅 批次需用日
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-info bg-white" 
+                                            onclick="window.triggerBatchDate('ordered', '${major.id}')">
+                                        📅 批次下單日
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-dark bg-white" 
+                                            onclick="window.batchUpdateStatus('${major.id}', '${major.name}')">
+                                        ⚡ 批次狀態
+                                    </button>
+                                </div>
                             </div>
                         </td>
                     `;
@@ -281,7 +292,6 @@ function initProcurementPage() {
                 }
             });
 
-            // 第二階段：額外項目
             const allExtraQuotes = quotations.filter(q => q.isExtra);
             if (allExtraQuotes.length > 0) {
                 targetMajorItems.forEach((major) => {
@@ -304,27 +314,21 @@ function initProcurementPage() {
                 });
             }
 
-            if (!hasAnyData) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding: 20px;">沒有符合的項目資料</td></tr>';
-            }
+            if (!hasAnyData) tbody.innerHTML = '<tr><td colspan="9" class="text-center" style="padding: 20px;">沒有符合的項目資料</td></tr>';
         }
 
         function createDetailRow(item) {
             const tr = document.createElement('tr');
-            
             const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
             const itemQuotes = quotations.filter(q => q.detailItemId === item.id && !q.isExtra);
             
-            let statusText = '規劃中', statusClass = 'status-planning';
-            let currentStatusCode = 'planning';
-            let reqDate = '';
-            let ordDate = '';
+            let statusText = '規劃中', statusClass = 'status-planning', currentStatusCode = 'planning';
+            let reqDate = '', ordDate = '';
 
             if (itemPO) {
                 currentStatusCode = itemPO.status;
                 reqDate = itemPO.requiredDate || '';
                 ordDate = itemPO.orderedDate || '';
-
                 const statusMap = {
                     'inquiry': {t: '詢價中', c: 'status-inquiry'},
                     'ordered': {t: '已下單', c: 'status-ordered'},
@@ -334,60 +338,28 @@ function initProcurementPage() {
                 statusText = s.t; statusClass = s.c;
             }
 
-            // 日期過期變紅字
             let reqDateStyle = '';
             if (reqDate) {
                 const today = new Date().toISOString().split('T')[0];
-                if (reqDate < today && currentStatusCode !== 'arrived') {
-                    reqDateStyle = 'color: #e03131; font-weight: bold;';
-                }
+                if (reqDate < today && currentStatusCode !== 'arrived') reqDateStyle = 'color: #e03131; font-weight: bold;';
             }
 
-            let quotesHtml = '<span class="text-muted text-sm">-</span>';
-            if (itemQuotes.length > 0) {
-                quotesHtml = itemQuotes.map(q => 
-                    `<span class="quote-chip" title="${q.supplierName}">
-                        ${(q.supplierName || '').substring(0,4)}.. $${q.quotedUnitPrice || 0}
-                     </span>`
-                ).join('');
-            }
-
+            let quotesHtml = itemQuotes.length > 0 ? itemQuotes.map(q => `<span class="quote-chip" title="${q.supplierName}">${(q.supplierName || '').substring(0,4)}.. $${q.quotedUnitPrice || 0}</span>`).join('') : '<span class="text-muted text-sm">-</span>';
+            
             let qty = 0;
             if (item.totalQuantity !== undefined) qty = Number(item.totalQuantity);
             else if (item.quantity !== undefined) qty = Number(item.quantity);
 
-            let unitPrice = 0;
-            if (item.unitPrice !== undefined) unitPrice = item.unitPrice;
-            else if (item.cost !== undefined) unitPrice = item.cost;
+            let unitPrice = item.unitPrice !== undefined ? item.unitPrice : (item.cost !== undefined ? item.cost : 0);
 
             tr.innerHTML = `
                 <td>${item.sequence || '-'}</td>
-                <td>
-                    <div style="font-weight:bold;">${item.name || '未命名'}</div>
-                    <div class="text-muted text-sm">${item.brand || ''} ${item.model || ''}</div>
-                </td>
+                <td><div style="font-weight:bold;">${item.name || '未命名'}</div><div class="text-muted text-sm">${item.brand || ''} ${item.model || ''}</div></td>
                 <td>${item.unit || '-'}</td>
-                
-                <td>
-                    <input type="date" class="form-control form-control-sm date-input" 
-                           value="${reqDate}" style="${reqDateStyle}"
-                           onchange="window.updateDate('${item.id}', 'requiredDate', this.value)">
-                </td>
-                
-                <td>
-                    <input type="date" class="form-control form-control-sm date-input" 
-                           value="${ordDate}"
-                           onchange="window.updateDate('${item.id}', 'orderedDate', this.value)">
-                </td>
-
+                <td><input type="date" class="form-control form-control-sm date-input" value="${reqDate}" style="${reqDateStyle}" onchange="window.updateDate('${item.id}', 'requiredDate', this.value)"></td>
+                <td><input type="date" class="form-control form-control-sm date-input" value="${ordDate}" onchange="window.updateDate('${item.id}', 'orderedDate', this.value)"></td>
                 <td class="text-right">${qty}</td>
-                <td>
-                    <span class="order-chip ${statusClass}" 
-                          onclick="window.toggleStatus('${item.id}', '${currentStatusCode}')"
-                          title="點擊切換狀態">
-                        ${statusText}
-                    </span>
-                </td>
+                <td><span class="order-chip ${statusClass}" onclick="window.toggleStatus('${item.id}', '${currentStatusCode}')">${statusText}</span></td>
                 <td>${quotesHtml}</td>
                 <td class="text-right">${unitPrice ? parseInt(unitPrice).toLocaleString() : '-'}</td>
             `;
@@ -397,53 +369,19 @@ function initProcurementPage() {
         function createExtraQuoteRow(quote) {
             const tr = document.createElement('tr');
             tr.style.backgroundColor = '#fff9db';
-
-            const quotesHtml = `
-                <span class="quote-chip" style="border: 1px solid #f59f00; color: #f59f00;" title="${quote.supplierName}">
-                    ${(quote.supplierName || '').substring(0,4)}.. $${quote.quotedUnitPrice || 0}
-                </span>`;
+            const quotesHtml = `<span class="quote-chip" style="border: 1px solid #f59f00; color: #f59f00;" title="${quote.supplierName}">${(quote.supplierName || '').substring(0,4)}.. $${quote.quotedUnitPrice || 0}</span>`;
 
             tr.innerHTML = `
                 <td class="text-muted"><small>(額外)</small></td>
-                <td>
-                    <div style="font-weight:bold; color: #d63384;">${quote.itemName || '額外項目'}</div>
-                    <div class="text-muted text-sm">${quote.remark || '(廠商新增項目)'}</div>
-                </td>
+                <td><div style="font-weight:bold; color: #d63384;">${quote.itemName || '額外項目'}</div><div class="text-muted text-sm">${quote.remark || '(廠商新增項目)'}</div></td>
                 <td>${quote.itemUnit || '-'}</td>
-                <td></td><td></td> <td class="text-right">${quote.itemQty || 1}</td>
+                <td></td><td></td>
+                <td class="text-right">${quote.itemQty || 1}</td>
                 <td><span class="text-muted text-sm">-</span></td>
                 <td>${quotesHtml}</td>
                 <td class="text-right">-</td>
             `;
             return tr;
-        }
-
-        function setupEventListeners() {
-            const bind = (id, event, handler) => {
-                const el = document.getElementById(id);
-                if (el) el.addEventListener(event, handler);
-            };
-
-            bind('projectSelect', 'change', (e) => onProjectChange(e.target.value));
-            bind('tenderSelect', 'change', (e) => onTenderChange(e.target.value));
-            bind('majorItemSelect', 'change', () => renderTable());
-            bind('exportRfqBtn', 'click', handleExportRFQ);
-            bind('importQuotesBtn', 'click', () => document.getElementById('importQuotesInput')?.click());
-            bind('importQuotesInput', 'change', handleImportQuotes);
-            bind('manageQuotesBtn', 'click', openQuoteManager);
-
-            window.toggleStatus = handleToggleStatus;
-            window.updateDate = handleUpdateDate;
-            window.batchUpdateStatus = handleBatchUpdateStatus;
-            window.deleteSupplierQuotes = deleteSupplierQuotes;
-            window.selectQuote = handleSelectQuote;
-            
-            document.querySelectorAll('[data-action="close-modal"]').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const modal = btn.closest('.modal-overlay');
-                    if (modal) modal.style.display = 'none';
-                });
-            });
         }
 
         function updateStats() {
@@ -457,12 +395,13 @@ function initProcurementPage() {
                 }
             });
 
-            document.getElementById('totalItemsCount').textContent = detailItems.length;
+            // 更新上方 Dashboard 的數字
             const setId = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
-            setId('count-planning', counts.planning);
-            setId('count-inquiry', counts.inquiry);
-            setId('count-ordered', counts.ordered);
-            setId('count-arrived', counts.arrived);
+            setId('dash-total', detailItems.length);
+            setId('dash-planning', counts.planning);
+            setId('dash-inquiry', counts.inquiry);
+            setId('dash-ordered', counts.ordered);
+            setId('dash-arrived', counts.arrived);
 
             renderChart(counts);
         }
@@ -494,127 +433,139 @@ function initProcurementPage() {
             }
         }
 
-        function setupChartContainer() {
-            if (document.getElementById('procurementChart')) return;
-            const statsContainer = document.querySelector('.procurement-stats') || document.querySelector('.stats-container');
-            if (statsContainer) {
-                const chartDiv = document.createElement('div');
-                chartDiv.style.width = '240px';
-                chartDiv.style.height = '100px';
-                chartDiv.innerHTML = '<canvas id="procurementChart"></canvas>';
-                statsContainer.appendChild(chartDiv);
-                statsContainer.style.display = 'flex';
-                statsContainer.style.justifyContent = 'space-between';
-                statsContainer.style.alignItems = 'center';
+        // 🔥 插入隱藏的日期輸入框 (用來實現批次選擇)
+        function injectHiddenDateInputs() {
+            if (document.getElementById('batch-date-picker')) return;
+            
+            const container = document.createElement('div');
+            container.style.display = 'none'; // 隱藏
+            container.innerHTML = `
+                <input type="date" id="batch-date-picker">
+            `;
+            document.body.appendChild(container);
+
+            // 綁定 Change 事件
+            const picker = document.getElementById('batch-date-picker');
+            picker.addEventListener('change', (e) => {
+                const dateStr = e.target.value;
+                if (dateStr && currentBatchMajorId && currentBatchType) {
+                    handleBatchDateUpdate(currentBatchType, currentBatchMajorId, dateStr);
+                }
+                // 重置
+                e.target.value = '';
+            });
+        }
+
+        // 🔥 觸發批次日期選擇
+        function triggerBatchDate(type, majorId) {
+            currentBatchMajorId = majorId;
+            currentBatchType = type; // 'required' or 'ordered'
+            
+            // 觸發隱藏的 input click
+            const picker = document.getElementById('batch-date-picker');
+            if (picker) {
+                // 注意：某些瀏覽器可能擋掉直接 click，通常 showPicker() 或 click() 有效
+                try {
+                    picker.showPicker(); 
+                } catch (e) {
+                    picker.click();
+                }
             }
         }
 
-        async function handleUpdateDate(itemId, field, dateStr) {
-            const itemPO = purchaseOrders.find(po => po.detailItemId === itemId);
-            const newItem = detailItems.find(i => i.id === itemId);
+        // 🔥 執行批次日期更新
+        async function handleBatchDateUpdate(type, majorId, dateStr) {
+            const targetDetails = detailItems.filter(d => d.majorItemId === majorId);
+            const typeLabel = type === 'required' ? '需用日期' : '下單日期';
+            
+            if (!confirm(`確定要將【${targetDetails.length}】個項目的「${typeLabel}」全部設為 ${dateStr} 嗎？`)) return;
 
-            try {
+            showLoading(true, '批次更新日期中...');
+            const batch = db.batch();
+            const fieldName = type === 'required' ? 'requiredDate' : 'orderedDate';
+
+            targetDetails.forEach(item => {
+                const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
+                let updates = { [fieldName]: dateStr, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+
                 if (itemPO) {
-                    await db.collection('purchaseOrders').doc(itemPO.id).update({
-                        [field]: dateStr,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    itemPO[field] = dateStr;
+                    const ref = db.collection('purchaseOrders').doc(itemPO.id);
+                    batch.update(ref, updates);
                 } else {
-                    const newData = {
-                        projectId: selectedProject.id,
-                        tenderId: selectedTender.id,
-                        detailItemId: itemId,
-                        majorItemId: newItem ? newItem.majorItemId : null,
-                        status: 'planning',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    };
-                    newData[field] = dateStr;
-                    
-                    const docRef = await db.collection('purchaseOrders').add(newData);
-                    purchaseOrders.push({ id: docRef.id, ...newData });
+                    const ref = db.collection('purchaseOrders').doc();
+                    batch.set(ref, {
+                        projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: item.id, majorItemId: majorId,
+                        status: 'planning', createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...updates
+                    });
                 }
-                renderTable(); // 重新渲染以更新過期狀態顏色
-            } catch (error) {
-                console.error(`更新${field}失敗:`, error);
-                showAlert(`更新失敗: ` + error.message, 'error');
-            }
-        }
-
-        async function handleToggleStatus(itemId, currentStatus) {
-            const statusCycle = {
-                'planning': 'inquiry',
-                'inquiry': 'ordered',
-                'ordered': 'arrived',
-                'arrived': 'planning'
-            };
-            const nextStatus = statusCycle[currentStatus] || 'inquiry';
-            const itemPO = purchaseOrders.find(po => po.detailItemId === itemId);
-            const newItem = detailItems.find(i => i.id === itemId);
-
-            showLoading(true, '更新狀態中...');
+            });
 
             try {
-                let updates = {
-                    status: nextStatus,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                };
-
-                if (nextStatus === 'ordered') {
-                    if (!itemPO || !itemPO.orderedDate) {
-                        updates.orderedDate = new Date().toISOString().split('T')[0];
-                    }
-                }
-
-                if (nextStatus === 'planning') {
-                    if (itemPO) await db.collection('purchaseOrders').doc(itemPO.id).delete();
-                } else {
-                    if (itemPO) {
-                        await db.collection('purchaseOrders').doc(itemPO.id).update(updates);
-                    } else {
-                        await db.collection('purchaseOrders').add({
-                            projectId: selectedProject.id,
-                            tenderId: selectedTender.id,
-                            detailItemId: itemId,
-                            majorItemId: newItem ? newItem.majorItemId : null,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            ...updates
-                        });
-                    }
-                }
+                await batch.commit();
                 await onTenderChange(selectedTender.id);
-
+                showAlert('日期批次更新完成！', 'success');
             } catch (error) {
-                console.error("狀態更新失敗:", error);
-                showAlert("狀態更新失敗", 'error');
+                console.error("更新失敗:", error);
+                showAlert("更新失敗", 'error');
             } finally {
                 showLoading(false);
             }
         }
 
+        // --- 互動功能函式 ---
+        async function handleUpdateDate(itemId, field, dateStr) {
+            const itemPO = purchaseOrders.find(po => po.detailItemId === itemId);
+            const newItem = detailItems.find(i => i.id === itemId);
+            try {
+                if (itemPO) {
+                    await db.collection('purchaseOrders').doc(itemPO.id).update({
+                        [field]: dateStr, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } else {
+                    const newData = { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: itemId, majorItemId: newItem.majorItemId, status: 'planning', createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+                    newData[field] = dateStr;
+                    await db.collection('purchaseOrders').add(newData);
+                }
+                renderTable(); // 重繪以更新紅字狀態
+            } catch (error) { console.error(error); showAlert("更新失敗", 'error'); }
+        }
+
+        async function handleToggleStatus(itemId, currentStatus) {
+            const statusCycle = {'planning':'inquiry', 'inquiry':'ordered', 'ordered':'arrived', 'arrived':'planning'};
+            const nextStatus = statusCycle[currentStatus] || 'inquiry';
+            const itemPO = purchaseOrders.find(po => po.detailItemId === itemId);
+            const newItem = detailItems.find(i => i.id === itemId);
+
+            showLoading(true, '更新狀態中...');
+            try {
+                let updates = { status: nextStatus, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+                if (nextStatus === 'ordered' && (!itemPO || !itemPO.orderedDate)) updates.orderedDate = new Date().toISOString().split('T')[0];
+
+                if (nextStatus === 'planning' && itemPO) await db.collection('purchaseOrders').doc(itemPO.id).delete();
+                else if (itemPO) await db.collection('purchaseOrders').doc(itemPO.id).update(updates);
+                else await db.collection('purchaseOrders').add({ projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: itemId, majorItemId: newItem.majorItemId, createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...updates });
+                
+                await onTenderChange(selectedTender.id);
+            } catch (e) { showAlert("更新失敗", 'error'); } finally { showLoading(false); }
+        }
+
         async function handleBatchUpdateStatus(majorId, majorName) {
-            const statusOptions = { '1': 'inquiry', '2': 'ordered', '3': 'arrived', '4': 'planning' };
-            const statusLabels = { 'inquiry': '詢價中', 'ordered': '已下單', 'arrived': '已到貨', 'planning': '規劃中' };
-
             const choice = prompt(`變更【${majorName}】狀態代碼：\n1. 詢價中\n2. 已下單 (自動填入今天)\n3. 已到貨\n4. 回復規劃中`);
-            if (!choice || !statusOptions[choice]) return;
-
-            const nextStatus = statusOptions[choice];
+            const map = {'1':'inquiry', '2':'ordered', '3':'arrived', '4':'planning'};
+            if (!choice || !map[choice]) return;
+            const nextStatus = map[choice];
             const targetDetails = detailItems.filter(d => d.majorItemId === majorId);
-
-            if (!confirm(`將 ${targetDetails.length} 個項目變更為「${statusLabels[nextStatus]}」？`)) return;
-
-            showLoading(true, `批次更新中...`);
+            
+            if (!confirm(`將 ${targetDetails.length} 個項目變更為「${nextStatus}」？`)) return;
+            
+            showLoading(true);
             const batch = db.batch();
             const today = new Date().toISOString().split('T')[0];
 
             targetDetails.forEach(item => {
                 const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
                 let updates = { status: nextStatus, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-
-                if (nextStatus === 'ordered') {
-                    if (!itemPO || !itemPO.orderedDate) updates.orderedDate = today;
-                }
+                if (nextStatus === 'ordered' && (!itemPO || !itemPO.orderedDate)) updates.orderedDate = today;
 
                 if (itemPO) {
                     const ref = db.collection('purchaseOrders').doc(itemPO.id);
@@ -623,27 +574,60 @@ function initProcurementPage() {
                 } else {
                     if (nextStatus !== 'planning') {
                         const ref = db.collection('purchaseOrders').doc();
-                        batch.set(ref, {
-                            projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: item.id, majorItemId: majorId,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...updates
-                        });
+                        batch.set(ref, { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: item.id, majorItemId: majorId, createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...updates });
                     }
                 }
             });
+            await batch.commit();
+            await onTenderChange(selectedTender.id);
+            showAlert('批次更新完成', 'success');
+            showLoading(false);
+        }
 
-            try {
-                await batch.commit();
-                await onTenderChange(selectedTender.id);
-                showAlert('批次更新完成！', 'success');
-            } catch (error) {
-                console.error("批次更新失敗:", error);
-                showAlert("批次更新失敗: " + error.message, 'error');
-            } finally {
-                showLoading(false);
+        // --- 其他標準函式 ---
+        function setupEventListeners() {
+            const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+            const change = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('change', fn); };
+            
+            change('projectSelect', (e) => onProjectChange(e.target.value));
+            change('tenderSelect', (e) => onTenderChange(e.target.value));
+            change('majorItemSelect', () => renderTable());
+            bind('exportRfqBtn', handleExportRFQ);
+            bind('importQuotesBtn', () => document.getElementById('importQuotesInput')?.click());
+            change('importQuotesInput', handleImportQuotes);
+            bind('manageQuotesBtn', openQuoteManager);
+
+            window.toggleStatus = handleToggleStatus;
+            window.updateDate = handleUpdateDate;
+            window.batchUpdateStatus = handleBatchUpdateStatus;
+            window.triggerBatchDate = triggerBatchDate; // 🔥 批次日期
+            window.deleteSupplierQuotes = deleteSupplierQuotes;
+            window.selectQuote = handleSelectQuote;
+            
+            document.querySelectorAll('[data-action="close-modal"]').forEach(btn => btn.addEventListener('click', () => btn.closest('.modal-overlay').style.display = 'none'));
+        }
+
+        // 注入樣式
+        function injectStylesAndScripts() {
+            const style = document.createElement('style');
+            style.innerHTML = `
+                .status-planning { background-color: #e9ecef; color: #495057; }
+                .status-inquiry { background-color: #dbe4ff; color: #3b5bdb; }
+                .status-ordered { background-color: #fff3bf; color: #f08c00; }
+                .status-arrived { background-color: #d3f9d8; color: #2b8a3e; }
+                .order-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; min-width: 80px; text-align: center; }
+                .order-chip:hover { opacity: 0.8; transform: scale(1.05); }
+                .date-input { border: 1px solid #ced4da; border-radius: 4px; padding: 2px 5px; font-size: 0.85rem; width: 100%; box-sizing: border-box; }
+            `;
+            document.head.appendChild(style);
+            if (!document.querySelector('script[src*="chart.js"]')) {
+                const script = document.createElement('script');
+                script.src = "https://cdn.jsdelivr.net/npm/chart.js";
+                document.head.appendChild(script);
             }
         }
 
-        // --- 輔助函式 ---
+        // --- 略過詳細實作以節省空間 (請保持既有的匯入、刪除、匯出函式) ---
         function showLoading(show, msg) { const el = document.getElementById('loading'); if(el) { el.style.display = show ? 'flex' : 'none'; if(msg) el.querySelector('p').textContent = msg; } }
         function populateSelect(select, items, defaultText) { if(!select) return; select.innerHTML = `<option value="">${defaultText}</option>` + items.map(i => `<option value="${i.id}">${i.sequence ? i.sequence + '.' : ''} ${i.name || i.code}</option>`).join(''); select.disabled = items.length === 0; }
         function resetSelects(level) { if (level === 'project') { document.getElementById('tenderSelect').innerHTML = '<option value="">請先選擇專案</option>'; document.getElementById('tenderSelect').disabled = true; document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>'; document.getElementById('majorItemSelect').disabled = true; document.getElementById('mainContent').style.display = 'none'; document.getElementById('emptyState').style.display = 'flex'; } else if (level === 'tender') { document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>'; } }
@@ -651,8 +635,7 @@ function initProcurementPage() {
         function handleSelectQuote(quoteId) { console.log(quoteId); }
         function naturalSequenceSort(a, b) { const MAP = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'壹':1,'貳':2,'參':3,'肆':4,'伍':5,'陸':6,'柒':7,'捌':8,'玖':9,'拾':10}; const sA = String(a.sequence||''), sB = String(b.sequence||''); const nA = parseFloat(MAP[sA]||sA), nB = parseFloat(MAP[sB]||sB); if(!isNaN(nA)&&!isNaN(nB)) return nA-nB; return sA.localeCompare(sB, undefined, {numeric:true}); }
         function normalizeString(str) { return String(str).replace(/（/g, '(').replace(/）/g, ')').replace(/\s+/g, '').trim().toLowerCase(); }
-        
-        async function handleImportQuotes(e) {
+        async function handleImportQuotes(e) { /* 請複製 v24 的內容 */ 
             const file = e.target.files[0]; if (!file) return;
             try {
                 if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
@@ -667,10 +650,7 @@ function initProcurementPage() {
 
                 jsonData.forEach(row => {
                     const seq=row['項次']?String(row['項次']).trim():'', name=row['項目名稱']?String(row['項目名稱']).trim():'', price=row['供應商報價(單價)']||row['單價']||0;
-                    const foundMajor = majorItems.find(m => {
-                         const k = `${m.sequence||''} ${m.name||''}`;
-                         return normalizeString(seq).includes(normalizeString(k));
-                    });
+                    const foundMajor = majorItems.find(m => { const k = `${m.sequence||''} ${m.name||''}`; return normalizeString(seq).includes(normalizeString(k)); });
                     if(foundMajor) { curMajor=foundMajor; return; }
                     if(!curMajor || (!seq && !name)) return;
                     
@@ -690,10 +670,8 @@ function initProcurementPage() {
                 await onTenderChange(selectedTender.id);
             } catch(e) { console.error(e); showAlert(e.message, 'error'); } finally { e.target.value=''; showLoading(false); }
         }
-
-        function openQuoteManager() {
-             const mb = document.querySelector('#manageQuotesModal .modal-body');
-             if(!mb) return;
+        function openQuoteManager() { /* 請複製 v23 的內容 */ 
+             const mb = document.querySelector('#manageQuotesModal .modal-body'); if(!mb) return;
              if(!quotations.length) mb.innerHTML = '<div class="text-center p-4">無資料</div>';
              else {
                  let h = '<table class="table"><thead><tr><th>供應商</th><th>操作</th></tr></thead><tbody>';
@@ -704,7 +682,6 @@ function initProcurementPage() {
              }
              document.getElementById('manageQuotesModal').style.display='flex';
         }
-
         async function deleteSupplierQuotes(name) { 
             if(!confirm(`刪除 ${name}?`)) return;
             const qs = quotations.filter(q=>q.supplierName===name);
@@ -714,26 +691,67 @@ function initProcurementPage() {
             await onTenderChange(selectedTender.id);
             openQuoteManager();
         }
-
         function handleDeleteOrder() { openQuoteManager(); }
-        function handleExportRFQ() { /* 保持原樣 */ }
+        function handleExportRFQ() { /* 保持原樣 */ 
+             // 略...
+             if (!selectedTender) return showAlert('請先選擇標單', 'warning');
+            if (detailItems.length === 0) return showAlert('目前沒有項目可匯出', 'warning');
 
-        function injectStylesAndScripts() {
-            const style = document.createElement('style');
-            style.innerHTML = `
-                .status-planning { background-color: #e9ecef; color: #495057; }
-                .status-inquiry { background-color: #dbe4ff; color: #3b5bdb; }
-                .status-ordered { background-color: #fff3bf; color: #f08c00; }
-                .status-arrived { background-color: #d3f9d8; color: #2b8a3e; }
-                .order-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; min-width: 80px; text-align: center; }
-                .order-chip:hover { opacity: 0.8; transform: scale(1.05); }
-                .date-input { border: 1px solid #ced4da; border-radius: 4px; padding: 2px 5px; font-size: 0.85rem; width: 100%; box-sizing: border-box; }
-            `;
-            document.head.appendChild(style);
-            if (!document.querySelector('script[src*="chart.js"]')) {
-                const script = document.createElement('script');
-                script.src = "https://cdn.jsdelivr.net/npm/chart.js";
-                document.head.appendChild(script);
+            try {
+                if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
+
+                const exportData = [];
+
+                majorItems.forEach(major => {
+                    const myDetails = detailItems.filter(d => d.majorItemId === major.id);
+
+                    if (myDetails.length > 0) {
+                        exportData.push({
+                            '項次': `${major.sequence || ''} ${major.name || ''}`,
+                            '項目名稱': '',
+                            '說明(廠牌/型號)': '',
+                            '單位': '',
+                            '數量': '',
+                            '供應商報價(單價)': '',
+                            '小計(複價)': '',
+                            '備註': ''
+                        });
+
+                        myDetails.forEach(item => {
+                            let qty = 0;
+                            if (item.totalQuantity !== undefined && item.totalQuantity !== null) qty = Number(item.totalQuantity);
+                            else if (item.quantity !== undefined && item.quantity !== null) qty = Number(item.quantity);
+                            else if (item.qty !== undefined && item.qty !== null) qty = Number(item.qty);
+
+                            exportData.push({
+                                '項次': item.sequence || '',
+                                '項目名稱': item.name || '',
+                                '說明(廠牌/型號)': `${item.brand || ''} ${item.model || ''}`.trim(),
+                                '單位': item.unit || '',
+                                '數量': qty, 
+                                '供應商報價(單價)': '',
+                                '小計(複價)': '', 
+                                '備註': ''
+                            });
+                        });
+                    }
+                });
+
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(exportData);
+
+                ws['!cols'] = [
+                    {wch: 15}, {wch: 30}, {wch: 25}, {wch: 8}, {wch: 10}, 
+                    {wch: 15}, {wch: 15}, {wch: 20}
+                ];
+
+                XLSX.utils.book_append_sheet(wb, ws, "詢價單");
+                const filename = `${selectedProject.name}_${selectedTender.name}_詢價單.xlsx`;
+                XLSX.writeFile(wb, filename);
+
+            } catch (error) {
+                console.error("匯出失敗:", error);
+                showAlert("匯出失敗: " + error.message, 'error');
             }
         }
     });
