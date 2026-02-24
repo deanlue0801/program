@@ -1,14 +1,13 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v32.0 (最終潔淨版)
- * * 狀態：✅ 已清理 HTML，移除所有修補邏輯。
- * 功能：
- * 1. 【儀表板】：JS 自動產生包含圓餅圖與統計的儀表板。
- * 2. 【批次功能】：支援「批次需用日」、「批次下單日」、「批次狀態切換」。
- * 3. 【自動化】：切換「已下單」自動填入今天日期。
- * 4. 【智慧匯入】：支援模糊比對與全形半形轉換。
+ * 標單採購管理 (tenders-procurement.js) - v33.0 (UI 風格統一版)
+ * 修正重點：
+ * 1. 【UI 美化】：重寫 ensureDashboardSection，移除不搭調的漸層背景。
+ * 改用您原本的 CSS class (content-card, stat-card)，確保與下方表格風格一致。
+ * 2. 【版面配置】：使用 Flexbox 讓「統計數字」與「圓餅圖」左右並排，手機版自動換行。
+ * 3. 【功能保留】：完整保留 v32 的所有功能 (批次、自動日期、匯入)。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v32.0 最終潔淨版)...");
+    console.log("🚀 初始化採購管理頁面 (v33.0 UI 風格統一版)...");
 
     // 全域變數
     let statusChart = null;
@@ -171,10 +170,10 @@ function initProcurementPage() {
                 document.getElementById('mainContent').style.display = 'block';
                 document.getElementById('emptyState').style.display = 'none';
                 
-                ensureDashboardSection(); // 建立儀表板
-                adjustTableHeader();      // 修正表頭
-                renderTable();            // 建立表格
-                updateStats();            // 更新數據
+                ensureDashboardSection(); // 建立美化後的儀表板
+                adjustTableHeader();      
+                renderTable();            
+                updateStats();            
 
             } catch (error) {
                 console.error("資料載入失敗:", error);
@@ -185,54 +184,64 @@ function initProcurementPage() {
             }
         }
 
-        // --- UI 建構區 ---
+        // --- UI 建構區 (🔥 v33.0 核心修正) ---
 
-        // 建立上方儀表板 (包含圓餅圖與統計卡片)
+        // 建立上方儀表板 (使用原生 content-card 風格)
         function ensureDashboardSection() {
             const mainContent = document.getElementById('mainContent');
             const oldDash = document.getElementById('procurement-dashboard');
-            if (oldDash) oldDash.remove(); // 避免重複
+            if (oldDash) oldDash.remove();
 
             const dashboard = document.createElement('div');
             dashboard.id = 'procurement-dashboard';
-            dashboard.className = 'card mb-3 shadow-sm';
-            dashboard.style.borderLeft = '5px solid #20c997'; // 識別色
+            // 🔥 使用您原本的 CSS class，確保白色圓角卡片風格
+            dashboard.className = 'content-card'; 
+            dashboard.style.marginBottom = '20px'; // 增加一點底部間距
+
             dashboard.innerHTML = `
-                <div class="card-body" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; flex-wrap: wrap;">
+                <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
                     <div style="flex: 1; min-width: 300px;">
-                        <h3 class="card-title mb-3" style="font-weight: bold; color: #333;">📊 採購狀態儀表板</h3>
-                        <div class="d-flex flex-wrap" style="gap: 15px; font-size: 1rem;">
-                            <div class="p-2 border rounded text-center" style="min-width: 80px; background: #fff;">
-                                <div class="text-muted small">總項次</div>
-                                <strong id="dash-total" style="font-size: 1.2rem;">-</strong>
+                        <h3 class="content-subtitle" style="margin-bottom: 15px;">📊 採購狀態概覽</h3>
+                        
+                        <div class="custom-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px;">
+                            <div class="stat-card" style="background: #f8f9fa; border: 1px solid #eee;">
+                                <div class="stat-number" id="dash-total" style="font-size: 1.5rem; font-weight: bold; color: #333;">-</div>
+                                <div class="stat-label" style="font-size: 0.9rem; color: #666;">總項目</div>
                             </div>
-                            <div class="p-2 border rounded text-center" style="min-width: 80px; background: #e9ecef; border-color: #dee2e6 !important;">
-                                <div class="text-secondary small">規劃中</div>
-                                <strong id="dash-planning" style="font-size: 1.2rem; color: #495057;">-</strong>
+                            
+                            <div class="stat-card" style="background: #fff; border-left: 4px solid #e9ecef; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                <div class="stat-number" id="dash-planning" style="font-size: 1.5rem; font-weight: bold; color: #495057;">-</div>
+                                <div class="stat-label" style="font-size: 0.9rem; color: #666;">規劃中</div>
                             </div>
-                            <div class="p-2 border rounded text-center" style="min-width: 80px; background: #dbe4ff; border-color: #bac8ff !important;">
-                                <div class="text-primary small">詢價中</div>
-                                <strong id="dash-inquiry" style="font-size: 1.2rem; color: #3b5bdb;">-</strong>
+
+                            <div class="stat-card" style="background: #fff; border-left: 4px solid #4c6ef5; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                <div class="stat-number" id="dash-inquiry" style="font-size: 1.5rem; font-weight: bold; color: #4c6ef5;">-</div>
+                                <div class="stat-label" style="font-size: 0.9rem; color: #666;">詢價中</div>
                             </div>
-                            <div class="p-2 border rounded text-center" style="min-width: 80px; background: #fff3bf; border-color: #fcc419 !important;">
-                                <div class="text-warning small" style="color: #e67700;">已下單</div>
-                                <strong id="dash-ordered" style="font-size: 1.2rem; color: #f08c00;">-</strong>
+
+                            <div class="stat-card" style="background: #fff; border-left: 4px solid #fcc419; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                <div class="stat-number" id="dash-ordered" style="font-size: 1.5rem; font-weight: bold; color: #fcc419;">-</div>
+                                <div class="stat-label" style="font-size: 0.9rem; color: #666;">已下單</div>
                             </div>
-                            <div class="p-2 border rounded text-center" style="min-width: 80px; background: #d3f9d8; border-color: #8ce99a !important;">
-                                <div class="text-success small">已到貨</div>
-                                <strong id="dash-arrived" style="font-size: 1.2rem; color: #2b8a3e;">-</strong>
+
+                            <div class="stat-card" style="background: #fff; border-left: 4px solid #40c057; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                <div class="stat-number" id="dash-arrived" style="font-size: 1.5rem; font-weight: bold; color: #40c057;">-</div>
+                                <div class="stat-label" style="font-size: 0.9rem; color: #666;">已到貨</div>
                             </div>
                         </div>
                     </div>
-                    <div style="width: 250px; height: 120px; position: relative;">
+
+                    <div style="flex: 0 0 260px; height: 160px; display: flex; align-items: center; justify-content: center;">
                         <canvas id="procurementChart"></canvas>
                     </div>
                 </div>
             `;
+            
+            // 插入到 mainContent 的最前面
             mainContent.insertBefore(dashboard, mainContent.firstChild);
         }
 
-        // 強制設定表頭 (9欄)
+        // 強制設定表頭
         function adjustTableHeader() {
             const tbody = document.getElementById('procurementTableBody');
             if (!tbody) return;
@@ -274,20 +283,20 @@ function initProcurementPage() {
                     const headerRow = document.createElement('tr');
                     headerRow.className = 'table-active';
                     
-                    // 批次按鈕區
                     headerRow.innerHTML = `
                         <td colspan="9" style="background-color: #f1f3f5; padding: 8px 15px; vertical-align: middle; border-bottom: 2px solid #dee2e6;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <span style="font-weight: bold; font-size: 1.05rem;">
                                         ${major.sequence || ''} ${major.name || '未命名大項'} 
                                     </span>
                                     <span class="badge badge-secondary badge-pill">${myDetails.length} 項</span>
                                 </div>
+                                
                                 <div class="btn-group shadow-sm">
-                                    <button class="btn btn-sm btn-light border" onclick="window.triggerBatchDate('required', '${major.id}')" title="設定需用日期">📅 批次需用</button>
-                                    <button class="btn btn-sm btn-light border" onclick="window.triggerBatchDate('ordered', '${major.id}')" title="設定下單日期">📅 批次下單</button>
-                                    <button class="btn btn-sm btn-outline-dark border" onclick="window.batchUpdateStatus('${major.id}', '${major.name}')" title="變更狀態">⚡ 批次狀態</button>
+                                    <button class="btn btn-sm btn-light border" onclick="window.triggerBatchDate('required', '${major.id}')" title="批次需用日">📅 需用</button>
+                                    <button class="btn btn-sm btn-light border" onclick="window.triggerBatchDate('ordered', '${major.id}')" title="批次下單日">📅 下單</button>
+                                    <button class="btn btn-sm btn-outline-dark border" onclick="window.batchUpdateStatus('${major.id}', '${major.name}')" title="批次變更狀態">⚡ 狀態</button>
                                 </div>
                             </div>
                         </td>
@@ -301,7 +310,6 @@ function initProcurementPage() {
                 }
             });
 
-            // 額外項目
             const allExtraQuotes = quotations.filter(q => q.isExtra);
             if (allExtraQuotes.length > 0) {
                 targetMajorItems.forEach((major) => {
@@ -359,8 +367,10 @@ function initProcurementPage() {
                 <td>${item.sequence || '-'}</td>
                 <td><div style="font-weight:bold;">${item.name || '未命名'}</div><div class="text-muted text-sm">${item.brand || ''} ${item.model || ''}</div></td>
                 <td>${item.unit || '-'}</td>
+                
                 <td style="background-color: #fcf9fe;"><input type="date" class="form-control form-control-sm date-input" value="${reqDate}" style="${reqDateStyle}" onchange="window.updateDate('${item.id}', 'requiredDate', this.value)"></td>
                 <td style="background-color: #fff9f2;"><input type="date" class="form-control form-control-sm date-input" value="${ordDate}" onchange="window.updateDate('${item.id}', 'orderedDate', this.value)"></td>
+                
                 <td class="text-right">${qty}</td>
                 <td><span class="order-chip ${statusClass}" onclick="window.toggleStatus('${item.id}', '${currentStatusCode}')">${statusText}</span></td>
                 <td>${quotesHtml}</td>
@@ -409,13 +419,13 @@ function initProcurementPage() {
         }
 
         function renderChart(counts) {
-            if (typeof Chart === 'undefined') return;
+            if (typeof Chart === 'undefined') { console.warn("Chart.js not loaded yet"); return; }
             const ctx = document.getElementById('procurementChart');
             if (!ctx) return;
 
             const dataValues = [counts.planning, counts.inquiry, counts.ordered, counts.arrived];
-            const colors = ['#e9ecef', '#dbe4ff', '#fff3bf', '#d3f9d8'];
-            const borders = ['#ced4da', '#bac8ff', '#fcc419', '#8ce99a'];
+            const colors = ['#e9ecef', '#4c6ef5', '#fcc419', '#40c057']; // 使用更鮮明的卡片配色
+            const borders = ['#dee2e6', '#bac8ff', '#ffe066', '#8ce99a'];
 
             if (statusChart) {
                 statusChart.data.datasets[0].data = dataValues;
@@ -428,14 +438,14 @@ function initProcurementPage() {
                         datasets: [{ data: dataValues, backgroundColor: colors, borderColor: borders, borderWidth: 1 }]
                     },
                     options: {
-                        responsive: true, maintainAspectRatio: false, cutout: '70%',
+                        responsive: true, maintainAspectRatio: false, cutout: '65%',
                         plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 11 } } } }
                     }
                 });
             }
         }
 
-        // --- 批次與工具 ---
+        // --- 批次功能 ---
         function injectHiddenDateInputs() {
             if (document.getElementById('batch-date-picker')) return;
             const input = document.createElement('input');
@@ -509,7 +519,7 @@ function initProcurementPage() {
         }
 
         async function handleBatchUpdateStatus(majorId, majorName) {
-            const choice = prompt(`變更狀態：\n1.詢價\n2.下單\n3.到貨\n4.規劃`);
+            const choice = prompt(`變更【${majorName}】狀態：\n1.詢價\n2.下單\n3.到貨\n4.規劃`);
             const map = {'1':'inquiry', '2':'ordered', '3':'arrived', '4':'planning'};
             if (!choice || !map[choice]) return;
             const next = map[choice];
@@ -532,8 +542,8 @@ function initProcurementPage() {
 
         // --- 匯入與通用函式 ---
         function setupEventListeners() {
-            const click = (id, fn) => { const el = document.getElementById(id); if(el) el.onclick = fn; };
             const change = (id, fn) => { const el = document.getElementById(id); if(el) el.onchange = fn; };
+            const click = (id, fn) => { const el = document.getElementById(id); if(el) el.onclick = fn; };
             change('projectSelect', e => onProjectChange(e.target.value));
             change('tenderSelect', e => onTenderChange(e.target.value));
             change('majorItemSelect', () => renderTable());
@@ -541,12 +551,14 @@ function initProcurementPage() {
             click('importQuotesBtn', () => document.getElementById('importQuotesInput')?.click());
             change('importQuotesInput', handleImportQuotes);
             click('manageQuotesBtn', openQuoteManager);
+            
             window.triggerBatchDate = triggerBatchDate;
             window.batchUpdateStatus = handleBatchUpdateStatus;
             window.toggleStatus = handleToggleStatus;
             window.updateDate = handleUpdateDate;
             window.deleteSupplierQuotes = deleteSupplierQuotes;
             window.selectQuote = handleSelectQuote;
+
             document.querySelectorAll('[data-action="close-modal"]').forEach(b => b.onclick = () => b.closest('.modal-overlay').style.display='none');
         }
 
@@ -560,6 +572,18 @@ function initProcurementPage() {
                 .order-chip { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; min-width: 80px; text-align: center; }
                 .order-chip:hover { opacity: 0.8; transform: scale(1.05); }
                 .date-input { border: 1px solid #ced4da; border-radius: 4px; padding: 2px 5px; font-size: 0.85rem; width: 100%; box-sizing: border-box; }
+                
+                /* 🔥 v33 新增：美化統計卡片，讓它們跟下方的卡片風格一致 */
+                .stat-card {
+                    padding: 15px;
+                    border-radius: 8px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    transition: transform 0.2s;
+                }
+                .stat-card:hover { transform: translateY(-2px); }
             `;
             document.head.appendChild(style);
             if (!document.querySelector('script[src*="chart.js"]')) {
