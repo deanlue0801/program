@@ -70,17 +70,21 @@
                 <table class="table" id="procurementTable">
                     <thead>
                         <tr>
-                            <th style="width: 5%;">項次</th>
-                            <th style="width: 25%;">項目名稱</th>
-                            <th style="width: 8%;">單位</th>
-                            <th style="width: 8%;" class="text-right">數量</th>
-                            <th style="width: 20%;">採購狀態 (點擊切換)</th>
-                            <th style="width: 25%;">供應商報價 (點擊選擇)</th>
-                            <th style="width: 9%;" class="text-right">成本單價</th>
+                            <th style="width: 4%">項次</th>
+                            <th style="width: 20%">項目名稱</th>
+                            <th style="width: 4%">單位</th>
+                            <th style="width: 10%; background-color: #f8f0fc;">需用日期</th>
+                            <th style="width: 10%; background-color: #fff4e6;">下單日期</th>
+                            <th class="text-right" style="width: 6%">數量</th>
+                            <th style="width: 9%">採購狀態</th>
+                            <th style="width: 18%">供應商報價 (點擊選定)</th>
+                            <th class="text-right" style="width: 8%">成本單價</th>
+                            <th class="text-right" style="width: 8%">預算差異</th>
+                            <th class="text-center" style="width: 3%">附件</th>
                         </tr>
                     </thead>
                     <tbody id="procurementTableBody">
-                        </tbody>
+                    </tbody>
                 </table>
             </div>
         </div>
@@ -96,7 +100,7 @@
         <div class="modal-body">
             <p class="text-muted">此處列出目前已匯入報價的供應商。您可以刪除特定供應商的報價紀錄。</p>
             <div id="supplierQuotesList" class="list-group mt-3">
-                </div>
+            </div>
         </div>
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-action="close-modal">關閉</button>
