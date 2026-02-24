@@ -1,12 +1,14 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v30.0 (UI 重複修復版)
- * 修正重點：
- * 1. 【UI 修復】：加入 hideLegacyDashboard 函式。
- * - 自動偵測並隱藏頁面上原本舊有的「採購狀態概覽」HTML 區塊，解決出現兩個儀表板的 Bug。
- * 2. 【功能完整】：保留 v29 的強制儀表板 (圓餅圖)、批次日期、批次狀態等所有功能。
+ * 標單採購管理 (tenders-procurement.js) - v32.0 (最終潔淨版)
+ * * 狀態：✅ 已清理 HTML，移除所有修補邏輯。
+ * 功能：
+ * 1. 【儀表板】：JS 自動產生包含圓餅圖與統計的儀表板。
+ * 2. 【批次功能】：支援「批次需用日」、「批次下單日」、「批次狀態切換」。
+ * 3. 【自動化】：切換「已下單」自動填入今天日期。
+ * 4. 【智慧匯入】：支援模糊比對與全形半形轉換。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v30.0 UI 重複修復版)...");
+    console.log("🚀 初始化採購管理頁面 (v32.0 最終潔淨版)...");
 
     // 全域變數
     let statusChart = null;
@@ -118,7 +120,7 @@ function initProcurementPage() {
                     { field: 'projectId', operator: '==', value: selectedProject.id }
                 ];
 
-                // 載入標單細項
+                // 1. 載入標單結構
                 let majorData, detailDataRaw;
                 if (typeof safeFirestoreQuery === 'function') {
                     const [majorRes, detailRes] = await Promise.all([
@@ -140,7 +142,7 @@ function initProcurementPage() {
                 detailItems.sort(naturalSequenceSort);
                 populateSelect(majorItemSelect, majorItems, '所有大項目');
 
-                // 載入採購單 & 報價單
+                // 2. 載入採購與報價
                 try {
                     let poData = [];
                     if (typeof safeFirestoreQuery === 'function') {
@@ -165,15 +167,14 @@ function initProcurementPage() {
                     quotations = quoteData;
                 } catch (quoteError) { quotations = []; }
 
+                // 3. 渲染畫面
                 document.getElementById('mainContent').style.display = 'block';
                 document.getElementById('emptyState').style.display = 'none';
                 
-                // 🔥 UI 修復核心
-                ensureDashboardSection();
-                adjustTableHeader();   
-                
-                renderTable();
-                updateStats();
+                ensureDashboardSection(); // 建立儀表板
+                adjustTableHeader();      // 修正表頭
+                renderTable();            // 建立表格
+                updateStats();            // 更新數據
 
             } catch (error) {
                 console.error("資料載入失敗:", error);
@@ -184,28 +185,22 @@ function initProcurementPage() {
             }
         }
 
-        // 🔥 強制建立儀表板 並 隱藏舊的
+        // --- UI 建構區 ---
+
+        // 建立上方儀表板 (包含圓餅圖與統計卡片)
         function ensureDashboardSection() {
             const mainContent = document.getElementById('mainContent');
-
-            // 1. 先執行清除舊儀表板的邏輯
-            hideLegacyDashboard();
-
-            // 2. 檢查是否已經建立過新儀表板
             const oldDash = document.getElementById('procurement-dashboard');
-            if (oldDash) oldDash.remove();
+            if (oldDash) oldDash.remove(); // 避免重複
 
-            // 3. 建立新 Dashboard
             const dashboard = document.createElement('div');
             dashboard.id = 'procurement-dashboard';
             dashboard.className = 'card mb-3 shadow-sm';
-            // 使用漸層背景讓它看起來跟舊的不一樣
-            dashboard.style.background = 'linear-gradient(to right, #ffffff, #f8f9fa)'; 
-            dashboard.style.borderLeft = '5px solid #20c997'; 
+            dashboard.style.borderLeft = '5px solid #20c997'; // 識別色
             dashboard.innerHTML = `
                 <div class="card-body" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; flex-wrap: wrap;">
                     <div style="flex: 1; min-width: 300px;">
-                        <h5 class="card-title mb-3" style="font-weight: bold; color: #333;">📊 採購狀態概覽</h5>
+                        <h3 class="card-title mb-3" style="font-weight: bold; color: #333;">📊 採購狀態儀表板</h3>
                         <div class="d-flex flex-wrap" style="gap: 15px; font-size: 1rem;">
                             <div class="p-2 border rounded text-center" style="min-width: 80px; background: #fff;">
                                 <div class="text-muted small">總項次</div>
@@ -234,33 +229,10 @@ function initProcurementPage() {
                     </div>
                 </div>
             `;
-            
-            // 插入在 mainContent 最上方
             mainContent.insertBefore(dashboard, mainContent.firstChild);
         }
 
-        // 🔥 自動搜尋並隱藏舊的儀表板 HTML
-        function hideLegacyDashboard() {
-            // 策略：尋找含有「採購狀態概覽」或「採購概覽」文字的標題，然後隱藏其父容器
-            const allHeaders = document.querySelectorAll('h5, h4, .card-title');
-            
-            allHeaders.forEach(header => {
-                const text = header.textContent.trim();
-                // 如果標題包含關鍵字，且不是我們新建立的 dashboard (ID判斷)
-                if ((text.includes('採購狀態概覽') || text.includes('採購概覽')) && 
-                    !header.closest('#procurement-dashboard')) {
-                    
-                    // 嘗試找到最外層的卡片容器
-                    const parentCard = header.closest('.card') || header.closest('.stats-container');
-                    if (parentCard) {
-                        parentCard.style.display = 'none';
-                        console.log("已自動隱藏舊版儀表板:", parentCard);
-                    }
-                }
-            });
-        }
-
-        // 🔥 強制修正表頭
+        // 強制設定表頭 (9欄)
         function adjustTableHeader() {
             const tbody = document.getElementById('procurementTableBody');
             if (!tbody) return;
@@ -302,6 +274,7 @@ function initProcurementPage() {
                     const headerRow = document.createElement('tr');
                     headerRow.className = 'table-active';
                     
+                    // 批次按鈕區
                     headerRow.innerHTML = `
                         <td colspan="9" style="background-color: #f1f3f5; padding: 8px 15px; vertical-align: middle; border-bottom: 2px solid #dee2e6;">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -311,23 +284,10 @@ function initProcurementPage() {
                                     </span>
                                     <span class="badge badge-secondary badge-pill">${myDetails.length} 項</span>
                                 </div>
-                                
                                 <div class="btn-group shadow-sm">
-                                    <button class="btn btn-sm btn-light border" 
-                                            onclick="window.triggerBatchDate('required', '${major.id}')"
-                                            title="設定此大項所有項目的需用日期">
-                                        📅 批次需用
-                                    </button>
-                                    <button class="btn btn-sm btn-light border" 
-                                            onclick="window.triggerBatchDate('ordered', '${major.id}')"
-                                            title="設定此大項所有項目的下單日期">
-                                        📅 批次下單
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-dark border" 
-                                            onclick="window.batchUpdateStatus('${major.id}', '${major.name}')"
-                                            title="變更此大項所有項目的狀態">
-                                        ⚡ 批次狀態
-                                    </button>
+                                    <button class="btn btn-sm btn-light border" onclick="window.triggerBatchDate('required', '${major.id}')" title="設定需用日期">📅 批次需用</button>
+                                    <button class="btn btn-sm btn-light border" onclick="window.triggerBatchDate('ordered', '${major.id}')" title="設定下單日期">📅 批次下單</button>
+                                    <button class="btn btn-sm btn-outline-dark border" onclick="window.batchUpdateStatus('${major.id}', '${major.name}')" title="變更狀態">⚡ 批次狀態</button>
                                 </div>
                             </div>
                         </td>
@@ -341,6 +301,7 @@ function initProcurementPage() {
                 }
             });
 
+            // 額外項目
             const allExtraQuotes = quotations.filter(q => q.isExtra);
             if (allExtraQuotes.length > 0) {
                 targetMajorItems.forEach((major) => {
@@ -398,21 +359,8 @@ function initProcurementPage() {
                 <td>${item.sequence || '-'}</td>
                 <td><div style="font-weight:bold;">${item.name || '未命名'}</div><div class="text-muted text-sm">${item.brand || ''} ${item.model || ''}</div></td>
                 <td>${item.unit || '-'}</td>
-                
-                <td style="background-color: #fcf9fe;">
-                    <input type="date" class="form-control form-control-sm date-input" 
-                           value="${reqDate}" style="${reqDateStyle}"
-                           onchange="window.updateDate('${item.id}', 'requiredDate', this.value)"
-                           title="需用日期">
-                </td>
-                
-                <td style="background-color: #fff9f2;">
-                    <input type="date" class="form-control form-control-sm date-input" 
-                           value="${ordDate}"
-                           onchange="window.updateDate('${item.id}', 'orderedDate', this.value)"
-                           title="下單日期">
-                </td>
-
+                <td style="background-color: #fcf9fe;"><input type="date" class="form-control form-control-sm date-input" value="${reqDate}" style="${reqDateStyle}" onchange="window.updateDate('${item.id}', 'requiredDate', this.value)"></td>
+                <td style="background-color: #fff9f2;"><input type="date" class="form-control form-control-sm date-input" value="${ordDate}" onchange="window.updateDate('${item.id}', 'orderedDate', this.value)"></td>
                 <td class="text-right">${qty}</td>
                 <td><span class="order-chip ${statusClass}" onclick="window.toggleStatus('${item.id}', '${currentStatusCode}')">${statusText}</span></td>
                 <td>${quotesHtml}</td>
@@ -439,7 +387,6 @@ function initProcurementPage() {
             return tr;
         }
 
-        // 🔥 更新統計數字與圖表
         function updateStats() {
             const counts = { planning: 0, inquiry: 0, ordered: 0, arrived: 0 };
             detailItems.forEach(item => {
@@ -451,7 +398,6 @@ function initProcurementPage() {
                 }
             });
 
-            // 更新新 Dashboard 的數字
             const setId = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
             setId('dash-total', detailItems.length);
             setId('dash-planning', counts.planning);
@@ -463,7 +409,7 @@ function initProcurementPage() {
         }
 
         function renderChart(counts) {
-            if (typeof Chart === 'undefined') { console.warn("Chart.js not loaded yet"); return; }
+            if (typeof Chart === 'undefined') return;
             const ctx = document.getElementById('procurementChart');
             if (!ctx) return;
 
@@ -489,7 +435,7 @@ function initProcurementPage() {
             }
         }
 
-        // --- 批次功能 ---
+        // --- 批次與工具 ---
         function injectHiddenDateInputs() {
             if (document.getElementById('batch-date-picker')) return;
             const input = document.createElement('input');
@@ -521,49 +467,30 @@ function initProcurementPage() {
 
         async function handleBatchDateUpdate(type, majorId, dateStr) {
             const targetDetails = detailItems.filter(d => d.majorItemId === majorId);
-            const typeLabel = type === 'required' ? '需用日期' : '下單日期';
-            
-            if (!confirm(`將【${targetDetails.length}】個項目的「${typeLabel}」全部設為 ${dateStr}？`)) return;
-
+            if (!confirm(`將【${targetDetails.length}】個項目設為 ${dateStr}？`)) return;
             showLoading(true, '批次更新中...');
             const batch = db.batch();
             const fieldName = type === 'required' ? 'requiredDate' : 'orderedDate';
-
             targetDetails.forEach(item => {
                 const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
                 let updates = { [fieldName]: dateStr, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-
-                if (itemPO) {
-                    batch.update(db.collection('purchaseOrders').doc(itemPO.id), updates);
-                } else {
+                if (itemPO) batch.update(db.collection('purchaseOrders').doc(itemPO.id), updates);
+                else {
                     const ref = db.collection('purchaseOrders').doc();
-                    batch.set(ref, {
-                        projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: item.id, majorItemId: majorId,
-                        status: 'planning', createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...updates
-                    });
+                    batch.set(ref, { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: item.id, majorItemId: majorId, status: 'planning', createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...updates });
                 }
             });
-
-            try {
-                await batch.commit();
-                await onTenderChange(selectedTender.id);
-                showAlert('更新完成', 'success');
-            } catch (error) {
-                console.error(error); showAlert("更新失敗", 'error');
-            } finally {
-                showLoading(false);
-            }
+            await batch.commit();
+            await onTenderChange(selectedTender.id);
+            showLoading(false);
         }
 
-        // --- 互動功能函式 ---
         async function handleUpdateDate(itemId, field, dateStr) {
             const itemPO = purchaseOrders.find(po => po.detailItemId === itemId);
             const newItem = detailItems.find(i => i.id === itemId);
-            try {
-                if (itemPO) await db.collection('purchaseOrders').doc(itemPO.id).update({ [field]: dateStr, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                else await db.collection('purchaseOrders').add({ projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: itemId, majorItemId: newItem.majorItemId, status: 'planning', [field]: dateStr, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-                renderTable();
-            } catch(e) { showAlert('Error', 'error'); }
+            if (itemPO) await db.collection('purchaseOrders').doc(itemPO.id).update({ [field]: dateStr, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            else await db.collection('purchaseOrders').add({ projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: itemId, majorItemId: newItem.majorItemId, status: 'planning', [field]: dateStr, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            renderTable();
         }
         
         async function handleToggleStatus(itemId, currentStatus) {
@@ -572,23 +499,22 @@ function initProcurementPage() {
             const itemPO = purchaseOrders.find(po => po.detailItemId === itemId);
             const item = detailItems.find(i => i.id === itemId);
             showLoading(true);
-            try {
-                let up = { status: next, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-                if (next === 'ordered' && (!itemPO || !itemPO.orderedDate)) up.orderedDate = new Date().toISOString().split('T')[0];
-                if (next === 'planning' && itemPO) await db.collection('purchaseOrders').doc(itemPO.id).delete();
-                else if (itemPO) await db.collection('purchaseOrders').doc(itemPO.id).update(up);
-                else await db.collection('purchaseOrders').add({ projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: itemId, majorItemId: item.majorItemId, createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...up });
-                await onTenderChange(selectedTender.id);
-            } catch(e) { console.error(e); showAlert('Error', 'error'); } finally { showLoading(false); }
+            let up = { status: next, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+            if (next === 'ordered' && (!itemPO || !itemPO.orderedDate)) up.orderedDate = new Date().toISOString().split('T')[0];
+            if (next === 'planning' && itemPO) await db.collection('purchaseOrders').doc(itemPO.id).delete();
+            else if (itemPO) await db.collection('purchaseOrders').doc(itemPO.id).update(up);
+            else await db.collection('purchaseOrders').add({ projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: itemId, majorItemId: item.majorItemId, createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...up });
+            await onTenderChange(selectedTender.id);
+            showLoading(false);
         }
 
         async function handleBatchUpdateStatus(majorId, majorName) {
-            const choice = prompt(`變更【${majorName}】狀態：\n1.詢價\n2.下單\n3.到貨\n4.規劃`);
+            const choice = prompt(`變更狀態：\n1.詢價\n2.下單\n3.到貨\n4.規劃`);
             const map = {'1':'inquiry', '2':'ordered', '3':'arrived', '4':'planning'};
             if (!choice || !map[choice]) return;
             const next = map[choice];
             const targets = detailItems.filter(d => d.majorItemId === majorId);
-            if (!confirm(`變更 ${targets.length} 項為 ${next}?`)) return;
+            if (!confirm(`將 ${targets.length} 項變更為 ${next}？`)) return;
             showLoading(true);
             const b = db.batch();
             const today = new Date().toISOString().split('T')[0];
@@ -596,22 +522,18 @@ function initProcurementPage() {
                 const po = purchaseOrders.find(p => p.detailItemId === item.id);
                 let up = { status: next, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
                 if (next === 'ordered' && (!po || !po.orderedDate)) up.orderedDate = today;
-                if (po) {
-                    if (next === 'planning') b.delete(db.collection('purchaseOrders').doc(po.id));
-                    else b.update(db.collection('purchaseOrders').doc(po.id), up);
-                } else if (next !== 'planning') {
-                    b.set(db.collection('purchaseOrders').doc(), { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: item.id, majorItemId: majorId, createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...up });
-                }
+                if (po) { if (next === 'planning') b.delete(db.collection('purchaseOrders').doc(po.id)); else b.update(db.collection('purchaseOrders').doc(po.id), up); }
+                else if (next !== 'planning') b.set(db.collection('purchaseOrders').doc(), { projectId: selectedProject.id, tenderId: selectedTender.id, detailItemId: item.id, majorItemId: majorId, createdAt: firebase.firestore.FieldValue.serverTimestamp(), ...up });
             });
             await b.commit();
             await onTenderChange(selectedTender.id);
-            showAlert('批次更新完成', 'success');
             showLoading(false);
         }
 
+        // --- 匯入與通用函式 ---
         function setupEventListeners() {
-            const change = (id, fn) => { const el = document.getElementById(id); if(el) el.onchange = fn; };
             const click = (id, fn) => { const el = document.getElementById(id); if(el) el.onclick = fn; };
+            const change = (id, fn) => { const el = document.getElementById(id); if(el) el.onchange = fn; };
             change('projectSelect', e => onProjectChange(e.target.value));
             change('tenderSelect', e => onTenderChange(e.target.value));
             change('majorItemSelect', () => renderTable());
@@ -619,14 +541,12 @@ function initProcurementPage() {
             click('importQuotesBtn', () => document.getElementById('importQuotesInput')?.click());
             change('importQuotesInput', handleImportQuotes);
             click('manageQuotesBtn', openQuoteManager);
-            
             window.triggerBatchDate = triggerBatchDate;
             window.batchUpdateStatus = handleBatchUpdateStatus;
             window.toggleStatus = handleToggleStatus;
             window.updateDate = handleUpdateDate;
             window.deleteSupplierQuotes = deleteSupplierQuotes;
             window.selectQuote = handleSelectQuote;
-
             document.querySelectorAll('[data-action="close-modal"]').forEach(b => b.onclick = () => b.closest('.modal-overlay').style.display='none');
         }
 
@@ -649,7 +569,6 @@ function initProcurementPage() {
             }
         }
 
-        // --- 省略重複的輔助函式，請確保與 v28/v29 相同 ---
         function showLoading(show, msg) { const el = document.getElementById('loading'); if(el) { el.style.display = show ? 'flex' : 'none'; if(msg) el.querySelector('p').textContent = msg; } }
         function populateSelect(select, items, defaultText) { if(!select) return; select.innerHTML = `<option value="">${defaultText}</option>` + items.map(i => `<option value="${i.id}">${i.sequence ? i.sequence + '.' : ''} ${i.name || i.code}</option>`).join(''); select.disabled = items.length === 0; }
         function resetSelects(level) { if (level === 'project') { document.getElementById('tenderSelect').innerHTML = '<option value="">請先選擇專案</option>'; document.getElementById('tenderSelect').disabled = true; document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>'; document.getElementById('majorItemSelect').disabled = true; document.getElementById('mainContent').style.display = 'none'; document.getElementById('emptyState').style.display = 'flex'; } else if (level === 'tender') { document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>'; } }
