@@ -542,3 +542,94 @@ body.sidebar-open .sidebar-overlay { opacity: 1; visibility: visible; }
     .progress-management-page .progress-table .progress-status-select { flex-basis: 120px; padding: 4px 8px; }
     .progress-management-page .progress-table .photo-cell { justify-content: flex-end; gap: 0.5rem; }
 }
+/* =================================================================
+   ★ 修正：項次排序 Modal 專用樣式 (Sequence Manager Fix) ★
+   ================================================================= */
+
+/* 1. 列表容器：限制高度並允許捲動 */
+#sequenceList {
+    max-height: 60vh;       /* 避免視窗過長 */
+    overflow-y: auto;       /* 內容多時出現捲軸 */
+    padding: 15px;
+    background: #f8f9fa;    /* 淺灰底色區分 */
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+}
+
+/* 2. 單個排序項目的卡片樣式 */
+.sequence-item {
+    display: flex;              /* 讓內部元素水平排列 */
+    align-items: center;        /* 垂直置中 */
+    justify-content: flex-start; /* 靠左對齊 */
+    background: #ffffff;
+    padding: 12px 15px;
+    margin-bottom: 8px;         /* 項目間距 */
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.03); /* 輕微陰影 */
+    gap: 15px;                  /* 關鍵：元素之間的間隔 */
+    transition: all 0.2s ease;
+}
+
+/* 滑鼠移過去的效果 */
+.sequence-item:hover {
+    border-color: var(--primary-color-start);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+    transform: translateY(-1px);
+}
+
+/* 拖曳中的樣式 (Sortable.js 會加這個 class) */
+.sortable-ghost {
+    opacity: 0.4;
+    background-color: #e2e6ea;
+    border: 1px dashed #999;
+}
+
+/* 3. 拖曳手把 (三條線圖示) */
+.sequence-item .drag-handle {
+    cursor: grab;          /* 顯示手型游標 */
+    color: #adb5bd;        /* 淺灰色 */
+    font-size: 20px;
+    padding: 5px;
+    user-select: none;     /* 防止選取文字 */
+    flex-shrink: 0;        /* 防止被擠壓 */
+}
+
+.sequence-item .drag-handle:hover {
+    color: var(--text-dark); /* 滑鼠移過去變深色 */
+}
+
+.sequence-item .drag-handle:active {
+    cursor: grabbing;      /* 抓取時的游標 */
+}
+
+/* 4. 項次輸入框 */
+.sequence-item .sequence-input {
+    width: 70px;           /* 固定寬度 */
+    text-align: center;
+    padding: 6px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-weight: bold;
+    color: var(--primary-color-end);
+    font-size: 14px;
+    flex-shrink: 0;        /* 防止被擠壓 */
+}
+
+.sequence-item .sequence-input:focus {
+    border-color: var(--primary-color-start);
+    outline: none;
+    background-color: #fff;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+/* 5. 項目名稱 */
+.sequence-item .item-name {
+    font-weight: 500;
+    color: #333;
+    font-size: 15px;
+    flex-grow: 1;             /* 佔滿右側剩餘空間 */
+    white-space: nowrap;      /* 防止換行 */
+    overflow: hidden;         /* 超出隱藏 */
+    text-overflow: ellipsis;  /* 太長顯示 ... */
+}
