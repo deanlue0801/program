@@ -175,6 +175,10 @@ body, html {
   background: var(--danger-color);
   color: white;
 }
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-100%); }
+  .main-content { margin-left: 0; width: 100%; }
+}
 
 /* =================================================================
    4. 通用組件 (Components)
@@ -199,6 +203,7 @@ body, html {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-sm);
+  white-space: nowrap;
 }
 .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
 .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: var(--white); }
@@ -210,94 +215,18 @@ body, html {
 .btn-delete { background: var(--danger-color); color: var(--white); }
 .btn-sm { padding: 6px 12px; font-size: 12px; }
 .action-buttons { display: flex; gap: var(--spacing-sm); }
-
 .form-group { display: flex; flex-direction: column; }
 .form-group label { margin-bottom: 5px; font-weight: var(--font-weight-medium); font-size: var(--font-size-base); }
 .form-control { padding: 10px 15px; border: 1px solid var(--gray-border); border-radius: var(--radius-md); font-size: var(--font-size-base); }
-
-/* --- 表格基礎樣式 --- */
 .table-container { background: var(--white); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-md); }
-.table { width: 100%; border-collapse: collapse; border-spacing: 0; }
-.table thead th { 
-    background: var(--gray-light); 
-    padding: var(--spacing-md); 
-    text-align: left; 
-    font-weight: var(--font-weight-semibold); 
-    border-bottom: 2px solid var(--gray-border); 
-    vertical-align: middle;
-}
-.table tbody td { 
-    padding: var(--spacing-md); 
-    border-bottom: 1px solid #f0f0f0; 
-    vertical-align: middle;
-}
+.table { width: 100%; border-collapse: collapse; }
+.table thead th { background: var(--gray-light); padding: var(--spacing-md); text-align: left; font-weight: var(--font-weight-semibold); border-bottom: 2px solid var(--gray-border); }
+.table tbody td { padding: var(--spacing-md); border-bottom: 1px solid #f0f0f0; }
 .table tbody tr:hover { background: var(--gray-light); }
-
-/* --- 狀態標籤 (Status Badges) --- */
 .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
 .status-badge.planning { background: #fff3cd; color: #856404; }
 .status-badge.active { background: #d1ecf1; color: #0c5460; }
 .status-badge.completed { background: #d4edda; color: #155724; }
-
-/* --- 採購狀態膠囊按鈕 (Order Chips) - v34 Unified --- */
-.order-chip {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 15px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    background-color: var(--gray-light);
-    color: var(--text-dark);
-    border: 1px solid var(--gray-border);
-    transition: all 0.2s ease;
-    text-align: center;
-    min-width: 80px;
-}
-.order-chip:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    opacity: 0.9;
-}
-.order-chip.status-planning { background-color: #e9ecef; color: #495057; border-color: #dee2e6; } /* 規劃中 - 灰色 */
-.order-chip.status-inquiry { background-color: #dbe4ff; color: #3b5bdb; border-color: #bac8ff; } /* 詢價中 - 藍紫色 */
-.order-chip.status-ordered { background-color: #fff3bf; color: #f08c00; border-color: #fcc419; } /* 已下單 - 橘色 */
-.order-chip.status-arrived { background-color: #d3f9d8; color: #2b8a3e; border-color: #8ce99a; } /* 已到貨 - 綠色 */
-.order-chip.status-installed { background-color: #f3e5f5; color: #4a148c; border-color: #ce93d8; } /* 已安裝 - 紫色 */
-
-/* --- 報價標籤 (Quote Chips) --- */
-.quote-chip {
-    display: inline-block;
-    padding: 2px 8px;
-    margin: 2px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
-    color: #495057;
-    cursor: default;
-}
-.quote-chip.selected {
-    background-color: #d4edda;
-    border-color: #c3e6cb;
-    color: #155724;
-    font-weight: bold;
-}
-
-/* --- 日期輸入框 (Date Input) --- */
-.date-input { 
-    border: 1px solid #ced4da; 
-    border-radius: 4px; 
-    padding: 4px 8px; 
-    font-size: 0.9rem; 
-    width: 100%; 
-    box-sizing: border-box; 
-    background-color: #fff;
-    transition: border-color 0.2s;
-}
-.date-input:focus { border-color: var(--primary-color-start); outline: none; }
-
-/* --- 載入與空狀態 --- */
 .loading { display: none; justify-content: center; align-items: center; padding: 40px; gap: var(--spacing-md); }
 .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary-color-start); border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -317,7 +246,7 @@ body, html {
 .tenders-list-page .summary-card { background: var(--white); border-radius: var(--radius-md); padding: var(--spacing-lg); box-shadow: var(--shadow-md); border-left: 4px solid var(--primary-color-start); }
 .tenders-list-page .summary-value { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); margin-bottom: 5px; }
 
-/* --- 儀表板頁面 (Home Dashboard) --- */
+/* --- 儀表板頁面 --- */
 .dashboard-page .welcome-section { text-align: center; margin-bottom: var(--spacing-xl); background: var(--card-bg-glass); backdrop-filter: var(--card-backdrop-filter); border-radius: var(--radius-lg); padding: var(--spacing-xl); box-shadow: var(--shadow-lg); }
 .dashboard-page .welcome-section h1 { font-size: 32px; margin-bottom: 10px; background: linear-gradient(135deg, #4a63e2 0%, #603894 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .dashboard-page .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--spacing-lg); margin-bottom: var(--spacing-xl); }
@@ -337,41 +266,17 @@ body, html {
 .dashboard-page .activity-icon.tender { background: var(--success-color); }
 .dashboard-columns { display: grid; grid-template-columns: 2fr 1fr; gap: var(--spacing-lg); align-items: stretch; }
 
-/* --- 採購管理頁面 (Procurement Page) --- */
+@media (max-width: 992px) {
+  .dashboard-columns { grid-template-columns: 1fr; }
+}
+
+/* --- 採購管理頁面 --- */
 .procurement-page .procurement-table-container { overflow-x: auto; }
 .procurement-page #procurementTable { min-width: 1200px; }
 .procurement-page #procurementTable .major-item-header > td { background-color: var(--header-dark-bg) !important; color: var(--white) !important; font-weight: var(--font-weight-semibold); position: sticky; left: 0; z-index: 2; }
 .procurement-page #procurementTable thead th { position: sticky; top: 0; z-index: 3; background-color: var(--gray-light); }
-
-/* v34 新增：採購頁面上方儀表板 (JS 生成) */
-#procurement-dashboard {
-    margin-bottom: 20px;
-    animation: fadeIn 0.5s ease-in-out;
-}
-#procurement-dashboard .stat-card {
-    padding: 15px;
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.2s;
-    height: 100%;
-}
-#procurement-dashboard .stat-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-}
-
-/* 標題與按鈕區塊排版 */
-.card-header-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    flex-wrap: wrap;
-    gap: 10px;
-}
+/* 補回：表格分隔線樣式 */
+.table-container .table tr.major-item-start td { border-top: 2px solid var(--primary-color-start); background-color: #f8faff; }
 
 /* --- 成本控管分析頁面 --- */
 .cost-management-page .stats-grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--spacing-lg); margin-bottom: var(--spacing-lg); }
@@ -386,21 +291,114 @@ body, html {
 .cost-management-page .secondary-stats .stat-value { font-size: 1.5rem; }
 .cost-management-page .text-right { text-align: right; }
 
-/* --- 分配管理頁面 --- */
-.distribution-page .actions-panel { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--spacing-md); margin-bottom: var(--spacing-lg); }
-.distribution-page .distribution-table-container { overflow: auto; max-height: 65vh; border: 1px solid var(--gray-border); border-radius: var(--radius-md); }
-.distribution-page .distribution-table { min-width: 1200px; }
-.distribution-page .distribution-table th, .distribution-page .distribution-table td { text-align: center; white-space: nowrap; padding: 10px 8px; font-size: var(--font-size-base); border: 1px solid var(--gray-border); }
-.distribution-page .distribution-table thead th { position: sticky; top: 0; z-index: 3; background-color: var(--header-dark-bg); color: var(--white); }
-.distribution-page .distribution-table tbody td:first-child, .distribution-page .distribution-table tbody th:first-child { position: sticky; left: 0; z-index: 2; background-color: var(--gray-light); text-align: left; }
-.distribution-page .distribution-table thead th:first-child { z-index: 4; }
-.distribution-page .quantity-input { width: 60px; text-align: center; padding: 4px; border: 1px solid var(--gray-border); border-radius: 4px; }
-.distribution-page .quantity-input.has-value { background-color: #e8f5e9; }
-.distribution-page .total-column { font-weight: var(--font-weight-bold); background-color: #fce4ec !important; }
-.distribution-page .total-column.error { color: var(--danger-color); }
+/* =================================================================
+   ★ 分配管理頁面 (Distribution) - 強化版 (Freeze Panes Fix) ★
+   ================================================================= */
+.distribution-page .actions-panel { 
+    display: flex; justify-content: space-between; align-items: center; 
+    flex-wrap: wrap; gap: var(--spacing-md); margin-bottom: var(--spacing-lg); 
+}
+
+/* 1. 表格容器 */
+.distribution-page .distribution-table-container { 
+    overflow: auto; 
+    max-height: 70vh; /* 限制高度讓垂直捲軸出現 */
+    position: relative;
+    border: 1px solid var(--gray-border);
+    background: #fff;
+    border-radius: var(--radius-md);
+}
+
+.distribution-page .distribution-table {
+    border-collapse: separate; /* Sticky 關鍵設定 */
+    border-spacing: 0;
+    min-width: 100%;
+}
+
+/* 基礎儲存格 */
+.distribution-page .distribution-table th,
+.distribution-page .distribution-table td {
+    border-bottom: 1px solid #dee2e6;
+    border-right: 1px solid #dee2e6;
+    background: #fff;
+    padding: 8px 10px;
+    vertical-align: middle;
+}
+
+/* A. 固定表頭 (垂直捲動時固定) */
+.distribution-page .distribution-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20; /* 層級 2 */
+    background-color: var(--header-dark-bg);
+    color: var(--white);
+    font-weight: bold;
+    box-shadow: 0 1px 0 #dee2e6;
+}
+
+/* B. 固定左側欄位 (水平捲動時固定) */
+/* 第一欄：項次 */
+.distribution-page .distribution-table th:nth-child(1),
+.distribution-page .distribution-table td:nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 10; /* 層級 1 */
+    width: 60px;
+    min-width: 60px;
+    text-align: center;
+    border-right: 2px solid #dee2e6;
+}
+
+/* 第二欄：細項名稱 */
+.distribution-page .distribution-table th:nth-child(2),
+.distribution-page .distribution-table td:nth-child(2) {
+    position: sticky;
+    left: 60px; /* 接在第一欄後面 */
+    z-index: 10; /* 層級 1 */
+    min-width: 250px;
+    max-width: 300px;
+    border-right: 2px solid var(--primary-color-start); /* 明顯的分隔線 */
+}
+
+/* C. 左上角交集區 (垂直+水平都不動) - 修正「標題跟著捲動」的問題 */
+.distribution-page .distribution-table thead th:nth-child(1),
+.distribution-page .distribution-table thead th:nth-child(2) {
+    z-index: 30; /* 層級 3：最高！ */
+    background-color: var(--header-dark-bg);
+}
+
+/* D. 輸入框與狀態 */
+.distribution-page .quantity-input { 
+    width: 70px; text-align: center; padding: 6px; 
+    border: 1px solid var(--gray-border); border-radius: 4px; transition: all 0.2s;
+}
+.distribution-page .quantity-input:focus { 
+    border-color: var(--primary-color-start); background-color: #fff; 
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2); outline: none; transform: scale(1.05);
+}
+.distribution-page .quantity-input.has-value { 
+    background-color: #e8f5e9; font-weight: 600; color: var(--success-color); border-color: #c8e6c9; 
+}
+.distribution-page .total-column { 
+    font-weight: var(--font-weight-bold); background-color: #fff3e0 !important; 
+    text-align: center; min-width: 80px; color: var(--primary-color-end);
+}
+.distribution-page .total-column.error { 
+    background-color: #ffebee !important; color: var(--danger-color); 
+}
+
+/* E. 細項資訊美化 */
+.distribution-page .item-info { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.distribution-page .item-name { font-weight: 600; color: var(--text-dark); white-space: normal; line-height: 1.4; text-align: left; }
+.distribution-page .item-details { font-size: 0.85rem; color: var(--text-light); background-color: #f1f3f5; padding: 2px 6px; border-radius: 4px; display: inline-block; }
+.distribution-page .badge-seq { background-color: var(--gray-light); padding: 2px 6px; border-radius: 4px; font-size: 0.9rem; color: var(--text-light); }
 
 /* --- 彈出視窗 (Modal) --- */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); animation: fadeIn 0.3s; }
+.modal-overlay { 
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(0,0,0,0.6); z-index: 2000; display: none; 
+    align-items: center; justify-content: center; backdrop-filter: blur(5px); animation: fadeIn 0.3s; 
+}
 .modal-overlay.active { display: flex; }
 .modal-content { background: var(--gray-light); padding: var(--spacing-xl); border-radius: var(--radius-lg); width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); animation: slideUp 0.4s; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -409,32 +407,42 @@ body, html {
 .modal-content p { color: var(--text-light); margin-bottom: var(--spacing-lg); }
 .modal-section { margin-bottom: var(--spacing-lg); padding-bottom: var(--spacing-lg); border-bottom: 1px solid var(--gray-border); }
 .modal-section:last-child { border-bottom: none; }
-.modal-section h4 { margin-bottom: var(--spacing-md); color: var(--text-dark); }
 .modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: var(--spacing-lg); }
-.modal-actions > div { display: flex; gap: var(--spacing-sm); }
 .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--gray-border); padding-bottom: var(--spacing-md); margin-bottom: var(--spacing-lg); }
 .modal-close { border: none; background: none; font-size: 1.5rem; cursor: pointer; color: var(--text-light); }
 .modal-footer { display: flex; justify-content: flex-end; gap: var(--spacing-sm); border-top: 1px solid var(--gray-border); padding-top: var(--spacing-lg); margin-top: var(--spacing-lg); }
+
+/* 新增：樓層標籤樣式 */
+.floor-tag { display: inline-flex; align-items: center; background: var(--primary-color-start); color: white; padding: 6px 14px; border-radius: 20px; margin: 6px; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.remove-floor-btn { background: rgba(255,255,255,0.2); border: none; color: white; margin-left: 10px; cursor: pointer; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; line-height: 1; }
+.remove-floor-btn:hover { background: var(--danger-color); }
+
+/* 新增：排序 Modal 樣式 */
+#sequenceList { max-height: 60vh; overflow-y: auto; padding: 10px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6; }
+.sequence-item { display: flex; align-items: center; justify-content: space-between; background: #ffffff; padding: 12px 15px; margin-bottom: 8px; border: 1px solid #e9ecef; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); cursor: grab; }
+.sequence-item:active { cursor: grabbing; background-color: #f1f3f5; }
+.sequence-item .drag-handle { color: #adb5bd; font-size: 20px; margin-right: 15px; cursor: grab; padding: 5px; }
+.sequence-content { display: flex; align-items: center; flex-grow: 1; gap: 10px; }
+.sequence-item .sequence-input { width: 60px; text-align: center; padding: 6px; border: 1px solid #ced4da; border-radius: 4px; font-weight: bold; color: var(--primary-color-end); }
+.sequence-item .item-name { font-weight: 500; color: #333; flex-grow: 1; }
+
 .template-buttons { display: flex; flex-wrap: wrap; gap: var(--spacing-sm); }
 .custom-add-section { display: flex; gap: var(--spacing-sm); }
 .custom-add-section .form-control { flex-grow: 1; }
 .sortable-list { border: 1px solid var(--gray-border); border-radius: var(--radius-md); background: var(--white); min-height: 100px; padding: var(--spacing-sm); }
-.sortable-item { background: var(--white); padding: 10px; margin: 5px; border-radius: var(--radius-md); border: 1px solid var(--gray-border); cursor: grab; display: flex; justify-content: space-between; align-items: center; }
-.sortable-item:hover { background: var(--gray-light); }
-.sortable-item .handle { font-weight: bold; margin-right: 10px; }
-.sortable-item .delete-btn { cursor: pointer; color: var(--danger-color); }
 
-/* --- 空間分配管理頁面 (Space Distribution) --- */
+/* --- 空間分配管理頁面 (保留修正) --- */
 .space-distribution-page .tags-container { display: flex; flex-wrap: wrap; gap: var(--spacing-sm); background-color: var(--white); padding: var(--spacing-md); border-radius: var(--radius-md); border: 1px solid var(--gray-border); min-height: 80px; }
 .space-distribution-page .tag-item { background-color: var(--primary-color-start); color: var(--white); padding: 5px 10px; border-radius: var(--radius-md); display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-base); cursor: pointer; transition: all var(--transition-base); }
 .space-distribution-page .tag-item:hover { background-color: var(--danger-color); transform: scale(1.05); }
 .space-distribution-page .tag-item .delete-tag { font-weight: bold; }
+/* ✨✨✨【針對空間分配頁面輸入框的修正】✨✨✨ */
 .space-distribution-page .table-container { overflow: auto; max-height: 70vh; }
 .space-distribution-page .table th.floor-header { min-width: 100px; }
 .space-distribution-page .table .quantity-input { width: 80px; padding: 5px; font-size: var(--font-size-base); text-align: center; border: 1px solid var(--gray-border); border-radius: 4px; }
 .space-distribution-page .table .quantity-input.has-value { background-color: #e8f5e9; font-weight: 500; }
 
-/* --- 追蹤項目設定頁面 (Tracking Setup) --- */
+/* --- 追蹤項目設定頁面 --- */
 .tracking-setup-page .actions-panel { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--spacing-md); margin-bottom: var(--spacing-lg); }
 .tracking-setup-page .table th, .tracking-setup-page .table td { vertical-align: middle; }
 .tracking-setup-page .toggle-switch { position: relative; display: inline-block; width: 50px; height: 24px; }
@@ -444,7 +452,7 @@ body, html {
 .tracking-setup-page input:checked + .slider { background-color: var(--success-color); }
 .tracking-setup-page input:checked + .slider:before { transform: translateX(26px); }
 
-/* --- 標單詳情頁面 (Tender Detail) --- */
+/* --- 標單詳情頁面 --- */
 .detail-page .header-card .header-content { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--spacing-lg); flex-wrap: wrap; }
 .detail-page .header-info h1 { font-size: var(--font-size-display); font-weight: var(--font-weight-bold); margin-bottom: var(--spacing-sm); }
 .detail-page .header-meta { display: flex; gap: var(--spacing-lg); color: var(--text-light); font-size: var(--font-size-base); flex-wrap: wrap; }
@@ -477,7 +485,7 @@ body, html {
 .detail-page .data-table th, .detail-page .data-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--gray-border); }
 .detail-page .data-table th { background-color: var(--gray-light); }
 
-/* --- 編輯頁面 (Edit Page) --- */
+/* --- 編輯頁面 --- */
 .edit-page .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-lg); }
 .edit-page .summary-card { background-color: var(--gray-light); padding: var(--spacing-lg); border-radius: var(--radius-md); text-align: center; border-left: 4px solid; }
 .edit-page .summary-card .summary-label { font-size: var(--font-size-base); color: var(--text-light); margin-bottom: var(--spacing-sm); }
@@ -511,21 +519,17 @@ body.sidebar-open .sidebar-overlay { opacity: 1; visibility: visible; }
 
     /* 儀表板佈局調整 */
     .dashboard-columns { grid-template-columns: 1fr; }
-    #procurement-dashboard .card-body { flex-direction: column; align-items: stretch; }
-    #procurement-dashboard canvas { margin-top: 20px; align-self: center; }
 
-    /* 分配管理表格 -> 卡片式佈局 */
-    .distribution-page .distribution-table thead { display: none; }
-    .distribution-page .distribution-table tr { display: block; margin-bottom: var(--spacing-lg); border: 1px solid var(--gray-border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); padding: var(--spacing-sm); }
-    .distribution-page .distribution-table td { display: block; text-align: right; padding: 10px 12px; border: none; border-bottom: 1px dashed var(--gray-border); position: relative; }
-    .distribution-page .distribution-table td:last-child { border-bottom: none; }
-    .distribution-page .distribution-table td::before { content: attr(data-label); float: left; font-weight: 600; color: var(--text-light); }
-    .distribution-page .distribution-table td:first-child, .distribution-page .distribution-table th:first-child { position: static; min-width: auto; border-right: none; }
-    .distribution-page .distribution-table td:first-child { background-color: transparent !important; text-align: left; padding: 12px; font-weight: bold; font-size: 16px; border-bottom: 2px solid var(--primary-color-start); }
-    .distribution-page .distribution-table td:first-child::before { display: none; }
-    .distribution-page .distribution-table, .distribution-page .distribution-table-container { min-width: 100%; max-height: none; }
-
-    /* 施工進度管理表格響應式 */
+    /* 分配管理表格 -> 卡片式佈局 (在手機版取消 Sticky，改為水平捲動) */
+    .distribution-page .distribution-table-container { max-height: none; overflow-x: auto; }
+    .distribution-page .distribution-table th:nth-child(1),
+    .distribution-page .distribution-table td:nth-child(1),
+    .distribution-page .distribution-table th:nth-child(2),
+    .distribution-page .distribution-table td:nth-child(2) {
+        position: static; border-right: none; width: auto;
+    }
+    
+    /* 施工進度管理表格響應式 (從原始檔補回) */
     .progress-management-page .progress-table thead { display: none; }
     .progress-management-page .progress-table tr { display: block; margin-bottom: 1rem; border: 1px solid var(--gray-border); border-radius: var(--radius-md); padding: 0.5rem; box-shadow: var(--shadow-md); background: var(--white); }
     .progress-management-page .progress-table td { display: flex; justify-content: space-between; align-items: center; text-align: right; padding: 0.75rem 0.5rem; border-bottom: 1px dashed var(--gray-border); }
@@ -537,150 +541,4 @@ body.sidebar-open .sidebar-overlay { opacity: 1; visibility: visible; }
     .progress-management-page .progress-table td:nth-child(2) { font-size: var(--font-size-lg); font-weight: bold; padding-top: 0; line-height: 1.3; }
     .progress-management-page .progress-table .progress-status-select { flex-basis: 120px; padding: 4px 8px; }
     .progress-management-page .progress-table .photo-cell { justify-content: flex-end; gap: 0.5rem; }
-
-    /* 採購頁面手機版按鈕優化 */
-    .card-header-actions { flex-direction: column; align-items: flex-start; }
-    .action-buttons { width: 100%; justify-content: flex-start; margin-top: 10px; }
-}
-
-@media (min-width: 992px) {
-    /* 確保在桌面版顯示篩選區 */
-    .procurement-page .filter-row {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 20px;
-    }
-}
-
-/* =================================================================
-   7. 新增補充樣式 (New Additions v35.0)
-   ================================================================= */
-
-/* 分配管理 - 細項欄位美化 */
-.distribution-table .item-info {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    align-items: flex-start; /* 確保靠左 */
-}
-
-.distribution-table .item-name {
-    font-weight: 700;
-    color: var(--text-dark);
-    font-size: 0.95rem;
-    line-height: 1.4;
-}
-
-.distribution-table .item-details {
-    font-size: 0.8rem;
-    color: var(--text-light);
-    background-color: #f8f9fa;
-    border: 1px solid #e9ecef;
-    padding: 2px 8px;
-    border-radius: 12px;
-    display: inline-block;
-}
-
-/* 採購管理 - 預算差異與附件按鈕 */
-.variance-positive { color: var(--success-color); font-weight: bold; }
-.variance-negative { color: var(--danger-color); font-weight: bold; }
-.btn-attachment { color: var(--text-light); transition: color 0.2s; }
-.btn-attachment:hover { color: var(--primary-color-start); }
-
-/* --- 補充：分配管理頁面特定元件樣式 --- */
-
-/* 樓層標籤 (Modal 內使用) */
-.floor-tag {
-    display: inline-flex;
-    align-items: center;
-    background: var(--primary-color-start);
-    color: white;
-    padding: 5px 12px;
-    border-radius: 20px;
-    margin: 5px;
-    font-size: 14px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.floor-tag .remove-floor-btn {
-    background: none;
-    border: none;
-    color: white;
-    margin-left: 8px;
-    cursor: pointer;
-    font-size: 18px;
-    line-height: 1;
-}
-
-/* 排序項目 (Sequence Manager) */
-.sequence-item {
-    display: flex;
-    align-items: center;
-    background: white;
-    padding: 12px;
-    margin-bottom: 8px;
-    border: 1px solid var(--gray-border);
-    border-radius: var(--radius-md);
-    gap: 15px;
-}
-
-.sequence-item .drag-handle {
-    cursor: grab;
-    color: var(--text-light);
-    font-size: 18px;
-}
-
-.sequence-item .sequence-input {
-    width: 60px;
-    padding: 5px;
-    text-align: center;
-    border: 1px solid var(--gray-border);
-    border-radius: 4px;
-}
-
-.sequence-item .item-name {
-    font-weight: 500;
-}
-
-/* 分配表格進階美化 */
-.distribution-table .total-column {
-    background-color: #f8f9fa !important;
-    font-weight: bold;
-    color: var(--primary-color-end);
-    text-align: center;
-}
-
-.distribution-table .total-column.error {
-    background-color: #fff5f5 !important;
-    color: var(--danger-color);
-}
-
-/* 輸入框焦點狀態 */
-.quantity-input:focus {
-    border-color: var(--primary-color-start);
-    background-color: #fff;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
-    outline: none;
-}
-
-/* 讓表格橫向捲動時，項次與名稱固定 */
-.distribution-table th:nth-child(1),
-.distribution-table td:nth-child(1) {
-    position: sticky;
-    left: 0;
-    z-index: 10;
-    background: white;
-}
-
-.distribution-table th:nth-child(2),
-.distribution-table td:nth-child(2) {
-    position: sticky;
-    left: 80px; /* 根據項次寬度調整 */
-    z-index: 10;
-    background: white;
-    border-right: 2px solid var(--gray-border);
-}
-
-.distribution-table thead th {
-    z-index: 20;
 }
