@@ -551,3 +551,38 @@ body.sidebar-open .sidebar-overlay { opacity: 1; visibility: visible; }
         gap: 20px;
     }
 }
+
+/* =================================================================
+   7. 新增補充樣式 (New Additions v35.0)
+   ================================================================= */
+
+/* 分配管理 - 細項欄位美化 */
+.distribution-table .item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start; /* 確保靠左 */
+}
+
+.distribution-table .item-name {
+    font-weight: 700;
+    color: var(--text-dark);
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.distribution-table .item-details {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    padding: 2px 8px;
+    border-radius: 12px;
+    display: inline-block;
+}
+
+/* 採購管理 - 預算差異與附件按鈕 */
+.variance-positive { color: var(--success-color); font-weight: bold; }
+.variance-negative { color: var(--danger-color); font-weight: bold; }
+.btn-attachment { color: var(--text-light); transition: color 0.2s; }
+.btn-attachment:hover { color: var(--primary-color-start); }
