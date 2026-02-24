@@ -1,12 +1,12 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v17.0 (大項分組顯示版)
+ * 標單採購管理 (tenders-procurement.js) - v18.0 (匯出排序修正版)
  * 修正重點：
- * 1. 【介面優化】表格改為「大項目分組」顯示，每個大項有獨立標題列 (參考 Detail 頁面)。
- * 2. 只有當大項底下有細項時，才會顯示該大項標題。
- * 3. 完整保留 v16 的數量修正、排序優化與狀態切換功能。
+ * 1. 【匯出邏輯】依照「大項目」分組順序匯出，解決「相同項次擠在一起」的問題。
+ * 2. 【Excel優化】在 Excel 中插入「大項目標題列」，讓廠商報價更清楚。
+ * 3. 包含 v17 的分組顯示、數量修正 (totalQuantity) 與狀態切換功能。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v17.0 大項分組版)...");
+    console.log("🚀 初始化採購管理頁面 (v18.0 匯出排序修正版)...");
 
     // 1. 等待 HTML 元素
     function waitForElement(selector, callback) {
@@ -153,7 +153,6 @@ function initProcurementPage() {
 
                 // 排序
                 majorItems.sort(naturalSequenceSort);
-                // 細項排序: 先依sequence排序，分組時會再對應到各大項
                 detailItems.sort(naturalSequenceSort);
 
                 populateSelect(majorItemSelect, majorItems, '所有大項目');
@@ -199,7 +198,6 @@ function initProcurementPage() {
                 document.getElementById('mainContent').style.display = 'block';
                 document.getElementById('emptyState').style.display = 'none';
                 
-                // 🔥 渲染表格 (現在會自動分組)
                 renderTable();
                 updateStats();
 
@@ -212,7 +210,7 @@ function initProcurementPage() {
             }
         }
 
-        // --- (D) 渲染表格 (🔥 分組顯示邏輯) ---
+        // --- (D) 渲染表格 ---
         function renderTable() {
             const tbody = document.getElementById('procurementTableBody');
             const filterMajorId = document.getElementById('majorItemSelect').value;
@@ -237,9 +235,8 @@ function initProcurementPage() {
                     hasAnyData = true;
 
                     // (A) 插入大項標題列
-                    // 使用 colspan="7" 跨越所有欄位，並加上背景色
                     const headerRow = document.createElement('tr');
-                    headerRow.className = 'table-active'; // Bootstrap 灰色背景
+                    headerRow.className = 'table-active';
                     headerRow.innerHTML = `
                         <td colspan="7" style="font-weight: bold; background-color: #f1f3f5; padding: 12px 15px;">
                             ${major.sequence || ''} ${major.name || '未命名大項'}
@@ -247,7 +244,7 @@ function initProcurementPage() {
                     `;
                     tbody.appendChild(headerRow);
 
-                    // (B) 插入細項列 (內層迴圈)
+                    // (B) 插入細項列
                     myDetails.forEach(item => {
                         const tr = createDetailRow(item);
                         tbody.appendChild(tr);
@@ -255,13 +252,11 @@ function initProcurementPage() {
                 }
             });
 
-            // 處理沒有任何資料的情況
             if (!hasAnyData) {
                 tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px;">沒有符合的項目資料</td></tr>';
             }
         }
 
-        // 建立單一細項列的 HTML (抽離出來讓程式碼更整潔)
         function createDetailRow(item) {
             const tr = document.createElement('tr');
             
@@ -293,13 +288,12 @@ function initProcurementPage() {
                 ).join('');
             }
 
-            // 數量處理 (優先讀取 totalQuantity)
+            // 數量與單價
             let qty = 0;
             if (item.totalQuantity !== undefined && item.totalQuantity !== null) qty = Number(item.totalQuantity);
             else if (item.quantity !== undefined && item.quantity !== null) qty = Number(item.quantity);
             else if (item.qty !== undefined && item.qty !== null) qty = Number(item.qty);
 
-            // 單價處理
             let unitPrice = 0;
             if (item.unitPrice !== undefined) unitPrice = item.unitPrice;
             else if (item.cost !== undefined) unitPrice = item.cost;
@@ -407,6 +401,7 @@ function initProcurementPage() {
             console.log("選擇報價:", quoteId);
         }
 
+        // 🔥 匯出詢價單 (v18.0: 依大項分組匯出 + 插入標題列)
         function handleExportRFQ() {
             if (!selectedTender) return showAlert('請先選擇標單', 'warning');
             if (detailItems.length === 0) return showAlert('目前沒有項目可匯出', 'warning');
@@ -414,29 +409,53 @@ function initProcurementPage() {
             try {
                 if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
 
-                const exportData = detailItems.map(item => {
-                    let qty = 0;
-                    if (item.totalQuantity !== undefined && item.totalQuantity !== null) qty = Number(item.totalQuantity);
-                    else if (item.quantity !== undefined && item.quantity !== null) qty = Number(item.quantity);
-                    else if (item.qty !== undefined && item.qty !== null) qty = Number(item.qty);
+                const exportData = [];
 
-                    return {
-                        '項次': item.sequence || '',
-                        '項目名稱': item.name || '',
-                        '說明(廠牌/型號)': `${item.brand || ''} ${item.model || ''}`.trim(),
-                        '單位': item.unit || '',
-                        '數量': qty, 
-                        '供應商報價(單價)': '',
-                        '小計(複價)': '', 
-                        '備註': ''
-                    };
+                // 依據「大項目」順序建立資料
+                majorItems.forEach(major => {
+                    // 找出該大項下的細項
+                    const myDetails = detailItems.filter(d => d.majorItemId === major.id);
+
+                    if (myDetails.length > 0) {
+                        // 1. 插入大項標題列 (讓 Excel 也有分組感)
+                        exportData.push({
+                            '項次': `${major.sequence || ''} ${major.name || ''}`,
+                            '項目名稱': '',
+                            '說明(廠牌/型號)': '',
+                            '單位': '',
+                            '數量': '',
+                            '供應商報價(單價)': '',
+                            '小計(複價)': '',
+                            '備註': ''
+                        });
+
+                        // 2. 插入細項
+                        myDetails.forEach(item => {
+                            let qty = 0;
+                            if (item.totalQuantity !== undefined && item.totalQuantity !== null) qty = Number(item.totalQuantity);
+                            else if (item.quantity !== undefined && item.quantity !== null) qty = Number(item.quantity);
+                            else if (item.qty !== undefined && item.qty !== null) qty = Number(item.qty);
+
+                            exportData.push({
+                                '項次': item.sequence || '',
+                                '項目名稱': item.name || '',
+                                '說明(廠牌/型號)': `${item.brand || ''} ${item.model || ''}`.trim(),
+                                '單位': item.unit || '',
+                                '數量': qty, 
+                                '供應商報價(單價)': '',
+                                '小計(複價)': '', 
+                                '備註': ''
+                            });
+                        });
+                    }
                 });
 
                 const wb = XLSX.utils.book_new();
                 const ws = XLSX.utils.json_to_sheet(exportData);
 
+                // 設定欄寬
                 ws['!cols'] = [
-                    {wch: 8}, {wch: 30}, {wch: 25}, {wch: 8}, {wch: 10}, 
+                    {wch: 15}, {wch: 30}, {wch: 25}, {wch: 8}, {wch: 10}, 
                     {wch: 15}, {wch: 15}, {wch: 20}
                 ];
 
