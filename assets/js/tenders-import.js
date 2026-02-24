@@ -1,370 +1,792 @@
 /**
- * EXCEL 匯入頁面 (tenders/import.js) (SPA 版本) - v3.2 (權限最終修正)
- * 由 router.js 呼叫 initImportPage() 函數來啟動
+ * 標單採購管理 (tenders-procurement.js) - v22.0 (管理報價功能實作版)
+ * 新增功能：
+ * 1. 【管理供應商報價】實作 Modal 內的邏輯：
+ * - 統計各供應商的報價項數與總金額。
+ * - 提供「刪除特定供應商」所有報價的功能。
+ * 2. 包含 v21 的分組顯示、匯入智慧分組、數量修正等所有功能。
  */
-function initImportPage() {
+function initProcurementPage() {
+    console.log("🚀 初始化採購管理頁面 (v22.0 管理報價實作版)...");
 
-    // --- 頁面狀態管理 ---
-    let selectedFile = null;
-    let workbook = null;
-    let parsedData = [];
-    let projectsWithPermission = []; // 只儲存有權限的專案
-
-    // --- 初始化與事件綁定 ---
-    function initializePage() {
-        console.log("🚀 初始化 EXCEL 匯入頁面 (v3.2)...");
-        if (!auth.currentUser) return showAlert("無法獲取用戶資訊", "error");
-        setupEventListeners();
-        loadProjectsWithPermission(); // 改為載入有權限的專案
+    // 1. 等待 HTML 元素
+    function waitForElement(selector, callback) {
+        const element = document.querySelector(selector);
+        if (element) {
+            callback();
+            return;
+        }
+        const interval = setInterval(() => {
+            const element = document.querySelector(selector);
+            if (element) {
+                clearInterval(interval);
+                callback();
+            }
+        }, 100);
     }
 
-    function setupEventListeners() {
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
-        const customPatternCheckbox = document.getElementById('ruleCustomPattern');
-        const customPatternGroup = document.getElementById('customPatternGroup');
+    waitForElement('#projectSelect', () => {
+        console.log("✅ HTML 元素已就緒，開始執行...");
 
-        if (uploadArea) {
-            uploadArea.onclick = () => fileInput.click();
-            uploadArea.ondragover = (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); };
-            uploadArea.ondragleave = () => uploadArea.classList.remove('dragover');
-            uploadArea.ondrop = (e) => {
-                e.preventDefault();
-                uploadArea.classList.remove('dragover');
-                if (e.dataTransfer.files[0]) handleFileSelect({ target: { files: e.dataTransfer.files } });
-            };
-        }
-        if (fileInput) fileInput.onchange = handleFileSelect;
-        if (customPatternCheckbox) customPatternCheckbox.onchange = () => {
-            if (customPatternGroup) customPatternGroup.style.display = customPatternCheckbox.checked ? 'block' : 'none';
-        };
+        // --- 變數宣告 ---
+        let projects = [], tenders = [], majorItems = [], detailItems = [];
+        let purchaseOrders = [], quotations = [];
+        let selectedProject = null, selectedTender = null;
         
-        document.getElementById('parseBtn')?.addEventListener('click', parseExcel);
-        document.getElementById('backToUploadBtn')?.addEventListener('click', backToUpload);
-        document.getElementById('proceedToImportBtn')?.addEventListener('click', proceedToImport);
-        document.getElementById('backToPreviewBtn')?.addEventListener('click', backToPreview);
-        document.getElementById('executeImportBtn')?.addEventListener('click', executeImport);
-        document.getElementById('re-detectBtn')?.addEventListener('click', autoDetectMajorItems);
-        document.getElementById('clear-classBtn')?.addEventListener('click', clearAllClassifications);
-    }
-    
-    // --- 核心邏輯 ---
-    async function loadProjectsWithPermission() {
-        try {
-            showLoading(true, '載入專案列表...');
-            // 呼叫 firebase-config.js 中具備權限的函式
-            const allMyProjects = await loadProjects(); 
-            const userEmail = auth.currentUser.email;
+        const currentUser = firebase.auth().currentUser;
+        const db = firebase.firestore();
 
-            // 在前端再次篩選，只留下有權限匯入標單的專案
-            projectsWithPermission = allMyProjects.filter(project => {
-                const memberInfo = project.members[userEmail];
-                return memberInfo && (memberInfo.role === 'owner' || (memberInfo.role === 'editor' && memberInfo.permissions.canAccessTenders === true));
-            });
+        // --- 啟動初始化 ---
+        initializePage();
 
-            updateProjectOptions();
-        } catch (error) {
-            showAlert('載入專案失敗: ' + error.message, 'error');
-        } finally {
-            showLoading(false);
+        async function initializePage() {
+            if (!currentUser) return showAlert("無法獲取用戶資訊", "error");
+            setupEventListeners();
+            await loadProjectsWithPermission();
         }
-    }
 
-    function updateProjectOptions() {
-        const projectSelect = document.getElementById('projectSelectForImport');
-        if (!projectSelect) return;
-        projectSelect.innerHTML = '<option value="">請選擇要匯入的專案</option>';
-        if (projectsWithPermission.length === 0) {
-            projectSelect.innerHTML += '<option value="" disabled>您沒有可匯入標單的專案</option>';
-        } else {
-            projectsWithPermission.forEach(project => {
-                projectSelect.innerHTML += `<option value="${project.id}">${project.name}</option>`;
-            });
-        }
-    }
-
-    function handleFileSelect(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        if (!file.name.match(/\.(xls|xlsx)$/i)) return showAlert('請選擇 EXCEL 檔案 (.xls 或 .xlsx)', 'error');
-        if (file.size > 10 * 1024 * 1024) return showAlert('檔案大小不能超過 10MB', 'error');
-
-        selectedFile = file;
-        document.getElementById('tenderName').value = file.name.replace(/\.(xls|xlsx)$/i, '');
-        showAlert(`檔案 "${file.name}" 已選擇`, 'success');
-        setActiveStep(2);
-        document.getElementById('uploadSection').style.display = 'none';
-        document.getElementById('parseSection').style.display = 'block';
-        readExcelFile(file);
-    }
-
-    function readExcelFile(file) {
-        showLoading(true, '讀取 EXCEL 檔案...');
-        const reader = new FileReader();
-        reader.onload = (e) => {
+        // --- (A) 載入專案 ---
+        async function loadProjectsWithPermission() {
+            showLoading(true, '載入專案中...');
             try {
-                workbook = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-                const worksheetSelect = document.getElementById('worksheetSelect');
-                worksheetSelect.innerHTML = '';
-                workbook.SheetNames.forEach(name => worksheetSelect.innerHTML += `<option value="${name}">${name}</option>`);
-                showAlert('EXCEL 檔案讀取成功', 'success');
+                let allMyProjects = [];
+                if (typeof loadProjects === 'function') {
+                    allMyProjects = await loadProjects();
+                } else {
+                    const snapshot = await db.collection('projects').get();
+                    allMyProjects = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                }
+                
+                projects = allMyProjects.filter(project => {
+                    if (project.members && project.members[currentUser.email]) return true;
+                    if (project.createdBy === currentUser.email) return true;
+                    return false;
+                });
+
+                populateSelect(document.getElementById('projectSelect'), projects, '請選擇專案...');
             } catch (error) {
-                showAlert('解析檔案失敗: ' + error.message, 'error');
+                console.error("載入專案失敗:", error);
+                showAlert('載入專案失敗', 'error');
             } finally {
                 showLoading(false);
             }
-        };
-        reader.readAsArrayBuffer(file);
-    }
+        }
 
-    function parseExcel() {
-        if (!workbook) return showAlert('請先選擇檔案', 'error');
-        const worksheetName = document.getElementById('worksheetSelect').value;
-        if (!worksheetName) return showAlert('請選擇工作表', 'error');
-
-        try {
-            showLoading(true, '解析 EXCEL 資料...');
-            const worksheet = workbook.Sheets[worksheetName];
-            const startRow = parseInt(document.getElementById('startRow').value) || 1;
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: startRow - 1, raw: false, defval: "" });
+        // --- (B) 專案變更 -> 載入標單 ---
+        async function onProjectChange(projectId) {
+            resetSelects('tender');
+            if (!projectId) return;
             
-            parsedData = [];
-            let currentMajorItem = null;
+            selectedProject = projects.find(p => p.id === projectId);
+            const tenderSelect = document.getElementById('tenderSelect');
+            tenderSelect.innerHTML = '<option value="">載入中...</option>';
+            tenderSelect.disabled = true;
 
-            jsonData.forEach((row, index) => {
-                const itemName = row[1] ? String(row[1]).trim() : '';
-                if (!itemName) return;
-                
-                const quantity = parseFloat(row[3]) || 0;
-                const unitPrice = parseFloat(String(row[4]).replace(/[^0-9.-]+/g,"")) || 0;
-                let totalPrice = parseFloat(String(row[5]).replace(/[^0-9.-]+/g,"")) || 0;
-                
-                if (totalPrice === 0 && quantity > 0 && unitPrice > 0) totalPrice = quantity * unitPrice;
-
-                const rowData = {
-                    rowNumber: startRow + index, type: 'other', sequence: row[0] || '', name: itemName,
-                    unit: row[2] || '', quantity: quantity, unitPrice: unitPrice,
-                    totalPrice: totalPrice, parentId: null
-                };
-                
-                if (isMajorItem(rowData.name, rowData.sequence)) {
-                    rowData.type = 'major';
-                    currentMajorItem = rowData;
-                } else if (currentMajorItem && rowData.name) {
-                    rowData.type = 'detail';
-                    rowData.parentId = currentMajorItem.rowNumber;
+            try {
+                let tenderDocs = [];
+                if (typeof safeFirestoreQuery === 'function') {
+                    const result = await safeFirestoreQuery("tenders", [{ field: "projectId", operator: "==", value: projectId }]);
+                    tenderDocs = result.docs;
+                } else {
+                    const snapshot = await db.collection('tenders')
+                        .where('projectId', '==', projectId)
+                        .get();
+                    tenderDocs = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
                 }
-                parsedData.push(rowData);
-            });
-            showLoading(false);
-            showAlert('EXCEL 解析完成', 'success');
-            setActiveStep(3);
-            document.getElementById('parseSection').style.display = 'none';
-            document.getElementById('previewSection').style.display = 'block';
-            updatePreview();
-        } catch (error) {
-            showAlert('解析失敗: ' + error.message, 'error');
-            showLoading(false);
-        }
-    }
 
-    function isMajorItem(name, sequence) {
-        if (!name && !sequence) return false;
-        const text = (String(sequence) + ' ' + name).trim();
-        
-        if (document.getElementById('ruleChineseNumber').checked && /^[一二三四五六七八九十]/.test(text)) return true;
-        if (document.getElementById('ruleHeavenlyStem').checked && /^[甲乙丙丁戊己庚辛壬癸]/.test(text)) return true;
-        if (document.getElementById('ruleRomanNumber').checked && /^[IVX]+\.?\s/.test(text)) return true;
-        if (document.getElementById('ruleCustomPattern').checked) {
-            const pattern = document.getElementById('customPattern').value;
-            if (pattern) try { if (new RegExp(pattern).test(text)) return true; } catch (e) { console.warn("自定義正則表達式錯誤"); }
-        }
-        return false;
-    }
+                tenders = tenderDocs;
+                tenders.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
-    function updatePreview() {
-        let totalAmount = 0, majorCount = 0, detailCount = 0;
-        const previewTable = document.getElementById('previewTable');
-        previewTable.innerHTML = `
-            <thead>
-                <tr>
-                    <th>行號</th><th>類型</th><th>項次</th><th>項目名稱</th><th>單位</th>
-                    <th>數量</th><th>單價</th><th>總價</th><th>操作</th>
-                </tr>
-            </thead>
-            <tbody></tbody>`;
-
-        const newTableBody = previewTable.querySelector('tbody');
-
-        parsedData.forEach((item, index) => {
-            if (item.type === 'major') majorCount++; else if (item.type === 'detail') detailCount++;
-            totalAmount += item.totalPrice || 0;
-            const newRow = newTableBody.insertRow();
-            newRow.innerHTML = `
-                <td>${item.rowNumber}</td>
-                <td><span class="item-type ${item.type}" data-index="${index}">${getTypeLabel(item.type)}</span></td>
-                <td>${item.sequence}</td>
-                <td>${item.name}</td>
-                <td>${item.unit}</td>
-                <td>${item.quantity}</td>
-                <td>${formatCurrency(item.unitPrice)}</td>
-                <td>${formatCurrency(item.totalPrice)}</td>
-                <td><button class="btn btn-danger btn-sm" data-index="${index}">刪除</button></td>`;
-            
-            newRow.querySelector('.item-type').onclick = () => toggleItemType(index);
-            newRow.querySelector('.btn-danger').onclick = () => removeItem(index);
-        });
-        
-        document.getElementById('summaryTotal').textContent = parsedData.length;
-        document.getElementById('summaryMajor').textContent = majorCount;
-        document.getElementById('summaryDetail').textContent = detailCount;
-        document.getElementById('summaryAmount').textContent = formatCurrency(totalAmount);
-    }
-
-    function getTypeLabel(type) { return { major: '大項目', detail: '細項', other: '其他' }[type]; }
-
-    function toggleItemType(index) {
-        const types = ['other', 'major', 'detail'];
-        const currentType = parsedData[index].type;
-        parsedData[index].type = types[(types.indexOf(currentType) + 1) % types.length];
-        updatePreview();
-    }
-
-    function removeItem(index) {
-        if (confirm('確定要刪除這個項目嗎？')) {
-            parsedData.splice(index, 1);
-            updatePreview();
-        }
-    }
-
-    function autoDetectMajorItems() {
-        let currentMajorItem = null;
-        parsedData.forEach(item => {
-            if (isMajorItem(item.name, item.sequence)) {
-                item.type = 'major'; item.parentId = null; currentMajorItem = item;
-            } else if (currentMajorItem && item.name) {
-                item.type = 'detail'; item.parentId = currentMajorItem.rowNumber;
-            } else {
-                item.type = 'other'; item.parentId = null;
+                populateSelect(tenderSelect, tenders, '請選擇標單...');
+            } catch (error) {
+                console.error("載入標單失敗:", error);
+                tenderSelect.innerHTML = '<option value="">載入失敗</option>';
             }
-        });
-        updatePreview();
-        showAlert('重新識別完成', 'success');
-    }
+        }
 
-    function clearAllClassifications() {
-        parsedData.forEach(item => { item.type = 'other'; item.parentId = null; });
-        updatePreview();
-    }
+        // --- (C) 標單變更 -> 載入資料 ---
+        async function onTenderChange(tenderId) {
+            resetSelects('majorItem');
+            if (!tenderId) return;
 
-    async function executeImport() {
-        const projectId = document.getElementById('projectSelectForImport').value;
-        const tenderName = document.getElementById('tenderName').value.trim();
-        if (!projectId) return showAlert('請選擇一個您有權限的專案', 'error');
-        if (!tenderName) return showAlert('請輸入標單名稱', 'error');
+            selectedTender = tenders.find(t => t.id === tenderId);
+            const majorItemSelect = document.getElementById('majorItemSelect');
+            majorItemSelect.innerHTML = '<option value="">載入中...</option>';
+            majorItemSelect.disabled = true;
 
-        try {
-            showLoading(true, '正在匯入資料到 Firebase...');
-            const totalAmount = parsedData.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
-            const tenderData = {
-                projectId, name: tenderName, contractorName: document.getElementById('contractorName').value.trim(),
-                code: `TENDER-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-4)}`,
-                totalAmount, tax: Math.round(totalAmount * 0.05), status: 'planning',
-                createdBy: auth.currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            showLoading(true, '載入資料中...');
+
+            try {
+                const queryConditions = [
+                    { field: 'tenderId', operator: '==', value: tenderId },
+                    { field: 'projectId', operator: '==', value: selectedProject.id }
+                ];
+
+                // 1. 載入大項與細項
+                let majorData, detailDataRaw;
+
+                if (typeof safeFirestoreQuery === 'function') {
+                    const [majorRes, detailRes] = await Promise.all([
+                        safeFirestoreQuery('majorItems', queryConditions),
+                        safeFirestoreQuery('detailItems', queryConditions)
+                    ]);
+                    majorData = majorRes.docs;
+                    detailDataRaw = detailRes.docs;
+                } else {
+                    const majorSnap = await db.collection('majorItems')
+                        .where('tenderId', '==', tenderId)
+                        .where('projectId', '==', selectedProject.id)
+                        .get();
+                    
+                    const detailSnap = await db.collection('detailItems')
+                        .where('tenderId', '==', tenderId)
+                        .where('projectId', '==', selectedProject.id)
+                        .get();
+
+                    majorData = majorSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                    detailDataRaw = detailSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                }
+
+                majorItems = majorData;
+                detailItems = detailDataRaw.filter(item => !item.isAddition);
+
+                majorItems.sort(naturalSequenceSort);
+                detailItems.sort(naturalSequenceSort);
+
+                populateSelect(majorItemSelect, majorItems, '所有大項目');
+
+                // 2. 嘗試載入採購單
+                try {
+                    let poData = [];
+                    if (typeof safeFirestoreQuery === 'function') {
+                         const poRes = await safeFirestoreQuery('purchaseOrders', queryConditions);
+                         poData = poRes.docs;
+                    } else {
+                        const poSnap = await db.collection('purchaseOrders')
+                            .where('tenderId', '==', tenderId)
+                            .where('projectId', '==', selectedProject.id)
+                            .get();
+                        poData = poSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                    }
+                    purchaseOrders = poData;
+                } catch (poError) {
+                    console.warn("⚠️ 採購單讀取失敗:", poError.message);
+                    purchaseOrders = [];
+                }
+
+                // 3. 嘗試載入報價單
+                try {
+                    let quoteData = [];
+                    if (typeof safeFirestoreQuery === 'function') {
+                        const quoteRes = await safeFirestoreQuery('quotations', queryConditions);
+                        quoteData = quoteRes.docs;
+                    } else {
+                        const quoteSnap = await db.collection('quotations')
+                            .where('tenderId', '==', tenderId)
+                            .where('projectId', '==', selectedProject.id)
+                            .get();
+                        quoteData = quoteSnap.docs.map(d => ({id: d.id, ...d.data()}));
+                    }
+                    quotations = quoteData;
+                } catch (quoteError) {
+                    console.warn("⚠️ 報價單讀取失敗:", quoteError.message);
+                    quotations = [];
+                }
+
+                document.getElementById('mainContent').style.display = 'block';
+                document.getElementById('emptyState').style.display = 'none';
+                
+                renderTable();
+                updateStats();
+
+            } catch (error) {
+                console.error("❌ 資料載入失敗:", error);
+                showAlert('載入失敗: ' + error.message, 'error');
+                majorItemSelect.innerHTML = '<option value="">載入失敗</option>';
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // --- (D) 渲染表格 ---
+        function renderTable() {
+            const tbody = document.getElementById('procurementTableBody');
+            const filterMajorId = document.getElementById('majorItemSelect').value;
+            
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            let targetMajorItems = majorItems;
+            if (filterMajorId) {
+                targetMajorItems = majorItems.filter(m => m.id === filterMajorId);
+            }
+
+            let hasAnyData = false;
+
+            // 第一階段：原始項目
+            targetMajorItems.forEach(major => {
+                const myDetails = detailItems.filter(d => d.majorItemId === major.id);
+
+                if (myDetails.length > 0) {
+                    hasAnyData = true;
+                    const headerRow = document.createElement('tr');
+                    headerRow.className = 'table-active';
+                    headerRow.innerHTML = `
+                        <td colspan="7" style="font-weight: bold; background-color: #f1f3f5; padding: 12px 15px;">
+                            ${major.sequence || ''} ${major.name || '未命名大項'}
+                        </td>
+                    `;
+                    tbody.appendChild(headerRow);
+
+                    myDetails.forEach(item => {
+                        const tr = createDetailRow(item);
+                        tbody.appendChild(tr);
+                    });
+                }
+            });
+
+            // 第二階段：額外項目
+            const allExtraQuotes = quotations.filter(q => q.isExtra);
+            if (allExtraQuotes.length > 0) {
+                let hasVisibleExtra = false;
+                targetMajorItems.forEach((major, index) => {
+                    const myExtraQuotes = allExtraQuotes.filter(q => q.majorItemId === major.id);
+                    if (myExtraQuotes.length > 0) {
+                        hasVisibleExtra = true;
+                        hasAnyData = true;
+                        const headerRow = document.createElement('tr');
+                        headerRow.style.borderTop = "3px double #dee2e6";
+                        headerRow.innerHTML = `
+                            <td colspan="7" style="font-weight: bold; background-color: #fff3cd; color: #856404; padding: 12px 15px;">
+                                ⚠️ ${major.sequence || ''} ${major.name || ''} (廠商額外新增)
+                            </td>
+                        `;
+                        tbody.appendChild(headerRow);
+                        myExtraQuotes.forEach(quote => {
+                            const tr = createExtraQuoteRow(quote);
+                            tbody.appendChild(tr);
+                        });
+                    }
+                });
+            }
+
+            if (!hasAnyData) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px;">沒有符合的項目資料</td></tr>';
+            }
+        }
+
+        function createDetailRow(item) {
+            const tr = document.createElement('tr');
+            
+            const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
+            const itemQuotes = quotations.filter(q => q.detailItemId === item.id && !q.isExtra);
+            
+            let statusText = '規劃中', statusClass = 'status-planning';
+            let currentStatusCode = 'planning';
+
+            if (itemPO) {
+                currentStatusCode = itemPO.status;
+                const statusMap = {
+                    'ordered': {t: '已下單', c: 'status-ordered'},
+                    'arrived': {t: '已到貨', c: 'status-arrived'},
+                    'installed': {t: '已安裝', c: 'status-installed'}
+                };
+                const s = statusMap[itemPO.status] || {t: itemPO.status, c: 'status-planning'};
+                statusText = s.t; statusClass = s.c;
+            }
+
+            let quotesHtml = '<span class="text-muted text-sm">-</span>';
+            if (itemQuotes.length > 0) {
+                quotesHtml = itemQuotes.map(q => 
+                    `<span class="quote-chip" title="${q.supplierName || q.supplier}">
+                        ${(q.supplierName || q.supplier || '').substring(0,4)}.. $${q.quotedUnitPrice || 0}
+                     </span>`
+                ).join('');
+            }
+
+            let qty = 0;
+            if (item.totalQuantity !== undefined && item.totalQuantity !== null) qty = Number(item.totalQuantity);
+            else if (item.quantity !== undefined && item.quantity !== null) qty = Number(item.quantity);
+            else if (item.qty !== undefined && item.qty !== null) qty = Number(item.qty);
+
+            let unitPrice = 0;
+            if (item.unitPrice !== undefined) unitPrice = item.unitPrice;
+            else if (item.cost !== undefined) unitPrice = item.cost;
+
+            tr.innerHTML = `
+                <td>${item.sequence || '-'}</td>
+                <td>
+                    <div style="font-weight:bold;">${item.name || '未命名'}</div>
+                    <div class="text-muted text-sm">${item.brand || ''} ${item.model || ''}</div>
+                </td>
+                <td>${item.unit || '-'}</td>
+                <td class="text-right">${qty}</td>
+                <td>
+                    <span class="order-chip ${statusClass}" 
+                          onclick="window.toggleStatus('${item.id}', '${currentStatusCode}')"
+                          title="點擊切換狀態">
+                        ${statusText}
+                    </span>
+                </td>
+                <td>${quotesHtml}</td>
+                <td class="text-right">${unitPrice ? parseInt(unitPrice).toLocaleString() : '-'}</td>
+            `;
+            return tr;
+        }
+
+        function createExtraQuoteRow(quote) {
+            const tr = document.createElement('tr');
+            tr.style.backgroundColor = '#fff9db';
+
+            const quotesHtml = `
+                <span class="quote-chip" style="border: 1px solid #f59f00; color: #f59f00;" title="${quote.supplierName}">
+                    ${(quote.supplierName || '').substring(0,4)}.. $${quote.quotedUnitPrice || 0}
+                </span>`;
+
+            tr.innerHTML = `
+                <td class="text-muted"><small>(額外)</small></td>
+                <td>
+                    <div style="font-weight:bold; color: #d63384;">${quote.itemName || '額外項目'}</div>
+                    <div class="text-muted text-sm">${quote.remark || '(廠商新增項目)'}</div>
+                </td>
+                <td>${quote.itemUnit || '-'}</td>
+                <td class="text-right">${quote.itemQty || 1}</td>
+                <td><span class="text-muted text-sm">-</span></td>
+                <td>${quotesHtml}</td>
+                <td class="text-right">-</td>
+            `;
+            return tr;
+        }
+
+        // --- (E) 事件綁定 ---
+        function setupEventListeners() {
+            const bind = (id, event, handler) => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener(event, handler);
             };
-            
-            const tenderRef = await db.collection('tenders').add(tenderData);
-            
-            const batch = db.batch();
-            const majorItems = parsedData.filter(item => item.type === 'major');
-            const detailItems = parsedData.filter(item => item.type === 'detail');
-            const majorItemMap = {};
 
-            majorItems.forEach(majorItem => {
-                const majorRef = db.collection('majorItems').doc();
-                // 【核心修正】在寫入 majorItems 時，一併寫入 projectId
-                batch.set(majorRef, { 
-                    projectId: projectId, 
-                    tenderId: tenderRef.id, 
-                    sequence: majorItem.sequence || '', 
-                    name: majorItem.name || '', 
-                    amount: majorItem.totalPrice || 0, 
-                    status: 'planning', 
-                    createdBy: auth.currentUser.email, 
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp() 
-                });
-                majorItemMap[majorItem.rowNumber] = majorRef.id;
-            });
-            detailItems.forEach(detailItem => {
-                const detailRef = db.collection('detailItems').doc();
-                // 【核心修正】在寫入 detailItems 時，也一併寫入 projectId
-                batch.set(detailRef, { 
-                    projectId: projectId,
-                    tenderId: tenderRef.id, 
-                    majorItemId: majorItemMap[detailItem.parentId] || null, 
-                    sequence: detailItem.sequence || '', 
-                    name: detailItem.name || '', 
-                    unitPrice: detailItem.unitPrice || 0, 
-                    totalPrice: detailItem.totalPrice || 0, 
-                    unit: detailItem.unit || '', 
-                    totalQuantity: detailItem.quantity || 0, 
-                    createdBy: auth.currentUser.email, 
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp() 
+            bind('projectSelect', 'change', (e) => onProjectChange(e.target.value));
+            bind('tenderSelect', 'change', (e) => onTenderChange(e.target.value));
+            bind('majorItemSelect', 'change', () => renderTable());
+            bind('exportRfqBtn', 'click', handleExportRFQ);
+            
+            bind('importQuotesBtn', 'click', () => document.getElementById('importQuotesInput')?.click());
+            bind('importQuotesInput', 'change', handleImportQuotes);
+            
+            // ✅ 管理報價按鈕
+            bind('manageQuotesBtn', 'click', openQuoteManager);
+
+            // Modal 關閉
+            document.querySelectorAll('[data-action="close-modal"]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const modal = btn.closest('.modal-overlay');
+                    if (modal) modal.style.display = 'none';
                 });
             });
-            await batch.commit();
 
-            showLoading(false);
-            showAlert(`成功匯入！創建了 ${majorItems.length} 個大項目和 ${detailItems.length} 個細項`, 'success');
+            window.toggleStatus = handleToggleStatus;
+            window.selectQuote = handleSelectQuote;
             
-            setTimeout(() => navigateTo('/program/tenders/list'), 2000);
-
-        } catch (error) {
-            console.error("❌ 匯入失敗:", error);
-            showAlert('匯入失敗: ' + error.message, 'error');
-            showLoading(false);
+            // 將刪除功能掛載到 window，以便 Modal 內的按鈕呼叫
+            window.deleteSupplierQuotes = deleteSupplierQuotes;
         }
-    }
 
-    // --- UI 流程控制 ---
-    function setActiveStep(stepNumber) {
-        for (let i = 1; i <= 4; i++) {
-            const step = document.getElementById(`step${i}`);
-            if(!step) continue;
-            if (i < stepNumber) step.className = 'step completed';
-            else if (i === stepNumber) step.className = 'step active';
-            else step.className = 'step inactive';
-        }
-    }
-    function backToUpload() {
-        setActiveStep(1);
-        document.getElementById('parseSection').style.display = 'none';
-        document.getElementById('previewSection').style.display = 'none';
-        document.getElementById('uploadSection').style.display = 'block';
-        selectedFile = workbook = null;
-        parsedData = [];
-        document.getElementById('fileInput').value = '';
-    }
-    function proceedToImport() {
-        if (parsedData.length === 0) return showAlert('沒有可匯入的資料', 'error');
-        setActiveStep(4);
-        document.getElementById('previewSection').style.display = 'none';
-        document.getElementById('importSection').style.display = 'block';
-    }
-    function backToPreview() {
-        setActiveStep(3);
-        document.getElementById('importSection').style.display = 'none';
-        document.getElementById('previewSection').style.display = 'block';
-    }
-    function showLoading(show, text = '處理中...') {
-        const loadingSection = document.getElementById('loadingSection');
-        if (loadingSection) {
-            loadingSection.style.display = show ? 'flex' : 'none';
-            document.getElementById('loadingText').textContent = text;
-        }
-    }
+        // --- (F) 功能函數 ---
 
-    // --- 頁面啟動點 ---
-    initializePage();
+        // 🔥 管理供應商報價 (Modal 邏輯)
+        function openQuoteManager() {
+            if (!quotations || quotations.length === 0) {
+                return showAlert('目前沒有任何報價紀錄', 'info');
+            }
+
+            // 1. 統計資料
+            const stats = {};
+            quotations.forEach(q => {
+                const supplier = q.supplierName || '未知供應商';
+                if (!stats[supplier]) {
+                    stats[supplier] = { count: 0, totalAmount: 0 };
+                }
+                
+                // 計算項目數
+                stats[supplier].count++;
+                
+                // 計算總金額 (預估)
+                let qty = 1;
+                if (q.isExtra) {
+                    qty = q.itemQty || 1;
+                } else {
+                    const detail = detailItems.find(d => d.id === q.detailItemId);
+                    if (detail) {
+                        if (detail.totalQuantity) qty = Number(detail.totalQuantity);
+                        else if (detail.quantity) qty = Number(detail.quantity);
+                    }
+                }
+                stats[supplier].totalAmount += (q.quotedUnitPrice || 0) * qty;
+            });
+
+            // 2. 渲染列表
+            const container = document.getElementById('quoteManagerList'); // 假設 Modal 裡有一個容器
+            // 如果找不到容器，我們嘗試插入到 Modal Body
+            const modalBody = document.querySelector('#manageQuotesModal .modal-body');
+            
+            if (!container && !modalBody) return showAlert('找不到 Modal 容器', 'error');
+
+            let html = `
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>供應商名稱</th>
+                            <th class="text-right">報價項目數</th>
+                            <th class="text-right">總金額(預估)</th>
+                            <th class="text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            Object.keys(stats).forEach(supplier => {
+                html += `
+                    <tr>
+                        <td>${supplier}</td>
+                        <td class="text-right">${stats[supplier].count}</td>
+                        <td class="text-right">$${parseInt(stats[supplier].totalAmount).toLocaleString()}</td>
+                        <td class="text-center">
+                            <button class="btn btn-danger btn-sm" onclick="deleteSupplierQuotes('${supplier}')">
+                                刪除
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            
+            if (container) container.innerHTML = html;
+            else modalBody.innerHTML = `<h5 class="mb-3">供應商列表</h5>` + html;
+
+            // 3. 顯示 Modal
+            document.getElementById('manageQuotesModal').style.display = 'flex';
+        }
+
+        // 🔥 刪除特定供應商的所有報價
+        async function deleteSupplierQuotes(supplierName) {
+            if (!confirm(`確定要刪除「${supplierName}」的所有報價嗎？此動作無法復原。`)) return;
+
+            showLoading(true, `正在刪除 ${supplierName} 的報價...`);
+
+            try {
+                // 找出該供應商在此標單的所有報價
+                const targetQuotes = quotations.filter(q => q.supplierName === supplierName);
+                
+                const batch = db.batch();
+                targetQuotes.forEach(q => {
+                    const ref = db.collection('quotations').doc(q.id);
+                    batch.delete(ref);
+                });
+
+                await batch.commit();
+                
+                showAlert(`已刪除 ${supplierName} 的所有報價`, 'success');
+                document.getElementById('manageQuotesModal').style.display = 'none';
+                
+                // 重新載入
+                await onTenderChange(selectedTender.id);
+
+            } catch (error) {
+                console.error("刪除失敗:", error);
+                showAlert("刪除失敗: " + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 匯入 (v20 邏輯)
+        async function handleImportQuotes(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
+
+                const supplierName = prompt("請輸入此報價單的供應商名稱：");
+                if (!supplierName || supplierName.trim() === "") {
+                    showAlert("已取消匯入 (未輸入供應商)", "info");
+                    e.target.value = '';
+                    return;
+                }
+
+                showLoading(true, `正在解析 ${file.name}...`);
+
+                const data = await file.arrayBuffer();
+                const workbook = XLSX.read(data);
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                const batch = db.batch();
+                let matchCount = 0;
+                let extraCount = 0;
+                let operationCounter = 0;
+                let batches = []; 
+                let currentBatch = db.batch();
+                let currentMajorItem = null;
+
+                jsonData.forEach(row => {
+                    const seqCol = row['項次'] ? String(row['項次']).trim() : '';
+                    const nameCol = row['項目名稱'] ? String(row['項目名稱']).trim() : '';
+                    const priceRaw = row['供應商報價(單價)'] || row['單價'] || 0;
+                    
+                    const foundMajor = majorItems.find(m => {
+                        const majorKey = `${m.sequence || ''} ${m.name || ''}`.trim();
+                        return seqCol.includes(majorKey) || seqCol.replace('.','').includes(majorKey.replace('.',''));
+                    });
+
+                    if (foundMajor) {
+                        currentMajorItem = foundMajor;
+                        return;
+                    }
+
+                    if (!currentMajorItem || (!seqCol && !nameCol)) return;
+
+                    const targetItem = detailItems.find(item => 
+                        item.majorItemId === currentMajorItem.id && 
+                        String(item.sequence).trim() === seqCol && 
+                        String(item.name).trim() === nameCol
+                    );
+
+                    if (priceRaw > 0) {
+                        const price = Number(priceRaw);
+                        const newQuoteRef = db.collection('quotations').doc();
+                        let quoteData = {};
+
+                        if (targetItem) {
+                            quoteData = {
+                                projectId: selectedProject.id,
+                                tenderId: selectedTender.id,
+                                detailItemId: targetItem.id,
+                                majorItemId: currentMajorItem.id,
+                                supplierName: supplierName.trim(),
+                                quotedUnitPrice: price,
+                                isExtra: false,
+                                remark: row['備註'] || '',
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            };
+                            matchCount++;
+                        } else {
+                            quoteData = {
+                                projectId: selectedProject.id,
+                                tenderId: selectedTender.id,
+                                detailItemId: null,
+                                majorItemId: currentMajorItem.id,
+                                supplierName: supplierName.trim(),
+                                quotedUnitPrice: price,
+                                isExtra: true,
+                                itemName: nameCol || '未命名額外項',
+                                itemUnit: row['單位'] || '',
+                                itemQty: row['數量'] || 1,
+                                remark: row['備註'] || '',
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            };
+                            extraCount++;
+                        }
+
+                        currentBatch.set(newQuoteRef, quoteData);
+                        operationCounter++;
+
+                        if (operationCounter >= 450) {
+                            batches.push(currentBatch.commit());
+                            currentBatch = db.batch();
+                            operationCounter = 0;
+                        }
+                    }
+                });
+
+                if (operationCounter > 0) batches.push(currentBatch.commit());
+                await Promise.all(batches);
+
+                showAlert(`匯入完成！匹配 ${matchCount} 筆，額外新增 ${extraCount} 筆`, 'success');
+                await onTenderChange(selectedTender.id);
+
+            } catch (error) {
+                console.error("匯入失敗:", error);
+                showAlert("匯入失敗: " + error.message, 'error');
+            } finally {
+                e.target.value = '';
+                showLoading(false);
+            }
+        }
+
+        async function handleToggleStatus(itemId, currentStatus) {
+            const statusCycle = {
+                'planning': 'ordered',
+                'ordered': 'arrived',
+                'arrived': 'installed',
+                'installed': 'planning'
+            };
+
+            const nextStatus = statusCycle[currentStatus] || 'ordered';
+            const itemPO = purchaseOrders.find(po => po.detailItemId === itemId);
+
+            showLoading(true, '更新狀態中...');
+
+            try {
+                if (nextStatus === 'planning') {
+                    if (itemPO) {
+                        await db.collection('purchaseOrders').doc(itemPO.id).delete();
+                    }
+                } else {
+                    const poData = {
+                        status: nextStatus,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+
+                    if (itemPO) {
+                        await db.collection('purchaseOrders').doc(itemPO.id).update(poData);
+                    } else {
+                        const newItem = detailItems.find(i => i.id === itemId);
+                        await db.collection('purchaseOrders').add({
+                            projectId: selectedProject.id,
+                            tenderId: selectedTender.id,
+                            detailItemId: itemId,
+                            majorItemId: newItem ? newItem.majorItemId : null,
+                            status: nextStatus,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            ...poData
+                        });
+                    }
+                }
+                await onTenderChange(selectedTender.id);
+            } catch (error) {
+                console.error("狀態更新失敗:", error);
+                showAlert("狀態更新失敗: " + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function handleSelectQuote(quoteId) {
+            console.log("選擇報價:", quoteId);
+        }
+
+        function handleExportRFQ() {
+            if (!selectedTender) return showAlert('請先選擇標單', 'warning');
+            if (detailItems.length === 0) return showAlert('目前沒有項目可匯出', 'warning');
+
+            try {
+                if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
+
+                const exportData = [];
+
+                majorItems.forEach(major => {
+                    const myDetails = detailItems.filter(d => d.majorItemId === major.id);
+
+                    if (myDetails.length > 0) {
+                        exportData.push({
+                            '項次': `${major.sequence || ''} ${major.name || ''}`,
+                            '項目名稱': '',
+                            '說明(廠牌/型號)': '',
+                            '單位': '',
+                            '數量': '',
+                            '供應商報價(單價)': '',
+                            '小計(複價)': '',
+                            '備註': ''
+                        });
+
+                        myDetails.forEach(item => {
+                            let qty = 0;
+                            if (item.totalQuantity !== undefined && item.totalQuantity !== null) qty = Number(item.totalQuantity);
+                            else if (item.quantity !== undefined && item.quantity !== null) qty = Number(item.quantity);
+                            else if (item.qty !== undefined && item.qty !== null) qty = Number(item.qty);
+
+                            exportData.push({
+                                '項次': item.sequence || '',
+                                '項目名稱': item.name || '',
+                                '說明(廠牌/型號)': `${item.brand || ''} ${item.model || ''}`.trim(),
+                                '單位': item.unit || '',
+                                '數量': qty, 
+                                '供應商報價(單價)': '',
+                                '小計(複價)': '', 
+                                '備註': ''
+                            });
+                        });
+                    }
+                });
+
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(exportData);
+
+                ws['!cols'] = [
+                    {wch: 15}, {wch: 30}, {wch: 25}, {wch: 8}, {wch: 10}, 
+                    {wch: 15}, {wch: 15}, {wch: 20}
+                ];
+
+                XLSX.utils.book_append_sheet(wb, ws, "詢價單");
+                const filename = `${selectedProject.name}_${selectedTender.name}_詢價單.xlsx`;
+                XLSX.writeFile(wb, filename);
+
+            } catch (error) {
+                console.error("匯出失敗:", error);
+                showAlert("匯出失敗: " + error.message, 'error');
+            }
+        }
+
+        function handleDeleteOrder() {
+            // 這個按鈕應該是在 Modal 外的，目前暫時保留或隱藏
+            // 實際刪除功能已移至 Modal 內
+            openQuoteManager();
+        }
+
+        // --- 輔助函式 ---
+        function showLoading(show, msg) {
+            const el = document.getElementById('loading');
+            if(el) {
+                el.style.display = show ? 'flex' : 'none';
+                if(msg) el.querySelector('p').textContent = msg;
+            }
+        }
+
+        function populateSelect(select, items, defaultText) {
+            if(!select) return;
+            select.innerHTML = `<option value="">${defaultText}</option>` + 
+                items.map(i => `<option value="${i.id}">${i.sequence ? i.sequence + '.' : ''} ${i.name || i.code}</option>`).join('');
+            select.disabled = items.length === 0;
+        }
+
+        function resetSelects(level) {
+            if (level === 'project') {
+                document.getElementById('tenderSelect').innerHTML = '<option value="">請先選擇專案</option>';
+                document.getElementById('tenderSelect').disabled = true;
+                document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>';
+                document.getElementById('majorItemSelect').disabled = true;
+                document.getElementById('mainContent').style.display = 'none';
+                document.getElementById('emptyState').style.display = 'flex';
+            } else if (level === 'tender') {
+                document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>';
+            }
+        }
+        
+        function updateStats() {
+            const totalEl = document.getElementById('totalItemsCount');
+            if(totalEl) totalEl.textContent = detailItems.length;
+        }
+        
+        function showAlert(msg, type) {
+            alert(msg);
+        }
+
+        function naturalSequenceSort(a, b) {
+            const CHINESE_NUM_MAP = {
+                '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+                '壹': 1, '貳': 2, '參': 3, '肆': 4, '伍': 5, '陸': 6, '柒': 7, '捌': 8, '玖': 9, '拾': 10,
+                '甲': 1, '乙': 2, '丙': 3, '丁': 4, '戊': 5, '己': 6, '庚': 7, '辛': 8, '壬': 9, '癸': 10
+            };
+            const seqA = String(a.sequence || '');
+            const seqB = String(b.sequence || '');
+            const valA = CHINESE_NUM_MAP[seqA] || seqA;
+            const valB = CHINESE_NUM_MAP[seqB] || seqB;
+            const numA = parseFloat(valA);
+            const numB = parseFloat(valB);
+            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+            return seqA.localeCompare(seqB, undefined, {numeric: true, sensitivity: 'base'});
+        }
+    });
 }
