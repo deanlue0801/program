@@ -1,12 +1,12 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v16.0 (排序優化版)
- * 修正：
- * 1. 強化 naturalSequenceSort：支援中文數字 (一,二,三 / 壹,貳,參) 排序。
- * 2. 確保「下拉選單」與「表格內容」都依照正確的項次順序排列。
- * 3. 維持 v15.0 的數量修正與追加減過濾邏輯。
+ * 標單採購管理 (tenders-procurement.js) - v17.0 (大項分組顯示版)
+ * 修正重點：
+ * 1. 【介面優化】表格改為「大項目分組」顯示，每個大項有獨立標題列 (參考 Detail 頁面)。
+ * 2. 只有當大項底下有細項時，才會顯示該大項標題。
+ * 3. 完整保留 v16 的數量修正、排序優化與狀態切換功能。
  */
 function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v16.0 排序優化版)...");
+    console.log("🚀 初始化採購管理頁面 (v17.0 大項分組版)...");
 
     // 1. 等待 HTML 元素
     function waitForElement(selector, callback) {
@@ -147,24 +147,14 @@ function initProcurementPage() {
                 }
 
                 majorItems = majorData;
+                
+                // 過濾掉追加減項目
                 detailItems = detailDataRaw.filter(item => !item.isAddition);
 
-                // ✅ 關鍵：套用增強版排序
+                // 排序
                 majorItems.sort(naturalSequenceSort);
-                
-                // 細項也跟著排 (先依大項順序，再依細項 sequence)
-                detailItems.sort((a, b) => {
-                    // 1. 先比對大項順序
-                    const majorA = majorItems.find(m => m.id === a.majorItemId);
-                    const majorB = majorItems.find(m => m.id === b.majorItemId);
-                    const indexA = majorA ? majorItems.indexOf(majorA) : 9999;
-                    const indexB = majorB ? majorItems.indexOf(majorB) : 9999;
-                    
-                    if (indexA !== indexB) return indexA - indexB;
-
-                    // 2. 同大項內，比對細項 sequence
-                    return naturalSequenceSort(a, b);
-                });
+                // 細項排序: 先依sequence排序，分組時會再對應到各大項
+                detailItems.sort(naturalSequenceSort);
 
                 populateSelect(majorItemSelect, majorItems, '所有大項目');
 
@@ -208,6 +198,8 @@ function initProcurementPage() {
 
                 document.getElementById('mainContent').style.display = 'block';
                 document.getElementById('emptyState').style.display = 'none';
+                
+                // 🔥 渲染表格 (現在會自動分組)
                 renderTable();
                 updateStats();
 
@@ -220,82 +212,117 @@ function initProcurementPage() {
             }
         }
 
-        // --- (D) 渲染表格 ---
+        // --- (D) 渲染表格 (🔥 分組顯示邏輯) ---
         function renderTable() {
             const tbody = document.getElementById('procurementTableBody');
             const filterMajorId = document.getElementById('majorItemSelect').value;
             
             if (!tbody) return;
+            tbody.innerHTML = '';
 
-            const displayItems = filterMajorId 
-                ? detailItems.filter(i => i.majorItemId === filterMajorId) 
-                : detailItems;
-
-            if (displayItems.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px;">沒有資料</td></tr>';
-                return;
+            // 1. 決定要顯示哪些大項
+            let targetMajorItems = majorItems;
+            if (filterMajorId) {
+                targetMajorItems = majorItems.filter(m => m.id === filterMajorId);
             }
 
-            let html = '';
-            displayItems.forEach(item => {
-                const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
-                const itemQuotes = quotations.filter(q => q.detailItemId === item.id);
-                
-                let statusText = '規劃中', statusClass = 'status-planning';
-                let currentStatusCode = 'planning';
+            let hasAnyData = false;
 
-                if (itemPO) {
-                    currentStatusCode = itemPO.status;
-                    const statusMap = {
-                        'ordered': {t: '已下單', c: 'status-ordered'},
-                        'arrived': {t: '已到貨', c: 'status-arrived'},
-                        'installed': {t: '已安裝', c: 'status-installed'}
-                    };
-                    const s = statusMap[itemPO.status] || {t: itemPO.status, c: 'status-planning'};
-                    statusText = s.t; statusClass = s.c;
-                }
+            // 2. 依序遍歷大項 (外層迴圈)
+            targetMajorItems.forEach(major => {
+                // 找出該大項底下的所有細項
+                const myDetails = detailItems.filter(d => d.majorItemId === major.id);
 
-                let quotesHtml = '<span class="text-muted text-sm">-</span>';
-                if (itemQuotes.length > 0) {
-                    quotesHtml = itemQuotes.map(q => 
-                        `<span class="quote-chip" title="${q.supplier}">
-                            ${(q.supplier||'').substring(0,4)}.. $${q.quotedUnitPrice || 0}
-                         </span>`
-                    ).join('');
-                }
+                if (myDetails.length > 0) {
+                    hasAnyData = true;
 
-                let qty = 0;
-                if (item.totalQuantity !== undefined && item.totalQuantity !== null) qty = Number(item.totalQuantity);
-                else if (item.quantity !== undefined && item.quantity !== null) qty = Number(item.quantity);
-                else if (item.qty !== undefined && item.qty !== null) qty = Number(item.qty);
-
-                // 成本單價
-                let unitPrice = 0;
-                if (item.unitPrice !== undefined) unitPrice = item.unitPrice;
-                else if (item.cost !== undefined) unitPrice = item.cost;
-
-                html += `
-                    <tr>
-                        <td>${item.sequence || '-'}</td>
-                        <td>
-                            <div style="font-weight:bold;">${item.name || '未命名'}</div>
-                            <div class="text-muted text-sm">${item.brand || ''} ${item.model || ''}</div>
+                    // (A) 插入大項標題列
+                    // 使用 colspan="7" 跨越所有欄位，並加上背景色
+                    const headerRow = document.createElement('tr');
+                    headerRow.className = 'table-active'; // Bootstrap 灰色背景
+                    headerRow.innerHTML = `
+                        <td colspan="7" style="font-weight: bold; background-color: #f1f3f5; padding: 12px 15px;">
+                            ${major.sequence || ''} ${major.name || '未命名大項'}
                         </td>
-                        <td>${item.unit || '-'}</td>
-                        <td class="text-right">${qty}</td>
-                        <td>
-                            <span class="order-chip ${statusClass}" 
-                                  onclick="window.toggleStatus('${item.id}', '${currentStatusCode}')"
-                                  title="點擊切換狀態">
-                                ${statusText}
-                            </span>
-                        </td>
-                        <td>${quotesHtml}</td>
-                        <td class="text-right">${unitPrice ? parseInt(unitPrice).toLocaleString() : '-'}</td>
-                    </tr>
-                `;
+                    `;
+                    tbody.appendChild(headerRow);
+
+                    // (B) 插入細項列 (內層迴圈)
+                    myDetails.forEach(item => {
+                        const tr = createDetailRow(item);
+                        tbody.appendChild(tr);
+                    });
+                }
             });
-            tbody.innerHTML = html;
+
+            // 處理沒有任何資料的情況
+            if (!hasAnyData) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px;">沒有符合的項目資料</td></tr>';
+            }
+        }
+
+        // 建立單一細項列的 HTML (抽離出來讓程式碼更整潔)
+        function createDetailRow(item) {
+            const tr = document.createElement('tr');
+            
+            const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
+            const itemQuotes = quotations.filter(q => q.detailItemId === item.id);
+            
+            // 狀態顯示
+            let statusText = '規劃中', statusClass = 'status-planning';
+            let currentStatusCode = 'planning';
+
+            if (itemPO) {
+                currentStatusCode = itemPO.status;
+                const statusMap = {
+                    'ordered': {t: '已下單', c: 'status-ordered'},
+                    'arrived': {t: '已到貨', c: 'status-arrived'},
+                    'installed': {t: '已安裝', c: 'status-installed'}
+                };
+                const s = statusMap[itemPO.status] || {t: itemPO.status, c: 'status-planning'};
+                statusText = s.t; statusClass = s.c;
+            }
+
+            // 報價顯示
+            let quotesHtml = '<span class="text-muted text-sm">-</span>';
+            if (itemQuotes.length > 0) {
+                quotesHtml = itemQuotes.map(q => 
+                    `<span class="quote-chip" title="${q.supplier}">
+                        ${(q.supplier||'').substring(0,4)}.. $${q.quotedUnitPrice || 0}
+                     </span>`
+                ).join('');
+            }
+
+            // 數量處理 (優先讀取 totalQuantity)
+            let qty = 0;
+            if (item.totalQuantity !== undefined && item.totalQuantity !== null) qty = Number(item.totalQuantity);
+            else if (item.quantity !== undefined && item.quantity !== null) qty = Number(item.quantity);
+            else if (item.qty !== undefined && item.qty !== null) qty = Number(item.qty);
+
+            // 單價處理
+            let unitPrice = 0;
+            if (item.unitPrice !== undefined) unitPrice = item.unitPrice;
+            else if (item.cost !== undefined) unitPrice = item.cost;
+
+            tr.innerHTML = `
+                <td>${item.sequence || '-'}</td>
+                <td>
+                    <div style="font-weight:bold;">${item.name || '未命名'}</div>
+                    <div class="text-muted text-sm">${item.brand || ''} ${item.model || ''}</div>
+                </td>
+                <td>${item.unit || '-'}</td>
+                <td class="text-right">${qty}</td>
+                <td>
+                    <span class="order-chip ${statusClass}" 
+                          onclick="window.toggleStatus('${item.id}', '${currentStatusCode}')"
+                          title="點擊切換狀態">
+                        ${statusText}
+                    </span>
+                </td>
+                <td>${quotesHtml}</td>
+                <td class="text-right">${unitPrice ? parseInt(unitPrice).toLocaleString() : '-'}</td>
+            `;
+            return tr;
         }
 
         // --- (E) 事件綁定 ---
@@ -484,31 +511,19 @@ function initProcurementPage() {
             alert(msg);
         }
 
-        // 🔥 增強版自然排序 (支援中文數字)
         function naturalSequenceSort(a, b) {
-            // 中文數字對照表
             const CHINESE_NUM_MAP = {
                 '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
                 '壹': 1, '貳': 2, '參': 3, '肆': 4, '伍': 5, '陸': 6, '柒': 7, '捌': 8, '玖': 9, '拾': 10,
                 '甲': 1, '乙': 2, '丙': 3, '丁': 4, '戊': 5, '己': 6, '庚': 7, '辛': 8, '壬': 9, '癸': 10
             };
-
             const seqA = String(a.sequence || '');
             const seqB = String(b.sequence || '');
-
-            // 1. 嘗試解析中文數字
             const valA = CHINESE_NUM_MAP[seqA] || seqA;
             const valB = CHINESE_NUM_MAP[seqB] || seqB;
-
-            // 2. 如果都是數字 (包含轉後的中文數字)，比大小
             const numA = parseFloat(valA);
             const numB = parseFloat(valB);
-            
-            if (!isNaN(numA) && !isNaN(numB)) {
-                return numA - numB;
-            }
-
-            // 3. 混合模式 (例如: 1-1, 1-2)
+            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
             return seqA.localeCompare(seqB, undefined, {numeric: true, sensitivity: 'base'});
         }
     });
