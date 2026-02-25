@@ -568,3 +568,248 @@ body.sidebar-open .sidebar-overlay { opacity: 1; visibility: visible; }
     .progress-management-page .progress-table .progress-status-select { flex-basis: 120px; padding: 4px 8px; }
     .progress-management-page .progress-table .photo-cell { justify-content: flex-end; gap: 0.5rem; }
 }
+/* =================================================================
+   ★ 標單編輯頁面專用樣式 (Tender Edit Page Styling) ★
+   ================================================================= */
+
+/* --- 1. 標單資訊抬頭卡片 (Header Info Cards) --- */
+.tender-header-card {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    margin-bottom: 25px;
+    border: 1px solid #e9ecef;
+}
+
+.tender-info-item {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 10px;
+    border-left: 4px solid #dee2e6; /* 左側裝飾線 */
+    padding-left: 15px;
+}
+
+.tender-info-item .label {
+    font-size: 13px;
+    color: #6c757d;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.tender-info-item .value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+.tender-info-item .value.large { font-size: 24px; color: var(--primary-color-start); }
+.tender-info-item .value.warning { color: #fd7e14; }
+.tender-info-item .value.success { color: var(--success-color); }
+
+/* --- 2. 大項目摺疊列表 (Major Item Accordion) --- */
+.major-item-wrapper {
+    margin-bottom: 15px;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.major-item-row {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    background: #f8f9fa;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-bottom: 1px solid transparent;
+}
+
+.major-item-row:hover {
+    background: #eef2f5;
+}
+
+.major-item-row.expanded {
+    background: #fff;
+    border-bottom: 1px solid #e9ecef;
+}
+
+/* 圓形編號 */
+.item-number-circle {
+    width: 32px;
+    height: 32px;
+    background: var(--primary-color-start);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+
+.item-name {
+    flex-grow: 1;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.item-analysis {
+    display: flex;
+    gap: 15px;
+    margin-right: 20px;
+    font-size: 14px;
+    color: #666;
+}
+
+.item-analysis .amount {
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+/* 展開箭頭動畫 */
+.item-expand-icon {
+    transition: transform 0.3s ease;
+    color: #adb5bd;
+}
+
+.major-item-row.expanded .item-expand-icon {
+    transform: rotate(90deg);
+    color: var(--primary-color-start);
+}
+
+/* --- 3. 細項內容容器與表格 (Detail Items) --- */
+.detail-items-container {
+    display: none;
+    padding: 0;
+    background: #fff;
+    animation: slideDown 0.3s ease-out;
+}
+
+.detail-items-container.expanded {
+    display: block;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.detail-items-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.detail-items-table th {
+    background: #f1f3f5;
+    padding: 10px 15px;
+    font-size: 13px;
+    color: #495057;
+    text-align: left;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.detail-items-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f1f3f5;
+    vertical-align: middle;
+    color: #333;
+    font-size: 14px;
+}
+
+.detail-items-table tr:last-child td { border-bottom: none; }
+.detail-items-table tr:hover { background-color: #f8faff; }
+
+/* 數字欄位靠右對齊 */
+.detail-items-table .number-cell {
+    text-align: right;
+    font-family: 'Consolas', 'Monaco', monospace; /* 讓數字對齊更好看 */
+    font-weight: 500;
+}
+
+/* 操作欄位靠中 */
+.detail-items-table .action-cell {
+    text-align: center;
+    width: 120px;
+}
+
+/* --- 4. 狀態指示條 (Status Bar) --- */
+/* 在 JS 中 renderDetailTable 函式裡有用到 .item-status-bar */
+.item-status-bar {
+    width: 4px;
+    height: 24px;
+    background-color: #dee2e6; /* 預設灰色 */
+    border-radius: 2px;
+    display: inline-block;
+}
+
+.item-status-bar.has-change {
+    background-color: #fd7e14; /* 橘色代表有變更 */
+    box-shadow: 0 0 4px rgba(253, 126, 20, 0.4);
+}
+
+.item-status-bar.is-zero {
+    background-color: #e9ecef; /* 淺灰代表數量為0 */
+}
+
+/* --- 5. 統計總覽卡片 (Summary Cards) --- */
+/* 修正原本 summary-grid 的排版 */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.summary-card {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: transform 0.2s;
+}
+
+.summary-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    border-color: var(--primary-color-start);
+}
+
+.summary-item-name {
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 5px;
+    border-bottom: 1px solid #f1f3f5;
+    padding-bottom: 5px;
+}
+
+.summary-detail {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #666;
+}
+
+.summary-detail.total {
+    margin-top: 5px;
+    padding-top: 5px;
+    border-top: 1px dashed #e9ecef;
+    font-weight: bold;
+    color: var(--primary-color-end);
+    font-size: 14px;
+}
+
+.summary-detail .success { color: var(--success-color); font-weight: bold; }
+.summary-detail .danger { color: var(--danger-color); font-weight: bold; }
