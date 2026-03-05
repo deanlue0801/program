@@ -1,5 +1,5 @@
 /**
- * 標單詳情頁 (tenders-detail.js) (SPA 版本) - v4.4 (表格欄位最終修正版)
+ * 標單詳情頁 (tenders-detail.js) (SPA 版本) - v5.0 (加入單價權重進度報表)
  */
 function initTenderDetailPage() {
     
@@ -7,11 +7,12 @@ function initTenderDetailPage() {
     let tenderId, projectId;
     let currentTender, currentProject;
     let majorItems = [], detailItems = [], allAdditionItems = [];
+    let allProgressItems = [], workItems = ['配管', '配線', '設備安裝', '測試']; // 新增進度與工項變數
     let allMajorItemsExpanded = false;
 
     // --- 初始化 ---
     async function initializePage() {
-        console.log("🚀 初始化標單詳情頁面 (v4.4)...");
+        console.log("🚀 初始化標單詳情頁面 (v5.0)...");
         ({ tenderId, projectId } = getUrlParams());
         
         if (!tenderId || !projectId) {
@@ -36,6 +37,7 @@ function initTenderDetailPage() {
             await loadTenderAndProjectDetails();
             await loadMajorAndDetailItems();
             await loadAllAdditionItems();
+            await loadProgressAndWorkItems(); // 新增：載入進度資料
 
             renderPage();
             setupEventListeners();
@@ -93,11 +95,34 @@ function initTenderDetailPage() {
         }
     }
 
+    // 新增：載入進度與工項資料
+    async function loadProgressAndWorkItems() {
+        try {
+            const [progressResult, workItemsResult] = await Promise.all([
+                safeFirestoreQuery('progressItems', [
+                    { field: 'tenderId', operator: '==', value: tenderId },
+                    { field: 'projectId', operator: '==', value: currentProject.id }
+                ]),
+                safeFirestoreQuery('workItems', [
+                    { field: 'tenderId', operator: '==', value: tenderId },
+                    { field: 'projectId', operator: '==', value: currentProject.id }
+                ])
+            ]);
+            allProgressItems = progressResult.docs;
+            if(workItemsResult.docs.length > 0 && workItemsResult.docs[0].items) {
+                workItems = workItemsResult.docs[0].items;
+            }
+        } catch (error) {
+            console.error("載入進度資料失敗:", error);
+        }
+    }
+
     // --- DOM 渲染 ---
     function renderPage() {
         renderHeader();
-        renderStats();
+        renderStatsAndProgress(); // 修改：合併統計與權重進度計算
         renderMajorItemsList();
+        renderProgressTab();      // 新增：渲染進度報表頁籤
         renderInfoTab();
     }
 
@@ -116,13 +141,134 @@ function initTenderDetailPage() {
         document.getElementById('distributionBtn').href = `/program/tenders/distribution?tenderId=${tenderId}&projectId=${projectId}`;
     }
     
-    function renderStats() {
-        const originalAmount = detailItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
-        const additionAmount = allAdditionItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
-        
-        document.getElementById('totalAmount').textContent = formatCurrency(originalAmount + additionAmount);
+    // 修改：計算單價權重進度並更新 UI
+    function renderStatsAndProgress() {
+        let totalTenderAmount = 0;
+        let totalEarnedAmount = 0;
+        let totalEquipmentCount = 0;
+        let completedEquipmentCount = 0;
+
+        // 計算各細項的金額與進度
+        detailItems.forEach(item => {
+            const relatedAdditions = allAdditionItems.filter(add => add.relatedItemId === item.id);
+            const additionalQuantity = relatedAdditions.reduce((sum, add) => sum + (add.totalQuantity || 0), 0);
+            const totalQuantity = (item.totalQuantity || 0) + additionalQuantity;
+            const itemTotalPrice = totalQuantity * (item.unitPrice || 0);
+            
+            totalTenderAmount += itemTotalPrice;
+            totalEquipmentCount += totalQuantity;
+
+            // 計算該細項的已獲取價值 (Earned Value)
+            let itemEarnedValue = 0;
+            let itemCompletedCount = 0;
+
+            for (let i = 1; i <= totalQuantity; i++) {
+                const uniqueId = `${item.id}-${i}`;
+                const progressItem = allProgressItems.find(p => p.uniqueId === uniqueId);
+                
+                if (progressItem && progressItem.workStatuses) {
+                    let completedSteps = 0;
+                    workItems.forEach(step => {
+                        if (progressItem.workStatuses[step] === '已完成') {
+                            completedSteps++;
+                        }
+                    });
+                    
+                    // 單一設備進度比例 (完成工項數 / 總工項數)
+                    const unitProgressRatio = completedSteps / workItems.length;
+                    itemEarnedValue += (item.unitPrice || 0) * unitProgressRatio;
+
+                    // 若全部工項皆完成，則算作一台完整設備
+                    if (unitProgressRatio === 1) {
+                        itemCompletedCount++;
+                    }
+                }
+            }
+            
+            totalEarnedAmount += itemEarnedValue;
+            completedEquipmentCount += itemCompletedCount;
+            
+            // 將計算結果暫存回 item 物件，供進度報表分組使用
+            item.calculatedTotalAmount = itemTotalPrice;
+            item.calculatedEarnedAmount = itemEarnedValue;
+        });
+
+        // 加入純追加項目(無關聯原項目)的總金額
+        const pureAdditions = allAdditionItems.filter(add => !add.relatedItemId);
+        pureAdditions.forEach(item => {
+             totalTenderAmount += (item.totalPrice || 0);
+        });
+
+        // 計算整體百分比
+        const overallProgressPercent = totalTenderAmount > 0 ? (totalEarnedAmount / totalTenderAmount) * 100 : 0;
+        const formattedProgress = overallProgressPercent.toFixed(1) + '%';
+
+        // 更新頂部統計數據
+        document.getElementById('totalAmount').textContent = formatCurrency(totalTenderAmount);
         document.getElementById('majorItemsCount').textContent = majorItems.length;
         document.getElementById('detailItemsCount').textContent = detailItems.length;
+        document.getElementById('overallProgress').textContent = formattedProgress;
+        document.getElementById('billingAmount').textContent = formatCurrency(totalEarnedAmount);
+        
+        // 更新總覽頁籤數據
+        const executionProgressEl = document.getElementById('executionProgress');
+        const billingProgressEl = document.getElementById('billingProgress');
+        if(executionProgressEl) executionProgressEl.textContent = formattedProgress;
+        if(billingProgressEl) billingProgressEl.textContent = formattedProgress;
+        
+        const equipmentCountEl = document.getElementById('equipmentCount');
+        const completedEquipmentEl = document.getElementById('completedEquipment');
+        if(equipmentCountEl) equipmentCountEl.textContent = totalEquipmentCount;
+        if(completedEquipmentEl) completedEquipmentEl.textContent = completedEquipmentCount;
+    }
+
+    // 新增：渲染進度報表頁籤 (依單價權重)
+    function renderProgressTab() {
+        const container = document.querySelector('#tab-progress .info-card');
+        if (!container) return;
+
+        if (majorItems.length === 0) {
+            container.innerHTML = `<h3>📈 進度報表</h3><div class="empty-state" style="padding: 40px;"><p>尚無工程大項資料。</p></div>`;
+            return;
+        }
+
+        let html = `<h3>📈 依工程大項進度報表 (單價權重基準)</h3>
+                    <table class="data-table" style="margin-top: 15px;">
+                        <thead>
+                            <tr>
+                                <th style="width: 30%;">工程大項</th>
+                                <th class="text-right" style="width: 20%;">合約金額</th>
+                                <th class="text-right" style="width: 20%;">可請款金額</th>
+                                <th style="width: 30%;">進度狀況</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+        majorItems.forEach(major => {
+            const itemsInMajor = detailItems.filter(d => d.majorItemId === major.id);
+            const majorTotalAmount = itemsInMajor.reduce((sum, item) => sum + (item.calculatedTotalAmount || 0), 0);
+            const majorEarnedAmount = itemsInMajor.reduce((sum, item) => sum + (item.calculatedEarnedAmount || 0), 0);
+            const progressPercent = majorTotalAmount > 0 ? (majorEarnedAmount / majorTotalAmount) * 100 : 0;
+            
+            html += `
+                <tr>
+                    <td><strong>${major.sequence || ''}. ${major.name}</strong></td>
+                    <td class="text-right">${formatCurrency(majorTotalAmount)}</td>
+                    <td class="text-right text-success"><strong>${formatCurrency(majorEarnedAmount)}</strong></td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="flex-grow: 1; background: #eee; height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div style="width: ${progressPercent}%; background: #4caf50; height: 100%;"></div>
+                            </div>
+                            <span style="font-size: 0.85em; width: 45px; text-align: right;">${progressPercent.toFixed(1)}%</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table>`;
+        container.innerHTML = html;
     }
 
     function renderMajorItemsList() {
@@ -152,7 +298,6 @@ function initTenderDetailPage() {
 
     function renderInfoTab() { /* ... */ }
 
-    // --- 【核心修正】重寫此函數，以符合您要的欄位順序 ---
     function buildDetailItemsTable(majorId) {
         const items = detailItems.filter(item => item.majorItemId === majorId);
         if (items.length === 0) {
@@ -160,12 +305,10 @@ function initTenderDetailPage() {
         }
 
         const rows = items.map(item => {
-            // 計算總數量 (合約數量 + 追加減數量)
             const relatedAdditions = allAdditionItems.filter(add => add.relatedItemId === item.id);
             const additionalQuantity = relatedAdditions.reduce((sum, add) => sum + (add.totalQuantity || 0), 0);
             const totalQuantity = (item.totalQuantity || 0) + additionalQuantity;
             
-            // 按照您指定的順序排列欄位
             return `
                 <tr>
                     <td>${item.sequence || ''}</td>
@@ -176,7 +319,6 @@ function initTenderDetailPage() {
                 </tr>`;
         }).join('');
 
-        // 產生符合您要求的表頭
         return `
             <table class="data-table">
                 <thead>
