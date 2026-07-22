@@ -148,40 +148,64 @@ function initImportPage() {
     }
 
     // 4. 解析 Sheet (Step 2 -> Step 3)
+    // 【修改點 1】智慧解析 Sheet（含跨行合併與嚴格大項判斷）
     function parseSelectedSheet() {
         if (!workbook) return;
         const sheetName = worksheetSelect.value;
         const worksheet = workbook.Sheets[sheetName];
         if (!worksheet) return;
-
+    
         const startRow = parseInt(startRowInput.value) || 1;
-        // 轉換為二維陣列
         const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
+    
         parsedData = [];
         let totalAmount = 0;
-
+    
         for (let i = startRow - 1; i < rawData.length; i++) {
             const row = rawData[i];
             if (!row || row.length === 0) continue;
-
+    
             const seq = String(row[0] || '').trim();
             const name = String(row[1] || '').trim();
             const spec = String(row[2] || '').trim();
             const unit = String(row[3] || '').trim();
-            const qty = parseFloat(row[4]) || 0;
-            const price = parseFloat(row[5]) || 0;
-            const amount = parseFloat(row[6]) || (qty * price);
-
+            
+            // 抓取數量與單價，若為非數字或空白則視為 null
+            const qtyRaw = row[4];
+            const priceRaw = row[5];
+            const amountRaw = row[6];
+    
+            const hasQuantity = qtyRaw !== undefined && qtyRaw !== null && String(qtyRaw).trim() !== '' && !isNaN(parseFloat(qtyRaw));
+            const qty = hasQuantity ? parseFloat(qtyRaw) : 0;
+            const price = parseFloat(priceRaw) || 0;
+            const amount = parseFloat(amountRaw) || (qty * price);
+    
+            // 如果連項次跟名稱都沒有，直接跳過
             if (!seq && !name) continue;
-
-            // 判斷是否為大項規則
-            const isMajor = checkIsMajorItem(seq, name);
-
+    
+            // --- 核心邏輯 1：處理 Excel 跨行（無項次、無數量的續行）---
+            if (!seq && !hasQuantity && parsedData.length > 0) {
+                // 抓取上一筆資料進行合併
+                const lastItem = parsedData[parsedData.length - 1];
+                if (name) {
+                    // 自動換行合併文字（加空格或換行）
+                    lastItem.name += ' ' + name;
+                }
+                if (spec) {
+                    lastItem.spec += (lastItem.spec ? ' ' : '') + spec;
+                }
+                continue; // 合併完畢，直接跳過此行不建立新項目
+            }
+    
+            // --- 核心邏輯 2：大項目嚴格判斷 ---
+            // 只有在「符合編號規則」且「沒有數量/金額」時，才是真正的分類大項
+            const isMajorPattern = checkIsMajorItem(seq, name);
+            const isMajor = isMajorPattern && !hasQuantity;
+    
             if (!isMajor) {
                 totalAmount += amount;
             }
-
+    
             parsedData.push({
                 id: i,
                 type: isMajor ? 'major' : 'detail',
@@ -191,20 +215,21 @@ function initImportPage() {
                 unit: unit,
                 qty: qty,
                 price: price,
-                amount: amount
+                amount: amount,
+                hasQuantity: hasQuantity
             });
         }
-
+    
         renderPreviewTable();
         switchStep(3);
     }
-
-    // 大項目判斷邏輯
+    
+    // 【修改點 2】優化大項目編號正則表達式
     function checkIsMajorItem(seq, name) {
         const fullStr = `${seq} ${name}`.trim();
-
-        if (ruleChineseNumber.checked && /^[一二三四五六七八九十壹貳參肆伍陸柒捌玖拾]+[、. ]/.test(fullStr)) return true;
-        if (ruleHeavenlyStem.checked && /^[甲乙丙丁戊己庚辛壬癸]+[、. ]/.test(fullStr)) return true;
+    
+        // 擴充正則，精準匹配 中文數字 / 天干地支 / 羅馬數字 / 括號數字
+        if (ruleChineseNumber.checked && /^([一二三四五六七八九十壹貳參肆伍陸柒捌玖拾]+[、. ]|[甲乙丙丁戊己庚辛壬癸]+[、. ])/.test(fullStr)) return true;
         if (ruleRomanNumber.checked && /^(I|II|III|IV|V|VI|VII|VIII|IX|X)+[、. ]/i.test(fullStr)) return true;
         
         if (ruleCustomPattern.checked && customPatternInput.value) {
@@ -217,7 +242,6 @@ function initImportPage() {
         }
         return false;
     }
-
     // 5. 渲染預覽表格
     function renderPreviewTable() {
         let majorCount = 0, detailCount = 0, totalAmt = 0;
