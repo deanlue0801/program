@@ -1,792 +1,407 @@
 /**
- * 標單採購管理 (tenders-procurement.js) - v22.0 (管理報價功能實作版)
- * 新增功能：
- * 1. 【管理供應商報價】實作 Modal 內的邏輯：
- * - 統計各供應商的報價項數與總金額。
- * - 提供「刪除特定供應商」所有報價的功能。
- * 2. 包含 v21 的分組顯示、匯入智慧分組、數量修正等所有功能。
+ * 匯入標單功能 (tenders-import.js) - v1.0
+ * 對應路由: /tenders/import
+ * 對應頁面: pages/tenders/import.html
  */
-function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v22.0 管理報價實作版)...");
+function initImportPage() {
+    console.log("🚀 初始化 Excel 匯入標單頁面...");
 
-    // 1. 等待 HTML 元素
-    function waitForElement(selector, callback) {
-        const element = document.querySelector(selector);
-        if (element) {
-            callback();
-            return;
+    // --- 全域變數設定 ---
+    let workbook = null;
+    let parsedData = []; // 儲存解析後的項目
+    let projects = [];
+    const db = firebase.firestore();
+    const currentUser = firebase.auth().currentUser;
+
+    // --- DOM 元素取得 ---
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const worksheetSelect = document.getElementById('worksheetSelect');
+    const startRowInput = document.getElementById('startRow');
+    const parseBtn = document.getElementById('parseBtn');
+    
+    const ruleChineseNumber = document.getElementById('ruleChineseNumber');
+    const ruleHeavenlyStem = document.getElementById('ruleHeavenlyStem');
+    const ruleRomanNumber = document.getElementById('ruleRomanNumber');
+    const ruleCustomPattern = document.getElementById('ruleCustomPattern');
+    const customPatternGroup = document.getElementById('customPatternGroup');
+    const customPatternInput = document.getElementById('customPattern');
+
+    const previewTable = document.getElementById('previewTable');
+    const proceedToImportBtn = document.getElementById('proceedToImportBtn');
+    const backToUploadBtn = document.getElementById('backToUploadBtn');
+    
+    const projectSelectForImport = document.getElementById('projectSelectForImport');
+    const tenderNameInput = document.getElementById('tenderName');
+    const contractorNameInput = document.getElementById('contractorName');
+    const backToPreviewBtn = document.getElementById('backToPreviewBtn');
+    const executeImportBtn = document.getElementById('executeImportBtn');
+
+    // Section 區塊
+    const uploadSection = document.getElementById('uploadSection');
+    const parseSection = document.getElementById('parseSection');
+    const previewSection = document.getElementById('previewSection');
+    const importSection = document.getElementById('importSection');
+
+    setupEventListeners();
+    loadProjects();
+
+    // 1. 事件綁定
+    function setupEventListeners() {
+        // (A) 檔案拖放與點擊上傳
+        if (uploadArea && fileInput) {
+            uploadArea.addEventListener('click', () => fileInput.click());
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#667eea';
+            });
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.style.borderColor = '#cbd5e0';
+            });
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#cbd5e0';
+                if (e.dataTransfer.files.length > 0) {
+                    handleFileSelect(e.dataTransfer.files[0]);
+                }
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileSelect(e.target.files[0]);
+                }
+            });
         }
-        const interval = setInterval(() => {
-            const element = document.querySelector(selector);
-            if (element) {
-                clearInterval(interval);
-                callback();
-            }
-        }, 100);
+
+        // 自定義正則表達式切換
+        if (ruleCustomPattern) {
+            ruleCustomPattern.addEventListener('change', (e) => {
+                customPatternGroup.style.display = e.target.checked ? 'block' : 'none';
+            });
+        }
+
+        // 按鈕流程切換
+        if (parseBtn) parseBtn.addEventListener('click', parseSelectedSheet);
+        if (backToUploadBtn) backToUploadBtn.addEventListener('click', () => switchStep(1));
+        if (proceedToImportBtn) proceedToImportBtn.addEventListener('click', () => switchStep(4));
+        if (backToPreviewBtn) backToPreviewBtn.addEventListener('click', () => switchStep(3));
+        if (executeImportBtn) executeImportBtn.addEventListener('click', executeImport);
+
+        // 重新識別與清除按鈕
+        const reDetectBtn = document.getElementById('re-detectBtn');
+        if (reDetectBtn) reDetectBtn.addEventListener('click', parseSelectedSheet);
+
+        const clearClassBtn = document.getElementById('clear-classBtn');
+        if (clearClassBtn) {
+            clearClassBtn.addEventListener('click', () => {
+                parsedData.forEach(item => item.type = 'detail');
+                renderPreviewTable();
+            });
+        }
     }
 
-    waitForElement('#projectSelect', () => {
-        console.log("✅ HTML 元素已就緒，開始執行...");
+    // 2. 步驟切換器
+    function switchStep(stepNum) {
+        [1, 2, 3, 4].forEach(i => {
+            const stepEl = document.getElementById(`step${i}`);
+            if (stepEl) {
+                stepEl.className = i === stepNum ? 'step active' : (i < stepNum ? 'step completed' : 'step inactive');
+            }
+        });
 
-        // --- 變數宣告 ---
-        let projects = [], tenders = [], majorItems = [], detailItems = [];
-        let purchaseOrders = [], quotations = [];
-        let selectedProject = null, selectedTender = null;
+        uploadSection.style.display = stepNum === 1 ? 'block' : 'none';
+        parseSection.style.display = stepNum === 2 ? 'block' : 'none';
+        previewSection.style.display = stepNum === 3 ? 'block' : 'none';
+        importSection.style.display = stepNum === 4 ? 'block' : 'none';
+    }
+
+    // 3. 處理選擇檔案 (Step 1 -> Step 2)
+    async function handleFileSelect(file) {
+        if (typeof XLSX === 'undefined') {
+            return showAlert('缺少 SheetJS (XLSX) 套件，請確認頁面已載入該函式庫', 'error');
+        }
+
+        showLoading(true, `讀取 ${file.name} 中...`);
+        try {
+            const data = await file.arrayBuffer();
+            workbook = XLSX.read(data, { type: 'array' });
+
+            worksheetSelect.innerHTML = '';
+            workbook.SheetNames.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                worksheetSelect.appendChild(opt);
+            });
+
+            // 設定預設標單名稱為檔名
+            if (tenderNameInput) {
+                tenderNameInput.value = file.name.replace(/\.[^/.]+$/, "");
+            }
+
+            switchStep(2);
+        } catch (err) {
+            console.error(err);
+            showAlert('檔案讀取失敗: ' + err.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // 4. 解析 Sheet (Step 2 -> Step 3)
+    function parseSelectedSheet() {
+        if (!workbook) return;
+        const sheetName = worksheetSelect.value;
+        const worksheet = workbook.Sheets[sheetName];
+        if (!worksheet) return;
+
+        const startRow = parseInt(startRowInput.value) || 1;
+        // 轉換為二維陣列
+        const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        parsedData = [];
+        let totalAmount = 0;
+
+        for (let i = startRow - 1; i < rawData.length; i++) {
+            const row = rawData[i];
+            if (!row || row.length === 0) continue;
+
+            const seq = String(row[0] || '').trim();
+            const name = String(row[1] || '').trim();
+            const spec = String(row[2] || '').trim();
+            const unit = String(row[3] || '').trim();
+            const qty = parseFloat(row[4]) || 0;
+            const price = parseFloat(row[5]) || 0;
+            const amount = parseFloat(row[6]) || (qty * price);
+
+            if (!seq && !name) continue;
+
+            // 判斷是否為大項規則
+            const isMajor = checkIsMajorItem(seq, name);
+
+            if (!isMajor) {
+                totalAmount += amount;
+            }
+
+            parsedData.push({
+                id: i,
+                type: isMajor ? 'major' : 'detail',
+                seq: seq,
+                name: name,
+                spec: spec,
+                unit: unit,
+                qty: qty,
+                price: price,
+                amount: amount
+            });
+        }
+
+        renderPreviewTable();
+        switchStep(3);
+    }
+
+    // 大項目判斷邏輯
+    function checkIsMajorItem(seq, name) {
+        const fullStr = `${seq} ${name}`.trim();
+
+        if (ruleChineseNumber.checked && /^[一二三四五六七八九十壹貳參肆伍陸柒捌玖拾]+[、. ]/.test(fullStr)) return true;
+        if (ruleHeavenlyStem.checked && /^[甲乙丙丁戊己庚辛壬癸]+[、. ]/.test(fullStr)) return true;
+        if (ruleRomanNumber.checked && /^(I|II|III|IV|V|VI|VII|VIII|IX|X)+[、. ]/i.test(fullStr)) return true;
         
-        const currentUser = firebase.auth().currentUser;
-        const db = firebase.firestore();
-
-        // --- 啟動初始化 ---
-        initializePage();
-
-        async function initializePage() {
-            if (!currentUser) return showAlert("無法獲取用戶資訊", "error");
-            setupEventListeners();
-            await loadProjectsWithPermission();
-        }
-
-        // --- (A) 載入專案 ---
-        async function loadProjectsWithPermission() {
-            showLoading(true, '載入專案中...');
+        if (ruleCustomPattern.checked && customPatternInput.value) {
             try {
-                let allMyProjects = [];
-                if (typeof loadProjects === 'function') {
-                    allMyProjects = await loadProjects();
-                } else {
-                    const snapshot = await db.collection('projects').get();
-                    allMyProjects = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
-                }
-                
-                projects = allMyProjects.filter(project => {
-                    if (project.members && project.members[currentUser.email]) return true;
-                    if (project.createdBy === currentUser.email) return true;
-                    return false;
-                });
-
-                populateSelect(document.getElementById('projectSelect'), projects, '請選擇專案...');
-            } catch (error) {
-                console.error("載入專案失敗:", error);
-                showAlert('載入專案失敗', 'error');
-            } finally {
-                showLoading(false);
+                const reg = new RegExp(customPatternInput.value);
+                if (reg.test(fullStr)) return true;
+            } catch (e) {
+                console.warn('無效的正則表達式');
             }
         }
+        return false;
+    }
 
-        // --- (B) 專案變更 -> 載入標單 ---
-        async function onProjectChange(projectId) {
-            resetSelects('tender');
-            if (!projectId) return;
-            
-            selectedProject = projects.find(p => p.id === projectId);
-            const tenderSelect = document.getElementById('tenderSelect');
-            tenderSelect.innerHTML = '<option value="">載入中...</option>';
-            tenderSelect.disabled = true;
+    // 5. 渲染預覽表格
+    function renderPreviewTable() {
+        let majorCount = 0, detailCount = 0, totalAmt = 0;
 
-            try {
-                let tenderDocs = [];
-                if (typeof safeFirestoreQuery === 'function') {
-                    const result = await safeFirestoreQuery("tenders", [{ field: "projectId", operator: "==", value: projectId }]);
-                    tenderDocs = result.docs;
-                } else {
-                    const snapshot = await db.collection('tenders')
-                        .where('projectId', '==', projectId)
-                        .get();
-                    tenderDocs = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
-                }
+        let html = `
+            <thead>
+                <tr>
+                    <th>類型</th>
+                    <th>項次</th>
+                    <th>項目名稱</th>
+                    <th>規格說明</th>
+                    <th>單位</th>
+                    <th>數量</th>
+                    <th>單價</th>
+                    <th>複價</th>
+                </tr>
+            </thead>
+            <tbody>
+        `;
 
-                tenders = tenderDocs;
-                tenders.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-
-                populateSelect(tenderSelect, tenders, '請選擇標單...');
-            } catch (error) {
-                console.error("載入標單失敗:", error);
-                tenderSelect.innerHTML = '<option value="">載入失敗</option>';
-            }
-        }
-
-        // --- (C) 標單變更 -> 載入資料 ---
-        async function onTenderChange(tenderId) {
-            resetSelects('majorItem');
-            if (!tenderId) return;
-
-            selectedTender = tenders.find(t => t.id === tenderId);
-            const majorItemSelect = document.getElementById('majorItemSelect');
-            majorItemSelect.innerHTML = '<option value="">載入中...</option>';
-            majorItemSelect.disabled = true;
-
-            showLoading(true, '載入資料中...');
-
-            try {
-                const queryConditions = [
-                    { field: 'tenderId', operator: '==', value: tenderId },
-                    { field: 'projectId', operator: '==', value: selectedProject.id }
-                ];
-
-                // 1. 載入大項與細項
-                let majorData, detailDataRaw;
-
-                if (typeof safeFirestoreQuery === 'function') {
-                    const [majorRes, detailRes] = await Promise.all([
-                        safeFirestoreQuery('majorItems', queryConditions),
-                        safeFirestoreQuery('detailItems', queryConditions)
-                    ]);
-                    majorData = majorRes.docs;
-                    detailDataRaw = detailRes.docs;
-                } else {
-                    const majorSnap = await db.collection('majorItems')
-                        .where('tenderId', '==', tenderId)
-                        .where('projectId', '==', selectedProject.id)
-                        .get();
-                    
-                    const detailSnap = await db.collection('detailItems')
-                        .where('tenderId', '==', tenderId)
-                        .where('projectId', '==', selectedProject.id)
-                        .get();
-
-                    majorData = majorSnap.docs.map(d => ({id: d.id, ...d.data()}));
-                    detailDataRaw = detailSnap.docs.map(d => ({id: d.id, ...d.data()}));
-                }
-
-                majorItems = majorData;
-                detailItems = detailDataRaw.filter(item => !item.isAddition);
-
-                majorItems.sort(naturalSequenceSort);
-                detailItems.sort(naturalSequenceSort);
-
-                populateSelect(majorItemSelect, majorItems, '所有大項目');
-
-                // 2. 嘗試載入採購單
-                try {
-                    let poData = [];
-                    if (typeof safeFirestoreQuery === 'function') {
-                         const poRes = await safeFirestoreQuery('purchaseOrders', queryConditions);
-                         poData = poRes.docs;
-                    } else {
-                        const poSnap = await db.collection('purchaseOrders')
-                            .where('tenderId', '==', tenderId)
-                            .where('projectId', '==', selectedProject.id)
-                            .get();
-                        poData = poSnap.docs.map(d => ({id: d.id, ...d.data()}));
-                    }
-                    purchaseOrders = poData;
-                } catch (poError) {
-                    console.warn("⚠️ 採購單讀取失敗:", poError.message);
-                    purchaseOrders = [];
-                }
-
-                // 3. 嘗試載入報價單
-                try {
-                    let quoteData = [];
-                    if (typeof safeFirestoreQuery === 'function') {
-                        const quoteRes = await safeFirestoreQuery('quotations', queryConditions);
-                        quoteData = quoteRes.docs;
-                    } else {
-                        const quoteSnap = await db.collection('quotations')
-                            .where('tenderId', '==', tenderId)
-                            .where('projectId', '==', selectedProject.id)
-                            .get();
-                        quoteData = quoteSnap.docs.map(d => ({id: d.id, ...d.data()}));
-                    }
-                    quotations = quoteData;
-                } catch (quoteError) {
-                    console.warn("⚠️ 報價單讀取失敗:", quoteError.message);
-                    quotations = [];
-                }
-
-                document.getElementById('mainContent').style.display = 'block';
-                document.getElementById('emptyState').style.display = 'none';
-                
-                renderTable();
-                updateStats();
-
-            } catch (error) {
-                console.error("❌ 資料載入失敗:", error);
-                showAlert('載入失敗: ' + error.message, 'error');
-                majorItemSelect.innerHTML = '<option value="">載入失敗</option>';
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        // --- (D) 渲染表格 ---
-        function renderTable() {
-            const tbody = document.getElementById('procurementTableBody');
-            const filterMajorId = document.getElementById('majorItemSelect').value;
-            
-            if (!tbody) return;
-            tbody.innerHTML = '';
-
-            let targetMajorItems = majorItems;
-            if (filterMajorId) {
-                targetMajorItems = majorItems.filter(m => m.id === filterMajorId);
-            }
-
-            let hasAnyData = false;
-
-            // 第一階段：原始項目
-            targetMajorItems.forEach(major => {
-                const myDetails = detailItems.filter(d => d.majorItemId === major.id);
-
-                if (myDetails.length > 0) {
-                    hasAnyData = true;
-                    const headerRow = document.createElement('tr');
-                    headerRow.className = 'table-active';
-                    headerRow.innerHTML = `
-                        <td colspan="7" style="font-weight: bold; background-color: #f1f3f5; padding: 12px 15px;">
-                            ${major.sequence || ''} ${major.name || '未命名大項'}
-                        </td>
-                    `;
-                    tbody.appendChild(headerRow);
-
-                    myDetails.forEach(item => {
-                        const tr = createDetailRow(item);
-                        tbody.appendChild(tr);
-                    });
-                }
-            });
-
-            // 第二階段：額外項目
-            const allExtraQuotes = quotations.filter(q => q.isExtra);
-            if (allExtraQuotes.length > 0) {
-                let hasVisibleExtra = false;
-                targetMajorItems.forEach((major, index) => {
-                    const myExtraQuotes = allExtraQuotes.filter(q => q.majorItemId === major.id);
-                    if (myExtraQuotes.length > 0) {
-                        hasVisibleExtra = true;
-                        hasAnyData = true;
-                        const headerRow = document.createElement('tr');
-                        headerRow.style.borderTop = "3px double #dee2e6";
-                        headerRow.innerHTML = `
-                            <td colspan="7" style="font-weight: bold; background-color: #fff3cd; color: #856404; padding: 12px 15px;">
-                                ⚠️ ${major.sequence || ''} ${major.name || ''} (廠商額外新增)
-                            </td>
-                        `;
-                        tbody.appendChild(headerRow);
-                        myExtraQuotes.forEach(quote => {
-                            const tr = createExtraQuoteRow(quote);
-                            tbody.appendChild(tr);
-                        });
-                    }
-                });
-            }
-
-            if (!hasAnyData) {
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding: 20px;">沒有符合的項目資料</td></tr>';
-            }
-        }
-
-        function createDetailRow(item) {
-            const tr = document.createElement('tr');
-            
-            const itemPO = purchaseOrders.find(po => po.detailItemId === item.id);
-            const itemQuotes = quotations.filter(q => q.detailItemId === item.id && !q.isExtra);
-            
-            let statusText = '規劃中', statusClass = 'status-planning';
-            let currentStatusCode = 'planning';
-
-            if (itemPO) {
-                currentStatusCode = itemPO.status;
-                const statusMap = {
-                    'ordered': {t: '已下單', c: 'status-ordered'},
-                    'arrived': {t: '已到貨', c: 'status-arrived'},
-                    'installed': {t: '已安裝', c: 'status-installed'}
-                };
-                const s = statusMap[itemPO.status] || {t: itemPO.status, c: 'status-planning'};
-                statusText = s.t; statusClass = s.c;
-            }
-
-            let quotesHtml = '<span class="text-muted text-sm">-</span>';
-            if (itemQuotes.length > 0) {
-                quotesHtml = itemQuotes.map(q => 
-                    `<span class="quote-chip" title="${q.supplierName || q.supplier}">
-                        ${(q.supplierName || q.supplier || '').substring(0,4)}.. $${q.quotedUnitPrice || 0}
-                     </span>`
-                ).join('');
-            }
-
-            let qty = 0;
-            if (item.totalQuantity !== undefined && item.totalQuantity !== null) qty = Number(item.totalQuantity);
-            else if (item.quantity !== undefined && item.quantity !== null) qty = Number(item.quantity);
-            else if (item.qty !== undefined && item.qty !== null) qty = Number(item.qty);
-
-            let unitPrice = 0;
-            if (item.unitPrice !== undefined) unitPrice = item.unitPrice;
-            else if (item.cost !== undefined) unitPrice = item.cost;
-
-            tr.innerHTML = `
-                <td>${item.sequence || '-'}</td>
-                <td>
-                    <div style="font-weight:bold;">${item.name || '未命名'}</div>
-                    <div class="text-muted text-sm">${item.brand || ''} ${item.model || ''}</div>
-                </td>
-                <td>${item.unit || '-'}</td>
-                <td class="text-right">${qty}</td>
-                <td>
-                    <span class="order-chip ${statusClass}" 
-                          onclick="window.toggleStatus('${item.id}', '${currentStatusCode}')"
-                          title="點擊切換狀態">
-                        ${statusText}
-                    </span>
-                </td>
-                <td>${quotesHtml}</td>
-                <td class="text-right">${unitPrice ? parseInt(unitPrice).toLocaleString() : '-'}</td>
-            `;
-            return tr;
-        }
-
-        function createExtraQuoteRow(quote) {
-            const tr = document.createElement('tr');
-            tr.style.backgroundColor = '#fff9db';
-
-            const quotesHtml = `
-                <span class="quote-chip" style="border: 1px solid #f59f00; color: #f59f00;" title="${quote.supplierName}">
-                    ${(quote.supplierName || '').substring(0,4)}.. $${quote.quotedUnitPrice || 0}
-                </span>`;
-
-            tr.innerHTML = `
-                <td class="text-muted"><small>(額外)</small></td>
-                <td>
-                    <div style="font-weight:bold; color: #d63384;">${quote.itemName || '額外項目'}</div>
-                    <div class="text-muted text-sm">${quote.remark || '(廠商新增項目)'}</div>
-                </td>
-                <td>${quote.itemUnit || '-'}</td>
-                <td class="text-right">${quote.itemQty || 1}</td>
-                <td><span class="text-muted text-sm">-</span></td>
-                <td>${quotesHtml}</td>
-                <td class="text-right">-</td>
-            `;
-            return tr;
-        }
-
-        // --- (E) 事件綁定 ---
-        function setupEventListeners() {
-            const bind = (id, event, handler) => {
-                const el = document.getElementById(id);
-                if (el) el.addEventListener(event, handler);
-            };
-
-            bind('projectSelect', 'change', (e) => onProjectChange(e.target.value));
-            bind('tenderSelect', 'change', (e) => onTenderChange(e.target.value));
-            bind('majorItemSelect', 'change', () => renderTable());
-            bind('exportRfqBtn', 'click', handleExportRFQ);
-            
-            bind('importQuotesBtn', 'click', () => document.getElementById('importQuotesInput')?.click());
-            bind('importQuotesInput', 'change', handleImportQuotes);
-            
-            // ✅ 管理報價按鈕
-            bind('manageQuotesBtn', 'click', openQuoteManager);
-
-            // Modal 關閉
-            document.querySelectorAll('[data-action="close-modal"]').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const modal = btn.closest('.modal-overlay');
-                    if (modal) modal.style.display = 'none';
-                });
-            });
-
-            window.toggleStatus = handleToggleStatus;
-            window.selectQuote = handleSelectQuote;
-            
-            // 將刪除功能掛載到 window，以便 Modal 內的按鈕呼叫
-            window.deleteSupplierQuotes = deleteSupplierQuotes;
-        }
-
-        // --- (F) 功能函數 ---
-
-        // 🔥 管理供應商報價 (Modal 邏輯)
-        function openQuoteManager() {
-            if (!quotations || quotations.length === 0) {
-                return showAlert('目前沒有任何報價紀錄', 'info');
-            }
-
-            // 1. 統計資料
-            const stats = {};
-            quotations.forEach(q => {
-                const supplier = q.supplierName || '未知供應商';
-                if (!stats[supplier]) {
-                    stats[supplier] = { count: 0, totalAmount: 0 };
-                }
-                
-                // 計算項目數
-                stats[supplier].count++;
-                
-                // 計算總金額 (預估)
-                let qty = 1;
-                if (q.isExtra) {
-                    qty = q.itemQty || 1;
-                } else {
-                    const detail = detailItems.find(d => d.id === q.detailItemId);
-                    if (detail) {
-                        if (detail.totalQuantity) qty = Number(detail.totalQuantity);
-                        else if (detail.quantity) qty = Number(detail.quantity);
-                    }
-                }
-                stats[supplier].totalAmount += (q.quotedUnitPrice || 0) * qty;
-            });
-
-            // 2. 渲染列表
-            const container = document.getElementById('quoteManagerList'); // 假設 Modal 裡有一個容器
-            // 如果找不到容器，我們嘗試插入到 Modal Body
-            const modalBody = document.querySelector('#manageQuotesModal .modal-body');
-            
-            if (!container && !modalBody) return showAlert('找不到 Modal 容器', 'error');
-
-            let html = `
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>供應商名稱</th>
-                            <th class="text-right">報價項目數</th>
-                            <th class="text-right">總金額(預估)</th>
-                            <th class="text-center">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
-            Object.keys(stats).forEach(supplier => {
+        parsedData.forEach((item, index) => {
+            if (item.type === 'major') {
+                majorCount++;
                 html += `
-                    <tr>
-                        <td>${supplier}</td>
-                        <td class="text-right">${stats[supplier].count}</td>
-                        <td class="text-right">$${parseInt(stats[supplier].totalAmount).toLocaleString()}</td>
-                        <td class="text-center">
-                            <button class="btn btn-danger btn-sm" onclick="deleteSupplierQuotes('${supplier}')">
-                                刪除
-                            </button>
+                    <tr style="background-color: #e9ecef; font-weight: bold;">
+                        <td>
+                            <span class="badge" style="background:#4a5568; color:#fff; cursor:pointer;" onclick="window.toggleItemType(${index})">
+                                大項目
+                            </span>
                         </td>
+                        <td>${item.seq}</td>
+                        <td colspan="6">${item.name}</td>
                     </tr>
                 `;
+            } else {
+                detailCount++;
+                totalAmt += item.amount;
+                html += `
+                    <tr>
+                        <td>
+                            <span class="badge" style="background:#cbd5e0; color:#2d3748; cursor:pointer;" onclick="window.toggleItemType(${index})">
+                                細項
+                            </span>
+                        </td>
+                        <td>${item.seq}</td>
+                        <td>${item.name}</td>
+                        <td>${item.spec}</td>
+                        <td>${item.unit}</td>
+                        <td style="text-align:right;">${item.qty}</td>
+                        <td style="text-align:right;">${item.price.toLocaleString()}</td>
+                        <td style="text-align:right;">${item.amount.toLocaleString()}</td>
+                    </tr>
+                `;
+            }
+        });
+
+        html += `</tbody>`;
+        previewTable.innerHTML = html;
+
+        document.getElementById('summaryTotal').textContent = parsedData.length;
+        document.getElementById('summaryMajor').textContent = majorCount;
+        document.getElementById('summaryDetail').textContent = detailCount;
+        document.getElementById('summaryAmount').textContent = '$' + totalAmt.toLocaleString();
+
+        window.toggleItemType = (idx) => {
+            parsedData[idx].type = parsedData[idx].type === 'major' ? 'detail' : 'major';
+            renderPreviewTable();
+        };
+    }
+
+    // 6. 載入可匯入的專案選單 (Step 4)
+    async function loadProjects() {
+        try {
+            const snapshot = await db.collection('projects').get();
+            projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            if (projectSelectForImport) {
+                projectSelectForImport.innerHTML = '<option value="">請選擇專案...</option>' + 
+                    projects.map(p => `<option value="${p.id}">${p.name || p.code}</option>`).join('');
+            }
+        } catch (err) {
+            console.error('載入專案失敗:', err);
+        }
+    }
+
+    // 7. 執行匯入資料庫
+    async function executeImport() {
+        const projectId = projectSelectForImport.value;
+        const tenderName = tenderNameInput.value.trim();
+        const contractorName = contractorNameInput.value.trim();
+
+        if (!projectId) return showAlert('請選擇專案', 'warning');
+        if (!tenderName) return showAlert('請輸入標單名稱', 'warning');
+
+        showLoading(true, '正在寫入資料庫...');
+
+        try {
+            // A. 新增 Tender 文件
+            const tenderRef = await db.collection('tenders').add({
+                projectId: projectId,
+                name: tenderName,
+                contractor: contractorName,
+                createdBy: currentUser ? currentUser.email : '',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            html += `</tbody></table>`;
-            
-            if (container) container.innerHTML = html;
-            else modalBody.innerHTML = `<h5 class="mb-3">供應商列表</h5>` + html;
+            let currentMajorId = null;
+            let currentMajorSeq = '';
+            let batches = [];
+            let currentBatch = db.batch();
+            let opCount = 0;
 
-            // 3. 顯示 Modal
-            document.getElementById('manageQuotesModal').style.display = 'flex';
-        }
+            // B. 逐列處理 Major Items 與 Detail Items
+            for (const item of parsedData) {
+                if (item.type === 'major') {
+                    const majorRef = db.collection('majorItems').doc();
+                    currentMajorId = majorRef.id;
+                    currentMajorSeq = item.seq;
 
-        // 🔥 刪除特定供應商的所有報價
-        async function deleteSupplierQuotes(supplierName) {
-            if (!confirm(`確定要刪除「${supplierName}」的所有報價嗎？此動作無法復原。`)) return;
-
-            showLoading(true, `正在刪除 ${supplierName} 的報價...`);
-
-            try {
-                // 找出該供應商在此標單的所有報價
-                const targetQuotes = quotations.filter(q => q.supplierName === supplierName);
-                
-                const batch = db.batch();
-                targetQuotes.forEach(q => {
-                    const ref = db.collection('quotations').doc(q.id);
-                    batch.delete(ref);
-                });
-
-                await batch.commit();
-                
-                showAlert(`已刪除 ${supplierName} 的所有報價`, 'success');
-                document.getElementById('manageQuotesModal').style.display = 'none';
-                
-                // 重新載入
-                await onTenderChange(selectedTender.id);
-
-            } catch (error) {
-                console.error("刪除失敗:", error);
-                showAlert("刪除失敗: " + error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        // 匯入 (v20 邏輯)
-        async function handleImportQuotes(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            try {
-                if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
-
-                const supplierName = prompt("請輸入此報價單的供應商名稱：");
-                if (!supplierName || supplierName.trim() === "") {
-                    showAlert("已取消匯入 (未輸入供應商)", "info");
-                    e.target.value = '';
-                    return;
-                }
-
-                showLoading(true, `正在解析 ${file.name}...`);
-
-                const data = await file.arrayBuffer();
-                const workbook = XLSX.read(data);
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-
-                const batch = db.batch();
-                let matchCount = 0;
-                let extraCount = 0;
-                let operationCounter = 0;
-                let batches = []; 
-                let currentBatch = db.batch();
-                let currentMajorItem = null;
-
-                jsonData.forEach(row => {
-                    const seqCol = row['項次'] ? String(row['項次']).trim() : '';
-                    const nameCol = row['項目名稱'] ? String(row['項目名稱']).trim() : '';
-                    const priceRaw = row['供應商報價(單價)'] || row['單價'] || 0;
-                    
-                    const foundMajor = majorItems.find(m => {
-                        const majorKey = `${m.sequence || ''} ${m.name || ''}`.trim();
-                        return seqCol.includes(majorKey) || seqCol.replace('.','').includes(majorKey.replace('.',''));
+                    currentBatch.set(majorRef, {
+                        projectId: projectId,
+                        tenderId: tenderRef.id,
+                        sequence: item.seq,
+                        name: item.name,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
-
-                    if (foundMajor) {
-                        currentMajorItem = foundMajor;
-                        return;
-                    }
-
-                    if (!currentMajorItem || (!seqCol && !nameCol)) return;
-
-                    const targetItem = detailItems.find(item => 
-                        item.majorItemId === currentMajorItem.id && 
-                        String(item.sequence).trim() === seqCol && 
-                        String(item.name).trim() === nameCol
-                    );
-
-                    if (priceRaw > 0) {
-                        const price = Number(priceRaw);
-                        const newQuoteRef = db.collection('quotations').doc();
-                        let quoteData = {};
-
-                        if (targetItem) {
-                            quoteData = {
-                                projectId: selectedProject.id,
-                                tenderId: selectedTender.id,
-                                detailItemId: targetItem.id,
-                                majorItemId: currentMajorItem.id,
-                                supplierName: supplierName.trim(),
-                                quotedUnitPrice: price,
-                                isExtra: false,
-                                remark: row['備註'] || '',
-                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                            };
-                            matchCount++;
-                        } else {
-                            quoteData = {
-                                projectId: selectedProject.id,
-                                tenderId: selectedTender.id,
-                                detailItemId: null,
-                                majorItemId: currentMajorItem.id,
-                                supplierName: supplierName.trim(),
-                                quotedUnitPrice: price,
-                                isExtra: true,
-                                itemName: nameCol || '未命名額外項',
-                                itemUnit: row['單位'] || '',
-                                itemQty: row['數量'] || 1,
-                                remark: row['備註'] || '',
-                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                            };
-                            extraCount++;
-                        }
-
-                        currentBatch.set(newQuoteRef, quoteData);
-                        operationCounter++;
-
-                        if (operationCounter >= 450) {
-                            batches.push(currentBatch.commit());
-                            currentBatch = db.batch();
-                            operationCounter = 0;
-                        }
-                    }
-                });
-
-                if (operationCounter > 0) batches.push(currentBatch.commit());
-                await Promise.all(batches);
-
-                showAlert(`匯入完成！匹配 ${matchCount} 筆，額外新增 ${extraCount} 筆`, 'success');
-                await onTenderChange(selectedTender.id);
-
-            } catch (error) {
-                console.error("匯入失敗:", error);
-                showAlert("匯入失敗: " + error.message, 'error');
-            } finally {
-                e.target.value = '';
-                showLoading(false);
-            }
-        }
-
-        async function handleToggleStatus(itemId, currentStatus) {
-            const statusCycle = {
-                'planning': 'ordered',
-                'ordered': 'arrived',
-                'arrived': 'installed',
-                'installed': 'planning'
-            };
-
-            const nextStatus = statusCycle[currentStatus] || 'ordered';
-            const itemPO = purchaseOrders.find(po => po.detailItemId === itemId);
-
-            showLoading(true, '更新狀態中...');
-
-            try {
-                if (nextStatus === 'planning') {
-                    if (itemPO) {
-                        await db.collection('purchaseOrders').doc(itemPO.id).delete();
-                    }
+                    opCount++;
                 } else {
-                    const poData = {
-                        status: nextStatus,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    };
-
-                    if (itemPO) {
-                        await db.collection('purchaseOrders').doc(itemPO.id).update(poData);
-                    } else {
-                        const newItem = detailItems.find(i => i.id === itemId);
-                        await db.collection('purchaseOrders').add({
-                            projectId: selectedProject.id,
-                            tenderId: selectedTender.id,
-                            detailItemId: itemId,
-                            majorItemId: newItem ? newItem.majorItemId : null,
-                            status: nextStatus,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            ...poData
-                        });
-                    }
+                    const detailRef = db.collection('detailItems').doc();
+                    currentBatch.set(detailRef, {
+                        projectId: projectId,
+                        tenderId: tenderRef.id,
+                        majorItemId: currentMajorId,
+                        sequence: item.seq,
+                        name: item.name,
+                        specification: item.spec,
+                        unit: item.unit,
+                        quantity: item.qty,
+                        totalQuantity: item.qty,
+                        unitPrice: item.price,
+                        amount: item.amount,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    opCount++;
                 }
-                await onTenderChange(selectedTender.id);
-            } catch (error) {
-                console.error("狀態更新失敗:", error);
-                showAlert("狀態更新失敗: " + error.message, 'error');
-            } finally {
-                showLoading(false);
+
+                if (opCount >= 450) {
+                    batches.push(currentBatch.commit());
+                    currentBatch = db.batch();
+                    opCount = 0;
+                }
             }
+
+            if (opCount > 0) batches.push(currentBatch.commit());
+            await Promise.all(batches);
+
+            showAlert('🎉 標單匯入成功！', 'success');
+            setTimeout(() => {
+                if (typeof navigateTo === 'function') {
+                    navigateTo(`/tenders/procurement?projectId=${projectId}&tenderId=${tenderRef.id}`);
+                } else {
+                    window.location.href = `/tenders/procurement`;
+                }
+            }, 1000);
+
+        } catch (err) {
+            console.error('匯入失敗:', err);
+            showAlert('匯入失敗: ' + err.message, 'error');
+        } finally {
+            showLoading(false);
         }
+    }
 
-        function handleSelectQuote(quoteId) {
-            console.log("選擇報價:", quoteId);
+    // 輔助函式
+    function showLoading(show, msg) {
+        const loadingEl = document.getElementById('loadingSection');
+        if (loadingEl) {
+            loadingEl.style.display = show ? 'flex' : 'none';
+            const txt = document.getElementById('loadingText');
+            if (txt && msg) txt.textContent = msg;
         }
+    }
 
-        function handleExportRFQ() {
-            if (!selectedTender) return showAlert('請先選擇標單', 'warning');
-            if (detailItems.length === 0) return showAlert('目前沒有項目可匯出', 'warning');
-
-            try {
-                if (typeof XLSX === 'undefined') throw new Error("缺少 XLSX 套件");
-
-                const exportData = [];
-
-                majorItems.forEach(major => {
-                    const myDetails = detailItems.filter(d => d.majorItemId === major.id);
-
-                    if (myDetails.length > 0) {
-                        exportData.push({
-                            '項次': `${major.sequence || ''} ${major.name || ''}`,
-                            '項目名稱': '',
-                            '說明(廠牌/型號)': '',
-                            '單位': '',
-                            '數量': '',
-                            '供應商報價(單價)': '',
-                            '小計(複價)': '',
-                            '備註': ''
-                        });
-
-                        myDetails.forEach(item => {
-                            let qty = 0;
-                            if (item.totalQuantity !== undefined && item.totalQuantity !== null) qty = Number(item.totalQuantity);
-                            else if (item.quantity !== undefined && item.quantity !== null) qty = Number(item.quantity);
-                            else if (item.qty !== undefined && item.qty !== null) qty = Number(item.qty);
-
-                            exportData.push({
-                                '項次': item.sequence || '',
-                                '項目名稱': item.name || '',
-                                '說明(廠牌/型號)': `${item.brand || ''} ${item.model || ''}`.trim(),
-                                '單位': item.unit || '',
-                                '數量': qty, 
-                                '供應商報價(單價)': '',
-                                '小計(複價)': '', 
-                                '備註': ''
-                            });
-                        });
-                    }
-                });
-
-                const wb = XLSX.utils.book_new();
-                const ws = XLSX.utils.json_to_sheet(exportData);
-
-                ws['!cols'] = [
-                    {wch: 15}, {wch: 30}, {wch: 25}, {wch: 8}, {wch: 10}, 
-                    {wch: 15}, {wch: 15}, {wch: 20}
-                ];
-
-                XLSX.utils.book_append_sheet(wb, ws, "詢價單");
-                const filename = `${selectedProject.name}_${selectedTender.name}_詢價單.xlsx`;
-                XLSX.writeFile(wb, filename);
-
-            } catch (error) {
-                console.error("匯出失敗:", error);
-                showAlert("匯出失敗: " + error.message, 'error');
-            }
-        }
-
-        function handleDeleteOrder() {
-            // 這個按鈕應該是在 Modal 外的，目前暫時保留或隱藏
-            // 實際刪除功能已移至 Modal 內
-            openQuoteManager();
-        }
-
-        // --- 輔助函式 ---
-        function showLoading(show, msg) {
-            const el = document.getElementById('loading');
-            if(el) {
-                el.style.display = show ? 'flex' : 'none';
-                if(msg) el.querySelector('p').textContent = msg;
-            }
-        }
-
-        function populateSelect(select, items, defaultText) {
-            if(!select) return;
-            select.innerHTML = `<option value="">${defaultText}</option>` + 
-                items.map(i => `<option value="${i.id}">${i.sequence ? i.sequence + '.' : ''} ${i.name || i.code}</option>`).join('');
-            select.disabled = items.length === 0;
-        }
-
-        function resetSelects(level) {
-            if (level === 'project') {
-                document.getElementById('tenderSelect').innerHTML = '<option value="">請先選擇專案</option>';
-                document.getElementById('tenderSelect').disabled = true;
-                document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>';
-                document.getElementById('majorItemSelect').disabled = true;
-                document.getElementById('mainContent').style.display = 'none';
-                document.getElementById('emptyState').style.display = 'flex';
-            } else if (level === 'tender') {
-                document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>';
-            }
-        }
-        
-        function updateStats() {
-            const totalEl = document.getElementById('totalItemsCount');
-            if(totalEl) totalEl.textContent = detailItems.length;
-        }
-        
-        function showAlert(msg, type) {
-            alert(msg);
-        }
-
-        function naturalSequenceSort(a, b) {
-            const CHINESE_NUM_MAP = {
-                '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
-                '壹': 1, '貳': 2, '參': 3, '肆': 4, '伍': 5, '陸': 6, '柒': 7, '捌': 8, '玖': 9, '拾': 10,
-                '甲': 1, '乙': 2, '丙': 3, '丁': 4, '戊': 5, '己': 6, '庚': 7, '辛': 8, '壬': 9, '癸': 10
-            };
-            const seqA = String(a.sequence || '');
-            const seqB = String(b.sequence || '');
-            const valA = CHINESE_NUM_MAP[seqA] || seqA;
-            const valB = CHINESE_NUM_MAP[seqB] || seqB;
-            const numA = parseFloat(valA);
-            const numB = parseFloat(valB);
-            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-            return seqA.localeCompare(seqB, undefined, {numeric: true, sensitivity: 'base'});
-        }
-    });
+    function showAlert(msg, type) {
+        alert(msg);
+    }
 }
