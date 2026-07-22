@@ -161,6 +161,17 @@ function initImportPage() {
         parsedData = [];
         let totalAmount = 0;
     
+        // 安全轉換純數字的輔助函式（若包含英文或符號則回傳 NaN，避免誤抓備註編碼）
+        const parseStrictNumber = (val) => {
+            if (val === undefined || val === null) return NaN;
+            const str = String(val).trim();
+            if (str === '' || str === '-') return NaN;
+            // 如果包含英文字母或非純數字符號（排除小數點），視為備註文字而非金額
+            if (/[a-zA-Z#,]/.test(str)) return NaN;
+            const num = parseFloat(str);
+            return isNaN(num) ? NaN : num;
+        };
+    
         for (let i = startRow - 1; i < rawData.length; i++) {
             const row = rawData[i];
             if (!row || row.length === 0) continue;
@@ -168,40 +179,43 @@ function initImportPage() {
             const seq = String(row[0] || '').trim();
             const name = String(row[1] || '').trim();
             const spec = String(row[2] || '').trim();
-            const unit = String(row[3] || '').trim(); // 關鍵：單位
+            const unit = String(row[3] || '').trim();
             
-            const qtyRaw = row[4];
-            const priceRaw = row[5];
-            const amountRaw = row[6];
+            // 嚴格解析數量、單價、複價
+            const qtyNum = parseStrictNumber(row[4]);
+            const priceNum = parseStrictNumber(row[5]);
+            const amountNum = parseStrictNumber(row[6]);
     
-            const hasQuantity = qtyRaw !== undefined && qtyRaw !== null && String(qtyRaw).trim() !== '' && !isNaN(parseFloat(qtyRaw));
-            const hasUnit = unit !== ''; // 是否有單位
-            const qty = hasQuantity ? parseFloat(qtyRaw) : 0;
-            const price = parseFloat(priceRaw) || 0;
-            const amount = parseFloat(amountRaw) || (qty * price);
+            const hasQuantity = !isNaN(qtyNum) && qtyNum > 0;
+            const hasUnit = unit !== '' && !['式', '項'].includes(unit); // 可依需求調整通用單位的寬鬆度
+            
+            const qty = !isNaN(qtyNum) ? qtyNum : 0;
+            const price = !isNaN(priceNum) ? priceNum : 0;
+            // 只有在複價是合法數字時才採用，否則由 qty * price 自動計算，絕不誤抓右側備註欄
+            const amount = !isNaN(amountNum) ? amountNum : (qty * price);
     
             // 完全空白列跳過
             if (!seq && !name && !spec && !unit) continue;
     
             // --- 核心邏輯 1：跨行（續行）自動併入上一行 ---
-            // 無項次、無單位、無數量，代表是上一行的品名或規格延伸
-            if (!seq && !hasUnit && !hasQuantity && parsedData.length > 0) {
+            if (!seq && !unit && isNaN(qtyNum) && parsedData.length > 0) {
                 const lastItem = parsedData[parsedData.length - 1];
                 if (name) {
-                    lastItem.name += (lastItem.name ? '\n' : '') + name;
+                    lastItem.name += (lastItem.name ? ' ' : '') + name;
                 }
                 if (spec) {
-                    lastItem.spec += (lastItem.spec ? '\n' : '') + spec;
+                    lastItem.spec += (lastItem.spec ? ' ' : '') + spec;
                 }
-                continue; // 合併完畢，不產生新項目
+                continue;
             }
     
             // --- 核心邏輯 2：大項目與細項判定 ---
-            // 有單位或有數量 -> 絕對是細項
-            // 無單位且無數量 + 符合編號格式 -> 才是大項目
+            // 判斷是否符合大項編號格式
             const isMajorPattern = checkIsMajorItem(seq, name);
-            const isDetail = hasUnit || hasQuantity;
-            const isMajor = isMajorPattern && !isDetail;
+            
+            // 判定為細項的條件：有實質數量 OR 有明確單位
+            // 判定為大項的條件：符合編號規則 + 沒有實質數量
+            const isMajor = isMajorPattern && !hasQuantity;
     
             if (!isMajor) {
                 totalAmount += amount;
@@ -222,25 +236,6 @@ function initImportPage() {
     
         renderPreviewTable();
         switchStep(3);
-    }
-    
-    function checkIsMajorItem(seq, name) {
-        const fullStr = `${seq} ${name}`.trim();
-    
-        // 匹配開頭為 中文數字、天干地支、羅馬數字、大寫英文字母 或 數字編號
-        if (ruleChineseNumber.checked && /^([一二三四五六七八九十壹貳參肆伍陸柒捌玖拾]+[、. ]|[甲乙丙丁戊己庚辛壬癸]+[、. ])/.test(fullStr)) return true;
-        if (ruleHeavenlyStem.checked && /^[甲乙丙丁戊己庚辛壬癸]+[、. ]/.test(fullStr)) return true;
-        if (ruleRomanNumber.checked && /^(I|II|III|IV|V|VI|VII|VIII|IX|X)+[、. ]/i.test(fullStr)) return true;
-        
-        if (ruleCustomPattern.checked && customPatternInput.value) {
-            try {
-                const reg = new RegExp(customPatternInput.value);
-                if (reg.test(fullStr)) return true;
-            } catch (e) {
-                console.warn('無效的正則表達式');
-            }
-        }
-        return false;
     }
     // 5. 渲染預覽表格
     function renderPreviewTable() {
