@@ -168,39 +168,40 @@ function initImportPage() {
             const seq = String(row[0] || '').trim();
             const name = String(row[1] || '').trim();
             const spec = String(row[2] || '').trim();
-            const unit = String(row[3] || '').trim();
+            const unit = String(row[3] || '').trim(); // 關鍵：單位
             
-            // 抓取數量與單價，若為非數字或空白則視為 null
             const qtyRaw = row[4];
             const priceRaw = row[5];
             const amountRaw = row[6];
     
             const hasQuantity = qtyRaw !== undefined && qtyRaw !== null && String(qtyRaw).trim() !== '' && !isNaN(parseFloat(qtyRaw));
+            const hasUnit = unit !== ''; // 是否有單位
             const qty = hasQuantity ? parseFloat(qtyRaw) : 0;
             const price = parseFloat(priceRaw) || 0;
             const amount = parseFloat(amountRaw) || (qty * price);
     
-            // 如果連項次跟名稱都沒有，直接跳過
-            if (!seq && !name) continue;
+            // 完全空白列跳過
+            if (!seq && !name && !spec && !unit) continue;
     
-            // --- 核心邏輯 1：處理 Excel 跨行（無項次、無數量的續行）---
-            if (!seq && !hasQuantity && parsedData.length > 0) {
-                // 抓取上一筆資料進行合併
+            // --- 核心邏輯 1：跨行（續行）自動併入上一行 ---
+            // 無項次、無單位、無數量，代表是上一行的品名或規格延伸
+            if (!seq && !hasUnit && !hasQuantity && parsedData.length > 0) {
                 const lastItem = parsedData[parsedData.length - 1];
                 if (name) {
-                    // 自動換行合併文字（加空格或換行）
-                    lastItem.name += ' ' + name;
+                    lastItem.name += (lastItem.name ? '\n' : '') + name;
                 }
                 if (spec) {
-                    lastItem.spec += (lastItem.spec ? ' ' : '') + spec;
+                    lastItem.spec += (lastItem.spec ? '\n' : '') + spec;
                 }
-                continue; // 合併完畢，直接跳過此行不建立新項目
+                continue; // 合併完畢，不產生新項目
             }
     
-            // --- 核心邏輯 2：大項目嚴格判斷 ---
-            // 只有在「符合編號規則」且「沒有數量/金額」時，才是真正的分類大項
+            // --- 核心邏輯 2：大項目與細項判定 ---
+            // 有單位或有數量 -> 絕對是細項
+            // 無單位且無數量 + 符合編號格式 -> 才是大項目
             const isMajorPattern = checkIsMajorItem(seq, name);
-            const isMajor = isMajorPattern && !hasQuantity;
+            const isDetail = hasUnit || hasQuantity;
+            const isMajor = isMajorPattern && !isDetail;
     
             if (!isMajor) {
                 totalAmount += amount;
@@ -215,8 +216,7 @@ function initImportPage() {
                 unit: unit,
                 qty: qty,
                 price: price,
-                amount: amount,
-                hasQuantity: hasQuantity
+                amount: amount
             });
         }
     
@@ -224,12 +224,12 @@ function initImportPage() {
         switchStep(3);
     }
     
-    // 【修改點 2】優化大項目編號正則表達式
     function checkIsMajorItem(seq, name) {
         const fullStr = `${seq} ${name}`.trim();
     
-        // 擴充正則，精準匹配 中文數字 / 天干地支 / 羅馬數字 / 括號數字
+        // 匹配開頭為 中文數字、天干地支、羅馬數字、大寫英文字母 或 數字編號
         if (ruleChineseNumber.checked && /^([一二三四五六七八九十壹貳參肆伍陸柒捌玖拾]+[、. ]|[甲乙丙丁戊己庚辛壬癸]+[、. ])/.test(fullStr)) return true;
+        if (ruleHeavenlyStem.checked && /^[甲乙丙丁戊己庚辛壬癸]+[、. ]/.test(fullStr)) return true;
         if (ruleRomanNumber.checked && /^(I|II|III|IV|V|VI|VII|VIII|IX|X)+[、. ]/i.test(fullStr)) return true;
         
         if (ruleCustomPattern.checked && customPatternInput.value) {
