@@ -1,5 +1,5 @@
 /**
- * 匯入標單功能 (tenders-import.js) - v1.0
+ * 匯入標單功能 (tenders-import.js) - v1.1
  * 對應路由: /tenders/import
  * 對應頁面: pages/tenders/import.html
  */
@@ -148,7 +148,6 @@ function initImportPage() {
     }
 
     // 4. 解析 Sheet (Step 2 -> Step 3)
-    // 【修改點 1】智慧解析 Sheet（含跨行合併與嚴格大項判斷）
     function parseSelectedSheet() {
         if (!workbook) return;
         const sheetName = worksheetSelect.value;
@@ -187,7 +186,7 @@ function initImportPage() {
             const amountNum = parseStrictNumber(row[6]);
     
             const hasQuantity = !isNaN(qtyNum) && qtyNum > 0;
-            const hasUnit = unit !== '' && !['式', '項'].includes(unit); // 可依需求調整通用單位的寬鬆度
+            const hasUnit = unit !== ''; 
             
             const qty = !isNaN(qtyNum) ? qtyNum : 0;
             const price = !isNaN(priceNum) ? priceNum : 0;
@@ -210,11 +209,7 @@ function initImportPage() {
             }
     
             // --- 核心邏輯 2：大項目與細項判定 ---
-            // 判斷是否符合大項編號格式
             const isMajorPattern = checkIsMajorItem(seq, name);
-            
-            // 判定為細項的條件：有實質數量 OR 有明確單位
-            // 判定為大項的條件：符合編號規則 + 沒有實質數量
             const isMajor = isMajorPattern && !hasQuantity;
     
             if (!isMajor) {
@@ -237,6 +232,27 @@ function initImportPage() {
         renderPreviewTable();
         switchStep(3);
     }
+
+    // 大項目識別判斷函式 (補回此處)
+    function checkIsMajorItem(seq, name) {
+        const fullStr = `${seq} ${name}`.trim();
+
+        // 匹配 中文數字/天干地支 (如: 一.、甲.參.二.)
+        if (ruleChineseNumber && ruleChineseNumber.checked && /^([一二三四五六七八九十壹貳參肆伍陸柒捌玖拾]+[、. ]|[甲乙丙丁戊己庚辛壬癸]+[、. ])/.test(fullStr)) return true;
+        if (ruleHeavenlyStem && ruleHeavenlyStem.checked && /^[甲乙丙丁戊己庚辛壬癸]+[、. ]/.test(fullStr)) return true;
+        if (ruleRomanNumber && ruleRomanNumber.checked && /^(I|II|III|IV|V|VI|VII|VIII|IX|X)+[、. ]/i.test(fullStr)) return true;
+        
+        if (ruleCustomPattern && ruleCustomPattern.checked && customPatternInput && customPatternInput.value) {
+            try {
+                const reg = new RegExp(customPatternInput.value);
+                if (reg.test(fullStr)) return true;
+            } catch (e) {
+                console.warn('無效的正則表達式');
+            }
+        }
+        return false;
+    }
+
     // 5. 渲染預覽表格
     function renderPreviewTable() {
         let majorCount = 0, detailCount = 0, totalAmt = 0;
