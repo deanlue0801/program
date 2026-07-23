@@ -147,7 +147,7 @@ function initImportPage() {
         }
     }
 
-    // 4. 解析 Sheet (Step 2 -> Step 3)
+// 4. 解析 Sheet (Step 2 -> Step 3)
     function parseSelectedSheet() {
         if (!workbook) return;
         const sheetName = worksheetSelect.value;
@@ -160,7 +160,7 @@ function initImportPage() {
         parsedData = [];
         let totalAmount = 0;
     
-        // 安全轉換純數字的輔助函式（若包含英文或符號則回傳 NaN，避免誤抓備註編碼）
+        // 安全轉換純數字的輔助函式
         const parseStrictNumber = (val) => {
             if (val === undefined || val === null) return NaN;
             const str = String(val).trim();
@@ -170,29 +170,57 @@ function initImportPage() {
             return isNaN(num) ? NaN : num;
         };
 
-        // 常見工程單位庫（用來偵測欄位是否錯位）
-        const commonUnits = ['式', '只', '座', '組', '套', '處', '個', '項', 'm', 'M', '米', '公尺', 'kg', 'KG', '噸', '台', '輛', '張', '塊', '捲', '迴路'];
-    
+        // 🔍 【步驟 A】採樣檢測：判斷這張 Excel 是否包含「規格說明」欄位
+        let hasSpecColumn = true; 
+        let qtyAtCol3Count = 0; // 數量出現在 row[3] 的次數
+        let qtyAtCol4Count = 0; // 數量出現在 row[4] 的次數
+
+        // 抽取前 30 列進行結構採樣
+        const sampleLimit = Math.min(rawData.length, startRow + 30);
+        for (let i = startRow - 1; i < sampleLimit; i++) {
+            const r = rawData[i];
+            if (!r) continue;
+            const valCol3 = parseStrictNumber(r[3]); // 測試 row[3] 是否為數字
+            const valCol4 = parseStrictNumber(r[4]); // 測試 row[4] 是否為數字
+
+            if (!isNaN(valCol3) && valCol3 > 0) qtyAtCol3Count++;
+            if (!isNaN(valCol4) && valCol4 > 0) qtyAtCol4Count++;
+        }
+
+        // 如果數量出現在 row[3] 的頻率高於 row[4]，代表這張 Excel 沒有規格欄位！
+        if (qtyAtCol3Count > qtyAtCol4Count) {
+            hasSpecColumn = false;
+            console.log("📊 自動判讀結果：這張 Excel 欄位結構為【無規格欄】(項次, 品名, 單位, 數量, 單價, 複價)");
+        } else {
+            console.log("📊 自動判讀結果：這張 Excel 欄位結構為【有規格欄】(項次, 品名, 規格, 單位, 數量, 單價, 複價)");
+        }
+
+        // 🔍 【步驟 B】依據判定好的結構，全表統一套用欄位索引
         for (let i = startRow - 1; i < rawData.length; i++) {
             const row = rawData[i];
             if (!row || row.length === 0) continue;
-    
+
             const seq = String(row[0] || '').trim();
             const name = String(row[1] || '').trim();
             
-            let spec = String(row[2] || '').trim();
-            let unit = String(row[3] || '').trim();
-            let qtyRaw = row[4];
-            let priceRaw = row[5];
-            let amountRaw = row[6];
+            let spec = '';
+            let unit = '';
+            let qtyRaw, priceRaw, amountRaw;
 
-            // 🔍 關鍵修復：偵測 row[2] 是否直接就是單位（無規格欄位的情況）
-            if (commonUnits.includes(spec)) {
-                unit = spec;     // row[2] 其實是單位
-                spec = '';       // 規格說明為空
-                qtyRaw = row[3]; // row[3] 是數量
-                priceRaw = row[4];// row[4] 是單價
-                amountRaw = row[5];// row[5] 是複價
+            if (hasSpecColumn) {
+                // 有規格欄的標準對應
+                spec = String(row[2] || '').trim();
+                unit = String(row[3] || '').trim();
+                qtyRaw = row[4];
+                priceRaw = row[5];
+                amountRaw = row[6];
+            } else {
+                // 無規格欄的縮減對應
+                spec = ''; // 無規格
+                unit = String(row[2] || '').trim();
+                qtyRaw = row[3];
+                priceRaw = row[4];
+                amountRaw = row[5];
             }
             
             // 嚴格解析數量、單價、複價
