@@ -150,6 +150,7 @@ function initImportPage() {
     // 4. 解析 Sheet (Step 2 -> Step 3)
     function parseSelectedSheet() {
         if (!workbook) return;
+        const isMajor = isMajorPattern;
         const sheetName = worksheetSelect.value;
         const worksheet = workbook.Sheets[sheetName];
         if (!worksheet) return;
@@ -208,50 +209,37 @@ function initImportPage() {
                 continue;
             }
     
-            // --- 核心邏輯 2：大項目與細項判定 ---
-            const isMajorPattern = checkIsMajorItem(seq, name);
-            const isMajor = isMajorPattern && !hasQuantity;
-    
-            if (!isMajor) {
-                totalAmount += amount;
+            // 大項目識別判斷函式（優化版：加入了細項流水號過濾）
+            function checkIsMajorItem(seq, name) {
+                const fullStr = `${seq} ${name}`.trim();
+            
+                // 1. 先攔截「細項特徵」：如果編號末端帶有 .數字. 或 .(數字) (例如 .1. 或 .1.(1))，直接排除大項！
+                if (/\.\d+(\.\(\d+\))?\.?$/.test(seq) || /\(\d+\)$/.test(seq)) {
+                    return false;
+                }
+            
+                // 2. 匹配標準大項開頭：中文數字/天干地支/羅馬數字 (例如: 甲.參.二. 或 甲.參.二.(一))
+                if (ruleChineseNumber && ruleChineseNumber.checked && /^([一二三四五六七八九十壹貳參肆伍陸柒捌玖拾]+[、. ]|[甲乙丙丁戊己庚辛壬癸]+[、. ])/.test(fullStr)) {
+                    return true;
+                }
+                if (ruleHeavenlyStem && ruleHeavenlyStem.checked && /^[甲乙丙丁戊己庚辛壬癸]+[、. ]/.test(fullStr)) {
+                    return true;
+                }
+                if (ruleRomanNumber && ruleRomanNumber.checked && /^(I|II|III|IV|V|VI|VII|VIII|IX|X)+[、. ]/i.test(fullStr)) {
+                    return true;
+                }
+                
+                // 3. 自定義模式
+                if (ruleCustomPattern && ruleCustomPattern.checked && customPatternInput && customPatternInput.value) {
+                    try {
+                        const reg = new RegExp(customPatternInput.value);
+                        if (reg.test(fullStr)) return true;
+                    } catch (e) {
+                        console.warn('無效的正則表達式');
+                    }
+                }
+                return false;
             }
-    
-            parsedData.push({
-                id: i,
-                type: isMajor ? 'major' : 'detail',
-                seq: seq,
-                name: name,
-                spec: spec,
-                unit: unit,
-                qty: qty,
-                price: price,
-                amount: amount
-            });
-        }
-    
-        renderPreviewTable();
-        switchStep(3);
-    }
-
-    // 大項目識別判斷函式 (補回此處)
-    function checkIsMajorItem(seq, name) {
-        const fullStr = `${seq} ${name}`.trim();
-
-        // 匹配 中文數字/天干地支 (如: 一.、甲.參.二.)
-        if (ruleChineseNumber && ruleChineseNumber.checked && /^([一二三四五六七八九十壹貳參肆伍陸柒捌玖拾]+[、. ]|[甲乙丙丁戊己庚辛壬癸]+[、. ])/.test(fullStr)) return true;
-        if (ruleHeavenlyStem && ruleHeavenlyStem.checked && /^[甲乙丙丁戊己庚辛壬癸]+[、. ]/.test(fullStr)) return true;
-        if (ruleRomanNumber && ruleRomanNumber.checked && /^(I|II|III|IV|V|VI|VII|VIII|IX|X)+[、. ]/i.test(fullStr)) return true;
-        
-        if (ruleCustomPattern && ruleCustomPattern.checked && customPatternInput && customPatternInput.value) {
-            try {
-                const reg = new RegExp(customPatternInput.value);
-                if (reg.test(fullStr)) return true;
-            } catch (e) {
-                console.warn('無效的正則表達式');
-            }
-        }
-        return false;
-    }
 
     // 5. 渲染預覽表格
     function renderPreviewTable() {
