@@ -169,6 +169,9 @@ function initImportPage() {
             const num = parseFloat(str);
             return isNaN(num) ? NaN : num;
         };
+
+        // 常見工程單位庫（用來偵測欄位是否錯位）
+        const commonUnits = ['式', '只', '座', '組', '套', '處', '個', '項', 'm', 'M', '米', '公尺', 'kg', 'KG', '噸', '台', '輛', '張', '塊', '捲', '迴路'];
     
         for (let i = startRow - 1; i < rawData.length; i++) {
             const row = rawData[i];
@@ -176,13 +179,26 @@ function initImportPage() {
     
             const seq = String(row[0] || '').trim();
             const name = String(row[1] || '').trim();
-            const spec = String(row[2] || '').trim();
-            const unit = String(row[3] || '').trim();
+            
+            let spec = String(row[2] || '').trim();
+            let unit = String(row[3] || '').trim();
+            let qtyRaw = row[4];
+            let priceRaw = row[5];
+            let amountRaw = row[6];
+
+            // 🔍 關鍵修復：偵測 row[2] 是否直接就是單位（無規格欄位的情況）
+            if (commonUnits.includes(spec)) {
+                unit = spec;     // row[2] 其實是單位
+                spec = '';       // 規格說明為空
+                qtyRaw = row[3]; // row[3] 是數量
+                priceRaw = row[4];// row[4] 是單價
+                amountRaw = row[5];// row[5] 是複價
+            }
             
             // 嚴格解析數量、單價、複價
-            const qtyNum = parseStrictNumber(row[4]);
-            const priceNum = parseStrictNumber(row[5]);
-            const amountNum = parseStrictNumber(row[6]);
+            const qtyNum = parseStrictNumber(qtyRaw);
+            const priceNum = parseStrictNumber(priceRaw);
+            const amountNum = parseStrictNumber(amountRaw);
     
             const qty = !isNaN(qtyNum) ? qtyNum : 0;
             const price = !isNaN(priceNum) ? priceNum : 0;
