@@ -1,5 +1,5 @@
 /**
- * 匯入標單功能 (tenders-import.js) - v1.1
+ * 匯入標單功能 (tenders-import.js) - v1.2 (語法結構修復版)
  * 對應路由: /tenders/import
  * 對應頁面: pages/tenders/import.html
  */
@@ -150,7 +150,6 @@ function initImportPage() {
     // 4. 解析 Sheet (Step 2 -> Step 3)
     function parseSelectedSheet() {
         if (!workbook) return;
-        const isMajor = isMajorPattern;
         const sheetName = worksheetSelect.value;
         const worksheet = workbook.Sheets[sheetName];
         if (!worksheet) return;
@@ -166,7 +165,6 @@ function initImportPage() {
             if (val === undefined || val === null) return NaN;
             const str = String(val).trim();
             if (str === '' || str === '-') return NaN;
-            // 如果包含英文字母或非純數字符號（排除小數點），視為備註文字而非金額
             if (/[a-zA-Z#,]/.test(str)) return NaN;
             const num = parseFloat(str);
             return isNaN(num) ? NaN : num;
@@ -186,12 +184,8 @@ function initImportPage() {
             const priceNum = parseStrictNumber(row[5]);
             const amountNum = parseStrictNumber(row[6]);
     
-            const hasQuantity = !isNaN(qtyNum) && qtyNum > 0;
-            const hasUnit = unit !== ''; 
-            
             const qty = !isNaN(qtyNum) ? qtyNum : 0;
             const price = !isNaN(priceNum) ? priceNum : 0;
-            // 只有在複價是合法數字時才採用，否則由 qty * price 自動計算，絕不誤抓右側備註欄
             const amount = !isNaN(amountNum) ? amountNum : (qty * price);
     
             // 完全空白列跳過
@@ -209,37 +203,61 @@ function initImportPage() {
                 continue;
             }
     
-            // 大項目識別判斷函式（優化版：加入了細項流水號過濾）
-            function checkIsMajorItem(seq, name) {
-                const fullStr = `${seq} ${name}`.trim();
-            
-                // 1. 先攔截「細項特徵」：如果編號末端帶有 .數字. 或 .(數字) (例如 .1. 或 .1.(1))，直接排除大項！
-                if (/\.\d+(\.\(\d+\))?\.?$/.test(seq) || /\(\d+\)$/.test(seq)) {
-                    return false;
-                }
-            
-                // 2. 匹配標準大項開頭：中文數字/天干地支/羅馬數字 (例如: 甲.參.二. 或 甲.參.二.(一))
-                if (ruleChineseNumber && ruleChineseNumber.checked && /^([一二三四五六七八九十壹貳參肆伍陸柒捌玖拾]+[、. ]|[甲乙丙丁戊己庚辛壬癸]+[、. ])/.test(fullStr)) {
-                    return true;
-                }
-                if (ruleHeavenlyStem && ruleHeavenlyStem.checked && /^[甲乙丙丁戊己庚辛壬癸]+[、. ]/.test(fullStr)) {
-                    return true;
-                }
-                if (ruleRomanNumber && ruleRomanNumber.checked && /^(I|II|III|IV|V|VI|VII|VIII|IX|X)+[、. ]/i.test(fullStr)) {
-                    return true;
-                }
-                
-                // 3. 自定義模式
-                if (ruleCustomPattern && ruleCustomPattern.checked && customPatternInput && customPatternInput.value) {
-                    try {
-                        const reg = new RegExp(customPatternInput.value);
-                        if (reg.test(fullStr)) return true;
-                    } catch (e) {
-                        console.warn('無效的正則表達式');
-                    }
-                }
-                return false;
+            // --- 核心邏輯 2：大項目與細項判定 ---
+            const isMajor = checkIsMajorItem(seq, name);
+    
+            if (!isMajor) {
+                totalAmount += amount;
             }
+    
+            parsedData.push({
+                id: i,
+                type: isMajor ? 'major' : 'detail',
+                seq: seq,
+                name: name,
+                spec: spec,
+                unit: unit,
+                qty: qty,
+                price: price,
+                amount: amount
+            });
+        }
+    
+        renderPreviewTable();
+        switchStep(3);
+    }
+
+    // 大項目識別判斷函式 (獨立放於外層，含末端流水號過濾)
+    function checkIsMajorItem(seq, name) {
+        const fullStr = `${seq} ${name}`.trim();
+
+        // 1. 先攔截細項特徵：若編號末端為 .數字. 或 .(數字) (如 .1. 或 .1.(1))，直接排除大項！
+        if (/\.\d+(\.\(\d+\))?\.?$/.test(seq) || /\(\d+\)$/.test(seq)) {
+            return false;
+        }
+
+        // 2. 匹配標準大項開頭：中文數字/天干地支/羅馬數字 (如: 甲.參.二. 或 甲.參.二.(一))
+        if (ruleChineseNumber && ruleChineseNumber.checked && /^([一二三四五六七八九十壹貳參肆伍陸柒捌玖拾]+[、. ]|[甲乙丙丁戊己庚辛壬癸]+[、. ])/.test(fullStr)) {
+            return true;
+        }
+        if (ruleHeavenlyStem && ruleHeavenlyStem.checked && /^[甲乙丙丁戊己庚辛壬癸]+[、. ]/.test(fullStr)) {
+            return true;
+        }
+        if (ruleRomanNumber && ruleRomanNumber.checked && /^(I|II|III|IV|V|VI|VII|VIII|IX|X)+[、. ]/i.test(fullStr)) {
+            return true;
+        }
+        
+        // 3. 自定義模式
+        if (ruleCustomPattern && ruleCustomPattern.checked && customPatternInput && customPatternInput.value) {
+            try {
+                const reg = new RegExp(customPatternInput.value);
+                if (reg.test(fullStr)) return true;
+            } catch (e) {
+                console.warn('無效的正則表達式');
+            }
+        }
+        return false;
+    }
 
     // 5. 渲染預覽表格
     function renderPreviewTable() {
