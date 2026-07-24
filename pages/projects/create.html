@@ -26,6 +26,13 @@
                         <input type="text" id="projectCode" class="form-control" required>
                     </div>
                     <div class="form-group">
+                        <label for="projectMode" class="form-label">專案模式</label>
+                        <select id="projectMode" class="form-control">
+                            <option value="estimation" selected>📊 業務估價模式</option>
+                            <option value="execution">🏗️ 正式執行模式</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label for="projectStatus" class="form-label">專案狀態</label>
                         <select id="projectStatus" class="form-control">
                             <option value="planning" selected>規劃中</option>
@@ -81,6 +88,7 @@
                 const projectData = {
                     name: document.getElementById('projectName').value.trim(),
                     code: document.getElementById('projectCode').value.trim(),
+                    mode: document.getElementById('projectMode').value, // 【新增】專案模式
                     status: document.getElementById('projectStatus').value,
                     budget: parseFloat(document.getElementById('projectBudget').value) || 0,
                     description: document.getElementById('projectDescription').value.trim(),
