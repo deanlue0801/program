@@ -1,5 +1,5 @@
 /**
- * 編輯專案頁面 (projects-edit.js) - v3.0 (權限 Map 結構)
+ * 編輯專案頁面 (projects-edit.js) - v3.1 (支援專案模式切換)
  */
 function initProjectEditPage() {
     let projectId = null, currentProjectData = {}, currentUserRole = null;
@@ -138,6 +138,7 @@ function initProjectEditPage() {
             name: document.getElementById('projectName').value.trim(),
             code: document.getElementById('projectCode').value.trim(),
             status: document.getElementById('statusSelect').value,
+            mode: document.getElementById('modeSelect') ? document.getElementById('modeSelect').value : (currentProjectData.mode || 'estimation'), // 【新增】更新專案模式
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         if (!updatedData.name) return showAlert("專案名稱為必填項", "error");
@@ -159,6 +160,11 @@ function initProjectEditPage() {
         document.getElementById('projectName').value = project.name || '';
         document.getElementById('projectCode').value = project.code || '';
         document.getElementById('statusSelect').value = project.status || 'planning';
+        
+        // 【新增】回填專案模式選單
+        const modeSelectEl = document.getElementById('modeSelect');
+        if (modeSelectEl) modeSelectEl.value = project.mode || 'estimation';
+
         const startDateEl = document.getElementById('startDate');
         if(startDateEl) startDateEl.value = safeFormatDateForInput(project.startDate);
         const endDateEl = document.getElementById('endDate');
