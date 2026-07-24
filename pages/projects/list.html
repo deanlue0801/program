@@ -36,6 +36,10 @@
         
         <div class="project-info">
             <div class="info-row">
+                <span class="info-label">專案模式：</span>
+                <span class="info-value project-mode"></span>
+            </div>
+            <div class="info-row">
                 <span class="info-label">專案預算：</span>
                 <span class="info-value budget"></span>
             </div>
@@ -62,14 +66,12 @@
     </div>
 </template>
 
-<!-- 【核心修改】將 projects-list.js 的所有邏輯內嵌到這裡 -->
 <script>
 /**
- * 專案列表頁面 (projects-list.js) - v3.0 (內嵌版本)
- * 負責載入並顯示使用者有權限的專案列表。
+ * 專案列表頁面 (projects-list.js) - v3.1 (內嵌支援專案模式版)
  */
 function initProjectsListPage() {
-    console.log("🚀 初始化專案列表頁面 (v3.0 內嵌版)...");
+    console.log("🚀 初始化專案列表頁面 (v3.1 內嵌版)...");
 
     const loadingEl = document.getElementById('loading');
     const container = document.getElementById('projectsListContainer');
@@ -117,6 +119,13 @@ function initProjectsListPage() {
         card.querySelector('.project-title').textContent = project.name || '未命名專案';
         card.querySelector('.project-code').textContent = project.code || 'N/A';
         
+        // 專案模式
+        const modeEl = card.querySelector('.project-mode');
+        if (modeEl) {
+            const isEstimation = (project.mode === 'estimation' || !project.mode);
+            modeEl.textContent = isEstimation ? '📊 業務估價' : '🏗️ 正式執行';
+        }
+
         const statusEl = card.querySelector('.project-status');
         statusEl.textContent = getStatusText(project.status);
         statusEl.className = `project-status status-${project.status || 'planning'}`;
