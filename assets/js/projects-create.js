@@ -1,8 +1,8 @@
 /**
- * 建立新專案頁面 (projects-create.js) - v3.0 (診斷增強最終版)
+ * 建立新專案頁面 (projects-create.js) - v3.1 (新增專案模式 mode 支援)
  */
 function initProjectCreatePage() {
-    console.log("🚀 [1/5] 初始化建立新專案頁面 (v3.0)...");
+    console.log("🚀 [1/5] 初始化建立新專案頁面 (v3.1)...");
 
     const form = document.getElementById('createProjectForm');
 
@@ -40,7 +40,8 @@ function initProjectCreatePage() {
                 name: formData.get('projectName'),
                 code: formData.get('projectCode'),
                 budget: Number(formData.get('projectBudget')) || 0,
-                status: formData.get('projectStatus'),
+                status: formData.get('projectStatus') || 'planning',
+                mode: formData.get('projectMode') || 'estimation', // 【新增】專案模式：'estimation' (業務估價) 或 'execution' (正式執行)
                 startDate: formData.get('projectStartDate'),
                 endDate: formData.get('projectEndDate'),
                 description: formData.get('projectDescription'),
