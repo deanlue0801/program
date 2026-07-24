@@ -19,7 +19,6 @@
             <div class="form-grid">
                 <div class="form-section">
                     <h3>基本資訊</h3>
-                    <!-- 將 ID 從 tenderName/tenderCode 改為 projectName/projectCode -->
                     <div class="form-group">
                         <label for="projectName">專案名稱 *</label>
                         <input type="text" id="projectName" class="form-control" required>
@@ -28,7 +27,14 @@
                         <label for="projectCode">專案編號</label>
                         <input type="text" id="projectCode" class="form-control">
                     </div>
-                     <div class="form-group">
+                    <div class="form-group">
+                        <label for="modeSelect">專案模式</label>
+                        <select id="modeSelect" class="form-control">
+                            <option value="estimation">📊 業務估價模式</option>
+                            <option value="execution">🏗️ 正式執行模式</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label for="statusSelect">專案狀態</label>
                         <select id="statusSelect" class="form-control">
                             <option value="planning">規劃中</option>
@@ -72,13 +78,10 @@
                 </div>
             </div>
 
-            <!-- ================================================================= -->
-            <!-- ✨✨✨ 第二階段：新增「成員管理」區塊 ✨✨✨ -->
-            <!-- ================================================================= -->
+            <!-- 成員管理區塊 -->
             <div id="memberManagementSection" class="form-section" style="grid-column: 1 / -1; margin-top: 2rem;">
                 <h3 class="section-title"><span>👥</span> 成員管理</h3>
                 
-                <!-- 現有成員列表 -->
                 <div class="table-container">
                     <table class="table">
                         <thead>
@@ -89,12 +92,10 @@
                             </tr>
                         </thead>
                         <tbody id="membersTableBody">
-                            <!-- 成員列表將由 JavaScript 動態生成 -->
                         </tbody>
                     </table>
                 </div>
 
-                <!-- 新增成員表單 -->
                 <div class="add-member-form" style="margin-top: 1.5rem; border-top: 1px solid #eee; padding-top: 1.5rem;">
                     <h4>新增成員</h4>
                     <div class="form-row">
@@ -111,7 +112,6 @@
                         </div>
                     </div>
                     
-                    <!-- 精細權限設定 (預設隱藏) -->
                     <div id="permissionsContainer" class="permissions-container" style="margin-top: 1rem;">
                         <h5>精細權限 (僅對「編輯者」有效)</h5>
                         <div class="permission-checkboxes">
@@ -119,17 +119,12 @@
                             <label><input type="checkbox" data-permission="canAccessDistribution"> 存取樓層分配</label>
                             <label><input type="checkbox" data-permission="canUploadPhotos"> 允許上傳照片</label>
                             <label><input type="checkbox" data-permission="canManageMembers"> 允許管理成員</label>
-                            <!-- 更多權限可在此處添加 -->
                         </div>
                     </div>
                     
                     <button type="button" id="addMemberBtn" class="btn btn-info" style="margin-top: 1rem;">新增成員</button>
                 </div>
             </div>
-            <!-- ================================================================= -->
-            <!-- ✨✨✨ 區塊結束 ✨✨✨ -->
-            <!-- ================================================================= -->
-
 
             <div class="form-actions">
                 <button type="button" id="cancelBtn" class="btn btn-secondary">取消</button>
