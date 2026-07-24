@@ -30,6 +30,17 @@
                         <li><a href="/program/tenders/import" data-route><i class="fas fa-file-import fa-fw"></i> 匯入細項</a></li>
                     </ul>
                 </li>
+                    <li class="nav-item-has-children">
+                    <a href="/program/quotes/list" data-route><i class="fas fa-hand-holding-dollar fa-fw"></i> 業務報價</a>
+                    <ul class="sub-nav">
+                        <li><a href="/program/quotes/import-cost" data-route><i class="fas fa-tags fa-fw"></i> 廠商詢價管理</a></li>
+                        <li><a href="/program/quotes/analysis" data-route><i class="fas fa-calculator fa-fw"></i> 報價與利潤分析</a></li>
+                    </ul>
+                </li>
+
+                <li><a href="/program/tenders/procurement" data-route><i class="fas fa-shopping-cart fa-fw"></i> 採購管理</a></li>
+                <li><a href="/program/cost-management" data-route><i class="fas fa-coins fa-fw"></i> 成本控管分析</a></li>
+            </ul>
             </ul>
             <div class="sidebar-footer">
                 <span id="currentUser"></span>
@@ -74,6 +85,10 @@
     <script src="/program/assets/js/tenders-tracking-setup.js"></script>
     <script src="/program/assets/js/tenders-procurement.js"></script>
     <script src="/program/assets/js/tenders-cost-management.js"></script>
+    <!-- 業務報價模組 -->
+    <script src="/program/assets/js/quotes-list.js"></script>
+    <script src="/program/assets/js/quotes-import-cost.js"></script>
+    <script src="/program/assets/js/quotes-analysis.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
