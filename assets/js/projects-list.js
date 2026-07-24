@@ -1,8 +1,8 @@
 /**
- * 專案列表頁面 (projects-list.js) - v4.0 (穩定版)
+ * 專案列表頁面 (projects-list.js) - v4.1 (支援模式標籤顯示)
  */
 function initProjectsListPage() {
-    console.log("🚀 初始化專案列表頁面 (v4.0)...");
+    console.log("🚀 初始化專案列表頁面 (v4.1)...");
 
     const loadingEl = document.getElementById('loading');
     const container = document.getElementById('projectsListContainer');
@@ -51,12 +51,24 @@ function initProjectsListPage() {
         const userRole = memberInfo ? memberInfo.role : '未知';
         const roleText = { owner: '擁有者', editor: '編輯者', viewer: '檢視者' }[userRole] || '未知';
 
+        // 專案名稱與代碼
         card.querySelector('.project-title').textContent = project.name || '未命名專案';
         card.querySelector('.project-code').textContent = project.code || 'N/A';
         
+        // 狀態標籤
         const statusEl = card.querySelector('.project-status');
-        statusEl.textContent = getStatusText(project.status);
-        statusEl.className = `project-status status-${project.status || 'planning'}`;
+        if (statusEl) {
+            statusEl.textContent = getStatusText(project.status);
+            statusEl.className = `project-status status-${project.status || 'planning'}`;
+        }
+
+        // 【新增】專案模式標籤渲染 (可選: 若 HTML 有預留 .project-mode 欄位)
+        const modeEl = card.querySelector('.project-mode');
+        if (modeEl) {
+            const isEstimation = (project.mode === 'estimation' || !project.mode);
+            modeEl.textContent = isEstimation ? '📊 業務估價' : '🏗️ 正式執行';
+            modeEl.className = `badge ${isEstimation ? 'badge-info' : 'badge-success'}`;
+        }
         
         card.querySelector('.budget').textContent = formatCurrency(project.budget || 0);
         card.querySelector('.created-date').textContent = formatDate(project.createdAt);
