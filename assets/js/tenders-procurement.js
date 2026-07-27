@@ -650,7 +650,29 @@ function initProcurementPage() {
         // --- 輔助函式 ---
         function showLoading(show, msg) { const el = document.getElementById('loading'); if(el) { el.style.display = show ? 'flex' : 'none'; if(msg) el.querySelector('p').textContent = msg; } }
         function populateSelect(select, items, defaultText) { if(!select) return; select.innerHTML = `<option value="">${defaultText}</option>` + items.map(i => `<option value="${i.id}">${i.sequence ? i.sequence + '.' : ''} ${i.name || i.code}</option>`).join(''); select.disabled = items.length === 0; }
-        function resetSelects(level) { if (level === 'project') { document.getElementById('tenderSelect').innerHTML = '<option value="">請先選擇專案</option>'; document.getElementById('tenderSelect').disabled = true; document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>'; document.getElementById('majorItemSelect').disabled = true; document.getElementById('mainContent').style.display = 'none'; document.getElementById('emptyState').style.display = 'flex'; } else if (level === 'tender') { document.getElementById('majorItemSelect').innerHTML = '<option value="">所有大項目</option>'; } }
+        function resetSelects(level) { 
+            const tenderSelect = document.getElementById('tenderSelect');
+            const majorItemSelect = document.getElementById('majorItemSelect') || document.getElementById('majorSelect');
+            const mainContent = document.getElementById('mainContent');
+            const emptyState = document.getElementById('emptyState');
+
+            if (level === 'project') { 
+                if (tenderSelect) {
+                    tenderSelect.innerHTML = '<option value="">請先選擇專案</option>'; 
+                    tenderSelect.disabled = true; 
+                }
+                if (majorItemSelect) {
+                    majorItemSelect.innerHTML = '<option value="">所有大項目</option>'; 
+                    majorItemSelect.disabled = true; 
+                }
+                if (mainContent) mainContent.style.display = 'none'; 
+                if (emptyState) emptyState.style.display = 'flex'; 
+            } else if (level === 'tender') { 
+                if (majorItemSelect) {
+                    majorItemSelect.innerHTML = '<option value="">所有大項目</option>'; 
+                }
+            } 
+        }
         function showAlert(msg, type) { alert(msg); }
         function naturalSequenceSort(a, b) { const MAP = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'壹':1,'貳':2,'參':3,'肆':4,'伍':5,'陸':6,'柒':7,'捌':8,'玖':9,'拾':10}; const sA = String(a.sequence||''), sB = String(b.sequence||''); const nA = parseFloat(MAP[sA]||sA), nB = parseFloat(MAP[sB]||sB); if(!isNaN(nA)&&!isNaN(nB)) return nA-nB; return sA.localeCompare(sB, undefined, {numeric:true}); }
         function normalizeString(str) { return String(str).replace(/（/g, '(').replace(/）/g, ')').replace(/\s+/g, '').trim().toLowerCase(); }
