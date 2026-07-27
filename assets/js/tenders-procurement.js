@@ -28,8 +28,18 @@ function initProcurementPage() {
         }, 100);
     }
 
-    waitForElement('#projectSelect', () => {
-        console.log("✅ HTML 元素已就緒，開始執行...");
+    // 【一勞永逸閘門】：檢查當前頁面是否有「採購頁面專屬」的 DOM 容器 (例如 procurementTableBody)
+        const isProcurementPage = !!document.getElementById('procurementTableBody');
+        
+        // 如果不是採購頁面，直接退出！完全不註冊事件、不讀取資料，也不去干涉其他頁面
+        if (!isProcurementPage) {
+            console.log("ℹ️ 當前非「標單採購頁面」，tenders-procurement.js 已自動停用，避免跨頁面干涉。");
+            return; 
+        }
+
+        console.log("✅ 確定為採購頁面，開始初始化 (v35.0)...");
+
+        let projects = [], tenders = [], majorItems = [], detailItems = [];
 
         let projects = [], tenders = [], majorItems = [], detailItems = [];
         let purchaseOrders = [], quotations = [];
