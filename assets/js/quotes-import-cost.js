@@ -30,19 +30,34 @@ function initQuotesImportCostPage() {
         }
     }
 
-    // 1. 載入可存取的專案
+// 1. 載入可存取的專案 (對齊 projects-edit.js 的權限驗證邏輯)
     async function loadProjects() {
         try {
+            const userEmail = currentUser ? currentUser.email : null;
+            if (!userEmail) {
+                console.warn("⚠️ 未取得當前使用者 Email");
+                return;
+            }
+
             const snapshot = await db.collection('projects').get();
             projectSelect.innerHTML = '<option value="">請選擇專案...</option>';
+
             snapshot.forEach(doc => {
                 const data = doc.data();
-                if (currentUser && data.members && data.members[currentUser.email]) {
-                    projectSelect.innerHTML += `<option value="${doc.id}">${data.name}</option>`;
+                
+                // 相容兩種結構：判斷 memberEmails 陣列 或 members 物件
+                const hasAccessByArray = Array.isArray(data.memberEmails) && data.memberEmails.includes(userEmail);
+                const hasAccessByObject = data.members && data.members[userEmail];
+
+                if (hasAccessByArray || hasAccessByObject) {
+                    projectSelect.innerHTML += `<option value="${doc.id}">${data.name || '未命名專案'}</option>`;
                 }
             });
         } catch (err) {
-            console.error("載入專案失敗:", err);
+            console.error("❌ 載入專案失敗:", err);
+            if (typeof showAlert === 'function') {
+                showAlert("載入專案失敗: " + err.message, "error");
+            }
         }
     }
 
@@ -54,15 +69,28 @@ function initQuotesImportCostPage() {
             return;
         }
 
+        tenderSelect.innerHTML = '<option value="">標單載入中...</option>';
+        tenderSelect.disabled = true;
+
         try {
             const snapshot = await db.collection('tenders').where('projectId', '==', projectId).get();
+            
+            if (snapshot.empty) {
+                tenderSelect.innerHTML = '<option value="">此專案尚無標單</option>';
+                tenderSelect.disabled = true;
+                return;
+            }
+
             tenderSelect.innerHTML = '<option value="">請選擇標單...</option>';
             snapshot.forEach(doc => {
-                tenderSelect.innerHTML += `<option value="${doc.id}">${doc.data().name}</option>`;
+                const data = doc.data();
+                tenderSelect.innerHTML += `<option value="${doc.id}">${data.name || '未命名標單'}</option>`;
             });
+
             tenderSelect.disabled = false;
         } catch (err) {
-            console.error("載入標單失敗:", err);
+            console.error("❌ 載入標單失敗:", err);
+            tenderSelect.innerHTML = '<option value="">載入標單失敗</option>';
         }
     }
 
