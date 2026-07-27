@@ -1,0 +1,195 @@
+/**
+ * 業務報價 - 廠商詢價管理 (quotes-import-cost.js)
+ * 對應路由: /quotes/import-cost
+ */
+function initQuotesImportCostPage() {
+    console.log("🚀 初始化廠商詢價管理頁面...");
+
+    const db = firebase.firestore();
+    const currentUser = firebase.auth().currentUser;
+
+    const projectSelect = document.getElementById('projectSelect');
+    const tenderSelect = document.getElementById('tenderSelect');
+    const saveCostBtn = document.getElementById('saveCostBtn');
+    const costTableBody = document.getElementById('costTableBody');
+
+    let currentItems = []; // 儲存當前標單細項
+
+    loadProjects();
+    setupEventListeners();
+
+    function setupEventListeners() {
+        if (projectSelect) {
+            projectSelect.addEventListener('change', (e) => loadTenders(e.target.value));
+        }
+        if (tenderSelect) {
+            tenderSelect.addEventListener('change', (e) => loadDetailItems(e.target.value));
+        }
+        if (saveCostBtn) {
+            saveCostBtn.addEventListener('click', saveCostData);
+        }
+    }
+
+    // 1. 載入可存取的專案
+    async function loadProjects() {
+        try {
+            const snapshot = await db.collection('projects').get();
+            projectSelect.innerHTML = '<option value="">請選擇專案...</option>';
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                if (currentUser && data.members && data.members[currentUser.email]) {
+                    projectSelect.innerHTML += `<option value="${doc.id}">${data.name}</option>`;
+                }
+            });
+        } catch (err) {
+            console.error("載入專案失敗:", err);
+        }
+    }
+
+    // 2. 載入專案對應的標單
+    async function loadTenders(projectId) {
+        if (!projectId) {
+            tenderSelect.innerHTML = '<option value="">請先選擇專案</option>';
+            tenderSelect.disabled = true;
+            return;
+        }
+
+        try {
+            const snapshot = await db.collection('tenders').where('projectId', '==', projectId).get();
+            tenderSelect.innerHTML = '<option value="">請選擇標單...</option>';
+            snapshot.forEach(doc => {
+                tenderSelect.innerHTML += `<option value="${doc.id}">${doc.data().name}</option>`;
+            });
+            tenderSelect.disabled = false;
+        } catch (err) {
+            console.error("載入標單失敗:", err);
+        }
+    }
+
+    // 3. 載入標單細項資料
+    async function loadDetailItems(tenderId) {
+        if (!tenderId) {
+            costTableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">請選擇標單</td></tr>';
+            saveCostBtn.disabled = true;
+            return;
+        }
+
+        try {
+            const snapshot = await db.collection('detailItems').where('tenderId', '==', tenderId).get();
+            currentItems = [];
+            snapshot.forEach(doc => {
+                currentItems.push({ id: doc.id, ...doc.data() });
+            });
+
+            renderCostTable();
+            saveCostBtn.disabled = false;
+        } catch (err) {
+            console.error("載入細項失敗:", err);
+        }
+    }
+
+    // 4. 渲染表格
+    function renderCostTable() {
+        if (currentItems.length === 0) {
+            costTableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">該標單尚無細項資料</td></tr>';
+            return;
+        }
+
+        let html = '';
+        currentItems.forEach((item, index) => {
+            const costPrice = item.costUnitPrice !== undefined ? item.costUnitPrice : (item.unitPrice || 0);
+            const costTotal = (item.totalQuantity || 0) * costPrice;
+            const vendor = item.vendorName || '';
+
+            html += `
+                <tr>
+                    <td>${item.sequence || '-'}</td>
+                    <td>${item.name || ''}</td>
+                    <td><small class="text-muted">${item.spec || '-'}</small></td>
+                    <td class="text-center">${item.unit || ''}</td>
+                    <td class="text-end">${(item.totalQuantity || 0).toLocaleString()}</td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm text-end cost-input" 
+                               data-index="${index}" value="${costPrice}" step="any" min="0">
+                    </td>
+                    <td class="text-end fw-bold cost-total" id="costTotal_${index}">
+                        NT$ ${Math.round(costTotal).toLocaleString()}
+                    </td>
+                    <td>
+                        <input type="text" class="form-control form-control-sm vendor-input" 
+                               data-index="${index}" value="${vendor}" placeholder="廠商或備註">
+                    </td>
+                </tr>
+            `;
+        });
+
+        costTableBody.innerHTML = html;
+
+        // 綁定動態試算事件
+        document.querySelectorAll('.cost-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const idx = e.target.dataset.index;
+                const newPrice = parseFloat(e.target.value) || 0;
+                currentItems[idx].costUnitPrice = newPrice;
+                
+                const qty = currentItems[idx].totalQuantity || 0;
+                const totalCell = document.getElementById(`costTotal_${idx}`);
+                if (totalCell) {
+                    totalCell.textContent = `NT$ ${Math.round(qty * newPrice).toLocaleString()}`;
+                }
+            });
+        });
+
+        document.querySelectorAll('.vendor-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const idx = e.target.dataset.index;
+                currentItems[idx].vendorName = e.target.value;
+            });
+        });
+    }
+
+    // 5. 批次寫入 Firestore (更新 costUnitPrice, costTotalPrice, vendorName)
+    async function saveCostData() {
+        if (currentItems.length === 0) return;
+
+        saveCostBtn.disabled = true;
+        saveCostBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>儲存中...';
+
+        try {
+            let batch = db.batch();
+            let count = 0;
+
+            for (const item of currentItems) {
+                const itemRef = db.collection('detailItems').doc(item.id);
+                const costPrice = item.costUnitPrice !== undefined ? item.costUnitPrice : (item.unitPrice || 0);
+                const costTotal = (item.totalQuantity || 0) * costPrice;
+
+                batch.update(itemRef, {
+                    costUnitPrice: costPrice,
+                    costTotalPrice: costTotal,
+                    vendorName: item.vendorName || '',
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                count++;
+                if (count >= 400) {
+                    await batch.commit();
+                    batch = db.batch();
+                    count = 0;
+                }
+            }
+
+            if (count > 0) {
+                await batch.commit();
+            }
+
+            alert('🎉 廠商詢價成本已成功儲存！');
+        } catch (err) {
+            console.error("儲存失敗:", err);
+            alert('儲存失敗: ' + err.message);
+        } finally {
+            saveCostBtn.disabled = false;
+            saveCostBtn.innerHTML = '<i class="fas fa-save me-1"></i>儲存成本詢價';
+        }
+    }
+}
