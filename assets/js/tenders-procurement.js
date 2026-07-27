@@ -1,17 +1,29 @@
 /**
  * 標單採購管理 (tenders-procurement.js) - v35.0 (預算差異與選商實作版)
- * * 更新日誌：
- * 1. [新增] 預算差異分析：計算 (成本 - 成交) * 數量，顯示盈虧。
- * 2. [新增] 選定廠商功能：點擊報價膠囊可將其設為「成交價」。
- * 3. [介面] 表格擴充至 11 欄，新增「預算差異」與「附件」。
  */
-function initProcurementPage() {
-    console.log("🚀 初始化採購管理頁面 (v35.0 預算差異版)...");
 
-    // 全域變數
+// 1. 確保掛載到全域，讓 router.js 隨時都找得到這個函式
+window.initProcurementPage = function () {
+    console.log("🚀 開始執行 initProcurementPage...");
+
+    // 2. 【一勞永逸閘門】：檢查當前頁面是否有採購頁面專屬 DOM
+    const isProcurementPage = !!document.getElementById('procurementTableBody') || !!document.getElementById('mainContent');
+    
+    // 如果不是採購頁面，直接退出！不註冊事件、不抓資料、不干涉其他頁面 (如詢價頁面)
+    if (!isProcurementPage) {
+        console.log("ℹ️ 當前非「標單採購頁面」，tenders-procurement.js 已自動停用。");
+        return; 
+    }
+
+    console.log("✅ 確定為採購頁面，開始初始化 (v35.0)...");
+
+    // 3. 全域變數宣告 (修正重複宣告問題)
     let statusChart = null;
     let currentBatchMajorId = null;
     let currentBatchType = null;
+    let projects = [], tenders = [], majorItems = [], detailItems = [];
+    let purchaseOrders = [], quotations = [];
+    let selectedProject = null, selectedTender = null;
 
     function waitForElement(selector, callback) {
         const element = document.querySelector(selector);
@@ -28,34 +40,17 @@ function initProcurementPage() {
         }, 100);
     }
 
-    // 【一勞永逸閘門】：檢查當前頁面是否有「採購頁面專屬」的 DOM 容器 (例如 procurementTableBody)
-        const isProcurementPage = !!document.getElementById('procurementTableBody');
-        
-        // 如果不是採購頁面，直接退出！完全不註冊事件、不讀取資料，也不去干涉其他頁面
-        if (!isProcurementPage) {
-            console.log("ℹ️ 當前非「標單採購頁面」，tenders-procurement.js 已自動停用，避免跨頁面干涉。");
-            return; 
-        }
+    const currentUser = firebase.auth().currentUser;
+    const db = firebase.firestore();
 
-        console.log("✅ 確定為採購頁面，開始初始化 (v35.0)...");
+    injectHiddenDateInputs();
 
-        let projects = [], tenders = [], majorItems = [], detailItems = [];
-
-        let projects = [], tenders = [], majorItems = [], detailItems = [];
-        let purchaseOrders = [], quotations = [];
-        let selectedProject = null, selectedTender = null;
-        
-        const currentUser = firebase.auth().currentUser;
-        const db = firebase.firestore();
-
-        injectHiddenDateInputs();
-
-        // 確保 Chart.js 有載入
-        if (!document.querySelector('script[src*="chart.js"]')) {
-            const script = document.createElement('script');
-            script.src = "https://cdn.jsdelivr.net/npm/chart.js";
-            document.head.appendChild(script);
-        }
+    // 確保 Chart.js 有載入
+    if (!document.querySelector('script[src*="chart.js"]')) {
+        const script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/chart.js";
+        document.head.appendChild(script);
+    }
 
         initializePage();
 
