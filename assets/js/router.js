@@ -32,6 +32,7 @@ const routes = {
     '/tenders/import': { html: 'pages/tenders/import.html', init: 'initImportPage', title: '匯入標單' },
     '/tenders/edit': { html: 'pages/tenders/edit.html', init: 'initTenderEditPage', title: '編輯標單' },
     '/tenders/procurement': { html: 'pages/tenders/procurement.html', init: 'initProcurementPage', title: '標單採購' }, 
+    '/quotes/import-cost': { html: 'pages/quotes/import-cost.html', init: 'initProcurementPage', title: '廠商詢價管理' }, 
     '404': { html: 'pages/404.html', title: '找不到頁面' }
 };
 
