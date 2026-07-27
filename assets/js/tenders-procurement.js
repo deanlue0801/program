@@ -113,8 +113,12 @@ function initProcurementPage() {
 
             selectedTender = tenders.find(t => t.id === tenderId);
             const majorItemSelect = document.getElementById('majorItemSelect');
-            majorItemSelect.innerHTML = '<option value="">載入中...</option>';
-            majorItemSelect.disabled = true;
+            
+            // 【修復關鍵】加上 if 判斷，確保頁面上有 majorItemSelect 才進行寫入
+            if (majorItemSelect) {
+                majorItemSelect.innerHTML = '<option value="">載入中...</option>';
+                majorItemSelect.disabled = true;
+            }
 
             showLoading(true, '載入資料中...');
 
