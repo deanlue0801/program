@@ -2,8 +2,19 @@
  * 業務報價 - 廠商詢價管理 (quotes-import-cost.js)
  * 對應路由: /quotes/import-cost
  */
-function initQuotesImportCostPage() {
-    console.log("🚀 初始化廠商詢價管理頁面...");
+
+// 1. 掛載到全域，確保 router.js 永遠找得到
+window.initQuotesImportCostPage = function () {
+    console.log("🚀 開始執行 initQuotesImportCostPage...");
+
+    // 2. 【一勞永逸閘門】：檢查當前頁面是否有「詢價頁面專屬」的 DOM (例如 costTableBody)
+    const costTableBody = document.getElementById('costTableBody');
+    if (!costTableBody) {
+        console.log("ℹ️ 當前非「廠商詢價頁面」，quotes-import-cost.js 已自動停用。");
+        return;
+    }
+
+    console.log("✅ 確定為廠商詢價頁面，開始初始化...");
 
     const db = firebase.firestore();
     const currentUser = firebase.auth().currentUser;
@@ -11,7 +22,6 @@ function initQuotesImportCostPage() {
     const projectSelect = document.getElementById('projectSelect');
     const tenderSelect = document.getElementById('tenderSelect');
     const saveCostBtn = document.getElementById('saveCostBtn');
-    const costTableBody = document.getElementById('costTableBody');
 
     let currentItems = []; // 儲存當前標單細項
 
@@ -30,7 +40,7 @@ function initQuotesImportCostPage() {
         }
     }
 
-// 1. 載入可存取的專案 (對齊 projects-edit.js 的權限驗證邏輯)
+    // 1. 載入可存取的專案
     async function loadProjects() {
         try {
             const userEmail = currentUser ? currentUser.email : null;
@@ -40,7 +50,9 @@ function initQuotesImportCostPage() {
             }
 
             const snapshot = await db.collection('projects').get();
-            projectSelect.innerHTML = '<option value="">請選擇專案...</option>';
+            if (projectSelect) {
+                projectSelect.innerHTML = '<option value="">請選擇專案...</option>';
+            }
 
             snapshot.forEach(doc => {
                 const data = doc.data();
@@ -49,7 +61,7 @@ function initQuotesImportCostPage() {
                 const hasAccessByArray = Array.isArray(data.memberEmails) && data.memberEmails.includes(userEmail);
                 const hasAccessByObject = data.members && data.members[userEmail];
 
-                if (hasAccessByArray || hasAccessByObject) {
+                if ((hasAccessByArray || hasAccessByObject) && projectSelect) {
                     projectSelect.innerHTML += `<option value="${doc.id}">${data.name || '未命名專案'}</option>`;
                 }
             });
@@ -63,6 +75,8 @@ function initQuotesImportCostPage() {
 
     // 2. 載入專案對應的標單
     async function loadTenders(projectId) {
+        if (!tenderSelect) return;
+
         if (!projectId) {
             tenderSelect.innerHTML = '<option value="">請先選擇專案</option>';
             tenderSelect.disabled = true;
@@ -97,8 +111,10 @@ function initQuotesImportCostPage() {
     // 3. 載入標單細項資料
     async function loadDetailItems(tenderId) {
         if (!tenderId) {
-            costTableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">請選擇標單</td></tr>';
-            saveCostBtn.disabled = true;
+            if (costTableBody) {
+                costTableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">請選擇標單</td></tr>';
+            }
+            if (saveCostBtn) saveCostBtn.disabled = true;
             return;
         }
 
@@ -110,7 +126,7 @@ function initQuotesImportCostPage() {
             });
 
             renderCostTable();
-            saveCostBtn.disabled = false;
+            if (saveCostBtn) saveCostBtn.disabled = false;
         } catch (err) {
             console.error("載入細項失敗:", err);
         }
@@ -118,6 +134,8 @@ function initQuotesImportCostPage() {
 
     // 4. 渲染表格
     function renderCostTable() {
+        if (!costTableBody) return;
+
         if (currentItems.length === 0) {
             costTableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">該標單尚無細項資料</td></tr>';
             return;
@@ -176,12 +194,14 @@ function initQuotesImportCostPage() {
         });
     }
 
-    // 5. 批次寫入 Firestore (更新 costUnitPrice, costTotalPrice, vendorName)
+    // 5. 批次寫入 Firestore
     async function saveCostData() {
         if (currentItems.length === 0) return;
 
-        saveCostBtn.disabled = true;
-        saveCostBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>儲存中...';
+        if (saveCostBtn) {
+            saveCostBtn.disabled = true;
+            saveCostBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>儲存中...';
+        }
 
         try {
             let batch = db.batch();
@@ -216,8 +236,10 @@ function initQuotesImportCostPage() {
             console.error("儲存失敗:", err);
             alert('儲存失敗: ' + err.message);
         } finally {
-            saveCostBtn.disabled = false;
-            saveCostBtn.innerHTML = '<i class="fas fa-save me-1"></i>儲存成本詢價';
+            if (saveCostBtn) {
+                saveCostBtn.disabled = false;
+                saveCostBtn.innerHTML = '<i class="fas fa-save me-1"></i>儲存成本詢價';
+            }
         }
     }
-}
+};
