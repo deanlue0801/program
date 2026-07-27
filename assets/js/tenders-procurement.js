@@ -114,7 +114,7 @@ function initProcurementPage() {
             selectedTender = tenders.find(t => t.id === tenderId);
             const majorItemSelect = document.getElementById('majorItemSelect');
             
-            // 【修復關鍵】加上 if 判斷，確保頁面上有 majorItemSelect 才進行寫入
+            // 安全防護：僅在 DOM 存在時更新選單
             if (majorItemSelect) {
                 majorItemSelect.innerHTML = '<option value="">載入中...</option>';
                 majorItemSelect.disabled = true;
@@ -125,7 +125,7 @@ function initProcurementPage() {
             try {
                 const queryConditions = [
                     { field: 'tenderId', operator: '==', value: tenderId },
-                    { field: 'projectId', operator: '==', value: selectedProject.id }
+                    { field: 'projectId', operator: '==', value: selectedProject ? selectedProject.id : '' }
                 ];
 
                 let majorData, detailDataRaw;
@@ -137,8 +137,8 @@ function initProcurementPage() {
                     majorData = majorRes.docs;
                     detailDataRaw = detailRes.docs;
                 } else {
-                    const majorSnap = await db.collection('majorItems').where('tenderId', '==', tenderId).where('projectId', '==', selectedProject.id).get();
-                    const detailSnap = await db.collection('detailItems').where('tenderId', '==', tenderId).where('projectId', '==', selectedProject.id).get();
+                    const majorSnap = await db.collection('majorItems').where('tenderId', '==', tenderId).where('projectId', '==', selectedProject ? selectedProject.id : '').get();
+                    const detailSnap = await db.collection('detailItems').where('tenderId', '==', tenderId).where('projectId', '==', selectedProject ? selectedProject.id : '').get();
                     majorData = majorSnap.docs.map(d => ({id: d.id, ...d.data()}));
                     detailDataRaw = detailSnap.docs.map(d => ({id: d.id, ...d.data()}));
                 }
@@ -147,7 +147,11 @@ function initProcurementPage() {
                 detailItems = detailDataRaw.filter(item => !item.isAddition);
                 majorItems.sort(naturalSequenceSort);
                 detailItems.sort(naturalSequenceSort);
-                populateSelect(majorItemSelect, majorItems, '所有大項目');
+                
+                // 安全防護：僅在 DOM 存在時更新大項目選單
+                if (majorItemSelect) {
+                    populateSelect(majorItemSelect, majorItems, '所有大項目');
+                }
 
                 try {
                     let poData = [];
@@ -155,7 +159,7 @@ function initProcurementPage() {
                          const poRes = await safeFirestoreQuery('purchaseOrders', queryConditions);
                          poData = poRes.docs;
                     } else {
-                        const poSnap = await db.collection('purchaseOrders').where('tenderId', '==', tenderId).where('projectId', '==', selectedProject.id).get();
+                        const poSnap = await db.collection('purchaseOrders').where('tenderId', '==', tenderId).where('projectId', '==', selectedProject ? selectedProject.id : '').get();
                         poData = poSnap.docs.map(d => ({id: d.id, ...d.data()}));
                     }
                     purchaseOrders = poData;
@@ -167,14 +171,17 @@ function initProcurementPage() {
                         const quoteRes = await safeFirestoreQuery('quotations', queryConditions);
                         quoteData = quoteRes.docs;
                     } else {
-                        const quoteSnap = await db.collection('quotations').where('tenderId', '==', tenderId).where('projectId', '==', selectedProject.id).get();
+                        const quoteSnap = await db.collection('quotations').where('tenderId', '==', tenderId).where('projectId', '==', selectedProject ? selectedProject.id : '').get();
                         quoteData = quoteSnap.docs.map(d => ({id: d.id, ...d.data()}));
                     }
                     quotations = quoteData;
                 } catch (quoteError) { quotations = []; }
 
-                document.getElementById('mainContent').style.display = 'block';
-                document.getElementById('emptyState').style.display = 'none';
+                // 【修復關鍵】：控制顯示前，先確認 mainContent 與 emptyState 是否存在
+                const mainContent = document.getElementById('mainContent');
+                const emptyState = document.getElementById('emptyState');
+                if (mainContent) mainContent.style.display = 'block';
+                if (emptyState) emptyState.style.display = 'none';
                 
                 ensureDashboardSection();
                 adjustTableHeader();      
@@ -184,7 +191,11 @@ function initProcurementPage() {
             } catch (error) {
                 console.error("資料載入失敗:", error);
                 showAlert('載入失敗: ' + error.message, 'error');
-                majorItemSelect.innerHTML = '<option value="">載入失敗</option>';
+                
+                // 【修復關鍵】：失敗時也確認 majorItemSelect 是否存在
+                if (majorItemSelect) {
+                    majorItemSelect.innerHTML = '<option value="">載入失敗</option>';
+                }
             } finally {
                 showLoading(false);
             }
