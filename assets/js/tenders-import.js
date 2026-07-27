@@ -1,10 +1,10 @@
 /**
- * 匯入標單功能 (tenders-import.js) - v1.3 (欄位結構自動判讀增強版)
+ * 匯入標單功能 (tenders-import.js) - v1.4 (新增業務報價欄位同步寫入)
  * 對應路由: /tenders/import
  * 對應頁面: pages/tenders/import.html
  */
 function initImportPage() {
-    console.log("🚀 初始化 Excel 匯入標單頁面 (v1.3)...");
+    console.log("🚀 初始化 Excel 匯入標單頁面 (v1.4)...");
 
     // --- 全域變數設定 ---
     let workbook = null;
@@ -480,6 +480,8 @@ function initImportPage() {
                     commitBatchIfNeeded();
                 } else {
                     const detailRef = db.collection('detailItems').doc();
+                    
+                    // 寫入工程基本欄位，並同時預設寫入業務報價/詢價所需欄位
                     batch.set(detailRef, {
                         tenderId,
                         projectId,
@@ -489,8 +491,13 @@ function initImportPage() {
                         spec: item.spec || '',
                         unit: item.unit || '',
                         totalQuantity: item.qty || 0,
-                        unitPrice: item.price || 0,
-                        totalPrice: item.amount || 0,
+                        unitPrice: item.price || 0,          // 標單/工程單價
+                        totalPrice: item.amount || 0,        // 標單/工程總價
+                        costUnitPrice: item.price || 0,      // 廠商詢價單價 (預設等於匯入單價)
+                        costTotalPrice: item.amount || 0,    // 廠商成本總價
+                        ownerUnitPrice: item.price || 0,     // 對業主報價單價 (預設等於匯入單價)
+                        ownerTotalPrice: item.amount || 0,   // 對業主報價總價
+                        vendorName: '',                      // 預設廠商名稱
                         excludeFromProgress: false,
                         isAddition: false,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
