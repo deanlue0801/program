@@ -1,0 +1,55 @@
+<div class="container-fluid">
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-tags me-2"></i>廠商詢價與成本管理</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3 align-items-center mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">選擇專案</label>
+                    <select id="projectSelect" class="form-select">
+                        <option value="">載入中...</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">選擇標單</label>
+                    <select id="tenderSelect" class="form-select" disabled>
+                        <option value="">請先選擇專案</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end gap-2">
+                    <button id="saveCostBtn" class="btn btn-primary" disabled>
+                        <i class="fas fa-save me-1"></i>儲存成本詢價
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 詢價清單表格 -->
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="costTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 80px;">項次</th>
+                            <th>項目名稱</th>
+                            <th>規格說明</th>
+                            <th style="width: 70px;">單位</th>
+                            <th style="width: 90px;" class="text-end">數量</th>
+                            <th style="width: 140px;" class="text-end">廠商詢價單價 (成本)</th>
+                            <th style="width: 140px;" class="text-end">成本總價</th>
+                            <th style="width: 160px;">詢價廠商 / 備註</th>
+                        </tr>
+                    </thead>
+                    <tbody id="costTableBody">
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">請先選取專案與標單</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
