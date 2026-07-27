@@ -205,6 +205,8 @@ function initProcurementPage() {
 
         function ensureDashboardSection() {
             const mainContent = document.getElementById('mainContent');
+            // 【修復關鍵】：若非採購頁面 (找不到 mainContent)，直接結束不執行
+            if (!mainContent) return;
             const oldDash = document.getElementById('procurement-dashboard');
             if (oldDash) oldDash.remove();
 
