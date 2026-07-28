@@ -119,7 +119,17 @@ window.initQuotesImportCostPage = function () {
         }
 
         try {
-            const snapshot = await db.collection('detailItems').where('tenderId', '==', tenderId).get();
+            // 取得當前選取的 projectId
+            const selectedProjectId = projectSelect ? projectSelect.value : null;
+
+            let query = db.collection('detailItems').where('tenderId', '==', tenderId);
+            
+            // 🟢 如果有 selectedProjectId，一併加入查詢條件，讓 Rules 可以直接用 resource.data.projectId 驗證
+            if (selectedProjectId) {
+                query = query.where('projectId', '==', selectedProjectId);
+            }
+
+            const snapshot = await query.get();
             currentItems = [];
             snapshot.forEach(doc => {
                 currentItems.push({ id: doc.id, ...doc.data() });
@@ -129,6 +139,9 @@ window.initQuotesImportCostPage = function () {
             if (saveCostBtn) saveCostBtn.disabled = false;
         } catch (err) {
             console.error("載入細項失敗:", err);
+            if (costTableBody) {
+                costTableBody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">❌ 載入失敗: ${err.message}</td></tr>`;
+            }
         }
     }
 
