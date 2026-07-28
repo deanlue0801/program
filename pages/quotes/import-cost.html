@@ -1,16 +1,28 @@
-<!-- 使用 style.css 原生的 glass 質感卡片結構 -->
 <div class="content-card">
   <!-- 頁面標題區塊 -->
-  <div class="d-flex align-items-center mb-4">
+  <div class="d-flex align-items-center justify-content-between mb-4">
     <h3 class="m-0 font-weight-bold" style="color: var(--text-dark);">
       <i class="fas fa-tags me-2" style="color: var(--primary-color-start);"></i>廠商詢價與成本管理
     </h3>
+    <!-- Excel 匯入 / 匯出按鈕區塊 -->
+    <div class="action-buttons">
+      <input type="file" id="importInput" accept=".xlsx, .xls" style="display: none;" />
+      <button id="importBtn" class="btn btn-info" disabled>
+        <i class="fas fa-file-import me-1"></i>匯入 Excel
+      </button>
+      <button id="exportBtn" class="btn btn-success" disabled>
+        <i class="fas fa-file-export me-1"></i>匯出 Excel
+      </button>
+      <button id="saveCostBtn" class="btn btn-primary" disabled>
+        <i class="fas fa-save me-1"></i>儲存成本詢價
+      </button>
+    </div>
   </div>
 
-  <!-- 選單與按鈕排版區塊 -->
-  <div class="row g-3 align-items-end">
+  <!-- 多層級下拉選單排版區塊 -->
+  <div class="row g-3 align-items-end mb-4">
     <!-- 選擇專案 -->
-    <div class="col-md-5">
+    <div class="col-md-4">
       <div class="form-group">
         <label for="projectSelect">選擇專案</label>
         <select id="projectSelect" class="form-control">
@@ -29,39 +41,41 @@
       </div>
     </div>
 
-    <!-- 儲存按鈕 -->
-    <div class="col-md-3 text-end">
-      <button id="saveCostBtn" class="btn btn-primary w-100" style="justify-content: center; height: 42px;" disabled>
-        <i class="fas fa-save"></i> 儲存成本詢價
-      </button>
+    <!-- 選擇大項目 -->
+    <div class="col-md-4">
+      <div class="form-group">
+        <label for="majorItemSelect">選擇大項目</label>
+        <select id="majorItemSelect" class="form-control" disabled>
+          <option value="">請先選擇標單</option>
+        </select>
+      </div>
     </div>
   </div>
-</div>
 
-    <!-- 詢價清單表格 -->
-    <div class="card">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="costTable">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 80px;">項次</th>
-                            <th>項目名稱</th>
-                            <th>規格說明</th>
-                            <th style="width: 70px;">單位</th>
-                            <th style="width: 90px;" class="text-end">數量</th>
-                            <th style="width: 140px;" class="text-end">廠商詢價單價 (成本)</th>
-                            <th style="width: 140px;" class="text-end">成本總價</th>
-                            <th style="width: 160px;">詢價廠商 / 備註</th>
-                        </tr>
-                    </thead>
-                    <tbody id="costTableBody">
-                        <tr>
-                            <td colspan="8" class="text-center text-muted py-4">請先選取專案與標單</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+  <!-- 未選擇時的 Empty State -->
+  <div id="emptyState" class="empty-state" style="display: flex;">
+    <i class="fas fa-search empty-state-icon"></i>
+    <p>請依序選擇專案、標單與大項目以檢視與編輯細項成本</p>
+  </div>
+
+  <!-- 資料表格區塊 -->
+  <div id="mainContent" class="table-container" style="display: none;">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th style="width: 70px; text-align: center;">項次</th>
+          <th style="width: 250px;">細項名稱</th>
+          <th style="width: 80px; text-align: center;">單位</th>
+          <th style="width: 90px; text-align: right;">數量</th>
+          <th style="width: 120px; text-align: right;">預算單價</th>
+          <th style="width: 140px; text-align: right;">報價單價</th>
+          <th style="width: 180px;">報價廠商</th>
+          <th>備註</th>
+        </tr>
+      </thead>
+      <tbody id="costTableBody">
+        <!-- 由 JS 動態繪製 -->
+      </tbody>
+    </table>
+  </div>
 </div>
