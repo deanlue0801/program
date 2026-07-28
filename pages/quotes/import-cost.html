@@ -1,30 +1,42 @@
-<div class="container-fluid">
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="fas fa-tags me-2"></i>廠商詢價與成本管理</h5>
-        </div>
-        <div class="card-body">
-            <div class="row g-3 align-items-center mb-3">
-                <div class="col-md-4">
-                    <label class="form-label">選擇專案</label>
-                    <select id="projectSelect" class="form-select">
-                        <option value="">載入中...</option>
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">選擇標單</label>
-                    <select id="tenderSelect" class="form-select" disabled>
-                        <option value="">請先選擇專案</option>
-                    </select>
-                </div>
-                <div class="col-md-4 d-flex align-items-end gap-2">
-                    <button id="saveCostBtn" class="btn btn-primary" disabled>
-                        <i class="fas fa-save me-1"></i>儲存成本詢價
-                    </button>
-                </div>
-            </div>
-        </div>
+<!-- 使用 style.css 原生的 glass 質感卡片結構 -->
+<div class="content-card">
+  <!-- 頁面標題區塊 -->
+  <div class="d-flex align-items-center mb-4">
+    <h3 class="m-0 font-weight-bold" style="color: var(--text-dark);">
+      <i class="fas fa-tags me-2" style="color: var(--primary-color-start);"></i>廠商詢價與成本管理
+    </h3>
+  </div>
+
+  <!-- 選單與按鈕排版區塊 -->
+  <div class="row g-3 align-items-end">
+    <!-- 選擇專案 -->
+    <div class="col-md-5">
+      <div class="form-group">
+        <label for="projectSelect">選擇專案</label>
+        <select id="projectSelect" class="form-control">
+          <option value="">載入專案中...</option>
+        </select>
+      </div>
     </div>
+
+    <!-- 選擇標單 -->
+    <div class="col-md-4">
+      <div class="form-group">
+        <label for="tenderSelect">選擇標單</label>
+        <select id="tenderSelect" class="form-control" disabled>
+          <option value="">請先選擇專案</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 儲存按鈕 -->
+    <div class="col-md-3 text-end">
+      <button id="saveCostBtn" class="btn btn-primary w-100" style="justify-content: center; height: 42px;" disabled>
+        <i class="fas fa-save"></i> 儲存成本詢價
+      </button>
+    </div>
+  </div>
+</div>
 
     <!-- 詢價清單表格 -->
     <div class="card">
