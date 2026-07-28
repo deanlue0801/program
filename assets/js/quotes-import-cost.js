@@ -144,13 +144,22 @@ function initQuotesImportCostPage() {
                 toggleButtons(false);
                 return;
             }
-
+        
             let html = '';
             detailItems.forEach(item => {
-                const quotePrice = item.quotePrice !== undefined ? item.quotePrice : '';
+                const quotePrice = item.quotePrice !== undefined && item.quotePrice !== null ? item.quotePrice : '';
                 const vendorName = item.vendorName || '';
                 const costRemark = item.costRemark || '';
-
+                
+                // 🎯 修正數量與單價取值邏輯
+                const displayQuantity = (item.tenderQuantity !== undefined && item.tenderQuantity !== null) 
+                    ? item.tenderQuantity 
+                    : (item.quantity || 0);
+                    
+                const displayUnitPrice = (item.tenderUnitPrice !== undefined && item.tenderUnitPrice !== null)
+                    ? item.tenderUnitPrice
+                    : (item.unitPrice || 0);
+        
                 html += `
                     <tr data-item-id="${item.id}">
                         <td class="text-center align-middle" style="line-height: 1.3;">${formatSequence(item.sequence)}</td>
@@ -159,8 +168,8 @@ function initQuotesImportCostPage() {
                             ${item.spec ? `<small class="text-muted">${item.spec}</small>` : ''}
                         </td>
                         <td class="text-center">${item.unit || ''}</td>
-                        <td class="text-end fw-bold">${item.quantity || 0}</td>
-                        <td class="text-end text-muted">${item.unitPrice ? item.unitPrice.toLocaleString() : 0}</td>
+                        <td class="text-end fw-bold">${displayQuantity.toLocaleString()}</td>
+                        <td class="text-end text-muted">${displayUnitPrice.toLocaleString()}</td>
                         <td>
                             <input type="number" class="form-control form-control-sm text-end input-quote-price" 
                                 value="${quotePrice}" placeholder="0" min="0" data-item-id="${item.id}">
@@ -176,7 +185,7 @@ function initQuotesImportCostPage() {
                     </tr>
                 `;
             });
-
+        
             costTableBody.innerHTML = html;
             toggleButtons(true);
         }
