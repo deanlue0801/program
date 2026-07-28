@@ -138,6 +138,23 @@ function initQuotesImportCostPage() {
             return seq;
         }
 
+        // 🎯 統整數量的判斷邏輯（與 tenders-procurement.js 保持一致）
+        function getItemQuantity(item) {
+            if (item.totalQuantity !== undefined && item.totalQuantity !== null) return Number(item.totalQuantity);
+            if (item.quantity !== undefined && item.quantity !== null) return Number(item.quantity);
+            if (item.qty !== undefined && item.qty !== null) return Number(item.qty);
+            if (item.tenderQuantity !== undefined && item.tenderQuantity !== null) return Number(item.tenderQuantity);
+            return 0;
+        }
+
+        // 🎯 統整預算單價的判斷邏輯
+        function getItemUnitPrice(item) {
+            if (item.unitPrice !== undefined && item.unitPrice !== null) return Number(item.unitPrice);
+            if (item.cost !== undefined && item.cost !== null) return Number(item.cost);
+            if (item.tenderUnitPrice !== undefined && item.tenderUnitPrice !== null) return Number(item.tenderUnitPrice);
+            return 0;
+        }
+
         function renderCostTable() {
             if (detailItems.length === 0) {
                 costTableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">此大項目下無細項資料</td></tr>';
@@ -151,14 +168,8 @@ function initQuotesImportCostPage() {
                 const vendorName = item.vendorName || '';
                 const costRemark = item.costRemark || '';
 
-                // 🎯 標單原始數量與預算單價的完整取值相容邏輯
-                const rawQuantity = (item.quantity !== undefined && item.quantity !== null) 
-                    ? item.quantity 
-                    : ((item.tenderQuantity !== undefined && item.tenderQuantity !== null) ? item.tenderQuantity : 0);
-
-                const rawUnitPrice = (item.unitPrice !== undefined && item.unitPrice !== null)
-                    ? item.unitPrice
-                    : ((item.tenderUnitPrice !== undefined && item.tenderUnitPrice !== null) ? item.tenderUnitPrice : 0);
+                const rawQuantity = getItemQuantity(item);
+                const rawUnitPrice = getItemUnitPrice(item);
 
                 html += `
                     <tr data-item-id="${item.id}">
@@ -168,8 +179,8 @@ function initQuotesImportCostPage() {
                             ${item.spec ? `<small class="text-muted">${item.spec}</small>` : ''}
                         </td>
                         <td class="text-center">${item.unit || ''}</td>
-                        <td class="text-end fw-bold">${Number(rawQuantity).toLocaleString()}</td>
-                        <td class="text-end text-muted">${Number(rawUnitPrice).toLocaleString()}</td>
+                        <td class="text-end fw-bold">${rawQuantity.toLocaleString()}</td>
+                        <td class="text-end text-muted">${rawUnitPrice.toLocaleString()}</td>
                         <td>
                             <input type="number" class="form-control form-control-sm text-end input-quote-price" 
                                 value="${quotePrice}" placeholder="0" min="0" data-item-id="${item.id}">
@@ -242,13 +253,8 @@ function initQuotesImportCostPage() {
                 const vendorName = row ? row.querySelector('.input-vendor-name')?.value || '' : (item.vendorName || '');
                 const remark = row ? row.querySelector('.input-cost-remark')?.value || '' : (item.costRemark || '');
 
-                const rawQuantity = (item.quantity !== undefined && item.quantity !== null) 
-                    ? item.quantity 
-                    : ((item.tenderQuantity !== undefined && item.tenderQuantity !== null) ? item.tenderQuantity : 0);
-
-                const rawUnitPrice = (item.unitPrice !== undefined && item.unitPrice !== null)
-                    ? item.unitPrice
-                    : ((item.tenderUnitPrice !== undefined && item.tenderUnitPrice !== null) ? item.tenderUnitPrice : 0);
+                const rawQuantity = getItemQuantity(item);
+                const rawUnitPrice = getItemUnitPrice(item);
 
                 data.push([
                     item.sequence || '',
