@@ -127,7 +127,17 @@ function initQuotesImportCostPage() {
                 showAlert('載入細項失敗: ' + err.message, 'error');
             }
         }
-
+        // 自動格式化項次：從第一個括號 ( 或 （ 處斷行
+        function formatSequence(seq) {
+            if (!seq) return '';
+            // 尋找第一個半形或全形左括號
+            const match = seq.match(/^([^(（]+)(.*)$/);
+            if (match && match[2]) {
+                return `${match[1]}<br><span class="text-muted" style="font-size: 0.9em;">${match[2]}</span>`;
+            }
+            return seq;
+        }
+        
         function renderCostTable() {
             if (detailItems.length === 0) {
                 costTableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">此大項目下無細項資料</td></tr>';
@@ -143,7 +153,7 @@ function initQuotesImportCostPage() {
 
                 html += `
                     <tr data-item-id="${item.id}">
-                        <td class="text-center">${item.sequence || ''}</td>
+                        <td class="text-center align-middle" style="line-height: 1.3;">${formatSequence(item.sequence)}</td>
                         <td>
                             <div class="fw-bold">${item.name || ''}</div>
                             ${item.spec ? `<small class="text-muted">${item.spec}</small>` : ''}
