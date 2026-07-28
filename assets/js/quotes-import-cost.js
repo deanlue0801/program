@@ -127,39 +127,39 @@ function initQuotesImportCostPage() {
                 showAlert('載入細項失敗: ' + err.message, 'error');
             }
         }
-        // 自動格式化項次：從第一個括號 ( 或 （ 處斷行
+
+        // 自動格式化項次：遇第一個半形/全形左括號時換行
         function formatSequence(seq) {
             if (!seq) return '';
-            // 尋找第一個半形或全形左括號
-            const match = seq.match(/^([^(（]+)(.*)$/);
+            const match = String(seq).match(/^([^(（]+)(.*)$/);
             if (match && match[2]) {
                 return `${match[1]}<br><span class="text-muted" style="font-size: 0.9em;">${match[2]}</span>`;
             }
             return seq;
         }
-        
+
         function renderCostTable() {
             if (detailItems.length === 0) {
                 costTableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">此大項目下無細項資料</td></tr>';
                 toggleButtons(false);
                 return;
             }
-        
+
             let html = '';
             detailItems.forEach(item => {
-                const quotePrice = item.quotePrice !== undefined && item.quotePrice !== null ? item.quotePrice : '';
+                const quotePrice = (item.quotePrice !== undefined && item.quotePrice !== null) ? item.quotePrice : '';
                 const vendorName = item.vendorName || '';
                 const costRemark = item.costRemark || '';
-                
-                // 🎯 修正數量與單價取值邏輯
-                const displayQuantity = (item.tenderQuantity !== undefined && item.tenderQuantity !== null) 
-                    ? item.tenderQuantity 
-                    : (item.quantity || 0);
-                    
-                const displayUnitPrice = (item.tenderUnitPrice !== undefined && item.tenderUnitPrice !== null)
-                    ? item.tenderUnitPrice
-                    : (item.unitPrice || 0);
-        
+
+                // 🎯 標單原始數量與預算單價的完整取值相容邏輯
+                const rawQuantity = (item.quantity !== undefined && item.quantity !== null) 
+                    ? item.quantity 
+                    : ((item.tenderQuantity !== undefined && item.tenderQuantity !== null) ? item.tenderQuantity : 0);
+
+                const rawUnitPrice = (item.unitPrice !== undefined && item.unitPrice !== null)
+                    ? item.unitPrice
+                    : ((item.tenderUnitPrice !== undefined && item.tenderUnitPrice !== null) ? item.tenderUnitPrice : 0);
+
                 html += `
                     <tr data-item-id="${item.id}">
                         <td class="text-center align-middle" style="line-height: 1.3;">${formatSequence(item.sequence)}</td>
@@ -168,8 +168,8 @@ function initQuotesImportCostPage() {
                             ${item.spec ? `<small class="text-muted">${item.spec}</small>` : ''}
                         </td>
                         <td class="text-center">${item.unit || ''}</td>
-                        <td class="text-end fw-bold">${displayQuantity.toLocaleString()}</td>
-                        <td class="text-end text-muted">${displayUnitPrice.toLocaleString()}</td>
+                        <td class="text-end fw-bold">${Number(rawQuantity).toLocaleString()}</td>
+                        <td class="text-end text-muted">${Number(rawUnitPrice).toLocaleString()}</td>
                         <td>
                             <input type="number" class="form-control form-control-sm text-end input-quote-price" 
                                 value="${quotePrice}" placeholder="0" min="0" data-item-id="${item.id}">
@@ -185,7 +185,7 @@ function initQuotesImportCostPage() {
                     </tr>
                 `;
             });
-        
+
             costTableBody.innerHTML = html;
             toggleButtons(true);
         }
@@ -242,12 +242,20 @@ function initQuotesImportCostPage() {
                 const vendorName = row ? row.querySelector('.input-vendor-name')?.value || '' : (item.vendorName || '');
                 const remark = row ? row.querySelector('.input-cost-remark')?.value || '' : (item.costRemark || '');
 
+                const rawQuantity = (item.quantity !== undefined && item.quantity !== null) 
+                    ? item.quantity 
+                    : ((item.tenderQuantity !== undefined && item.tenderQuantity !== null) ? item.tenderQuantity : 0);
+
+                const rawUnitPrice = (item.unitPrice !== undefined && item.unitPrice !== null)
+                    ? item.unitPrice
+                    : ((item.tenderUnitPrice !== undefined && item.tenderUnitPrice !== null) ? item.tenderUnitPrice : 0);
+
                 data.push([
                     item.sequence || '',
                     item.name || '',
                     item.unit || '',
-                    item.quantity || 0,
-                    item.unitPrice || 0,
+                    rawQuantity,
+                    rawUnitPrice,
                     quotePrice,
                     vendorName,
                     remark
