@@ -115,6 +115,16 @@ function initQuotesAnalysisPage() {
             }
         }
 
+        // 自動格式化項次：遇第一個半形/全形左括號時換行
+        function formatSequence(seq) {
+            if (!seq) return '';
+            const match = String(seq).match(/^([^(（]+)(.*)$/);
+            if (match && match[2]) {
+                return `${match[1]}<br><span class="text-muted" style="font-size: 0.9em;">${match[2]}</span>`;
+            }
+            return seq;
+        }
+
         function getItemQuantity(item) {
             if (item.totalQuantity !== undefined && item.totalQuantity !== null) return Number(item.totalQuantity);
             if (item.quantity !== undefined && item.quantity !== null) return Number(item.quantity);
@@ -151,7 +161,7 @@ function initQuotesAnalysisPage() {
 
                 html += `
                     <tr data-item-id="${item.id}">
-                        <td class="text-center">${item.sequence || ''}</td>
+                        <td class="text-center align-middle" style="line-height: 1.3;">${formatSequence(item.sequence)}</td>
                         <td>
                             <div class="fw-bold">${item.name || ''}</div>
                             ${item.spec ? `<small class="text-muted">${item.spec}</small>` : ''}
