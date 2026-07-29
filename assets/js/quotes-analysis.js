@@ -161,21 +161,21 @@ function initQuotesAnalysisPage() {
 
                 html += `
                     <tr data-item-id="${item.id}">
-                        <td class="text-center align-middle" style="line-height: 1.3;">${formatSequence(item.sequence)}</td>
-                        <td>
+                        <td class="text-center align-middle" style="line-height: 1.3; min-width: 110px;">${formatSequence(item.sequence)}</td>
+                        <td class="align-middle">
                             <div class="fw-bold">${item.name || ''}</div>
                             ${item.spec ? `<small class="text-muted">${item.spec}</small>` : ''}
                         </td>
-                        <td class="text-center">${item.unit || ''}</td>
-                        <td class="text-end fw-bold col-qty">${qty.toLocaleString()}</td>
-                        <td class="text-end text-muted col-cost-price">${costPrice.toLocaleString()}</td>
-                        <td>
+                        <td class="text-center align-middle">${item.unit || ''}</td>
+                        <td class="text-end fw-bold align-middle col-qty">${qty.toLocaleString()}</td>
+                        <td class="text-end text-muted align-middle col-cost-price">${costPrice.toLocaleString()}</td>
+                        <td class="align-middle">
                             <input type="number" class="form-control form-control-sm text-end input-owner-price" 
                                 value="${ownerPrice}" placeholder="0" min="0" data-item-id="${item.id}">
                         </td>
-                        <td class="text-end fw-bold col-owner-subtotal">0</td>
-                        <td class="text-end col-margin">0</td>
-                        <td class="text-end col-margin-rate">0%</td>
+                        <td class="text-end fw-bold align-middle col-owner-subtotal">0</td>
+                        <td class="text-end align-middle col-margin">0</td>
+                        <td class="text-end align-middle col-margin-rate">0%</td>
                     </tr>
                 `;
             });
@@ -218,11 +218,11 @@ function initQuotesAnalysisPage() {
                 
                 const marginTd = row.querySelector('.col-margin');
                 marginTd.textContent = 'NT$ ' + Math.round(profit).toLocaleString();
-                marginTd.className = `text-end col-margin ${profit >= 0 ? 'text-success' : 'text-danger'}`;
+                marginTd.className = `text-end align-middle col-margin ${profit >= 0 ? 'text-success' : 'text-danger'}`;
 
                 const rateTd = row.querySelector('.col-margin-rate');
                 rateTd.textContent = marginRate + '%';
-                rateTd.className = `text-end col-margin-rate ${profit >= 0 ? 'text-success' : 'text-danger'}`;
+                rateTd.className = `text-end align-middle col-margin-rate ${profit >= 0 ? 'text-success' : 'text-danger'}`;
 
                 totalCost += costSubtotal;
                 totalBudget += budgetSubtotal;
